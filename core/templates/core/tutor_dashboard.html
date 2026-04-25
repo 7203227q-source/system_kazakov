@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборд Репетитора - Подготовка к ЕГЭ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+            <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
+            <span class="text-xl font-bold text-gray-800">ExamPrep</span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="#" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg">
+                <i class="fas fa-users w-6"></i> Мои ученики
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-tasks w-6"></i> База заданий
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-file-signature w-6"></i> Проверка (ИИ)
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-comments w-6"></i> Сообщения
+                <span class="ml-auto bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">3</span>
+            </a>
+        </nav>
+        <div class="p-4 border-t border-gray-200">
+            <div class="flex items-center">
+                <img src="https://ui-avatars.com/api/?name=Мария+С.&background=FCE7F3&color=DB2777" alt="User" class="w-10 h-10 rounded-full">
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-gray-800">Мария Сергеевна</p>
+                    <p class="text-xs text-gray-500">Репетитор (Математика)</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0">
+            <h1 class="text-xl font-bold text-gray-800">Мои ученики</h1>
+            <div class="flex items-center space-x-4">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" placeholder="Поиск ученика..." class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                </div>
+                <button class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center">
+                    <i class="fas fa-plus mr-2"></i> Добавить ученика
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Left Col: Student List -->
+            <div class="w-1/3 bg-white border-r border-gray-200 overflow-y-auto">
+                <!-- Filters -->
+                <div class="p-4 border-b border-gray-200 flex space-x-2">
+                    <button class="px-3 py-1 bg-indigo-50 text-primary rounded-full text-xs font-medium">Все (12)</button>
+                    <button class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium hover:bg-gray-200">Требуют внимания (2)</button>
+                </div>
+
+                <!-- Student List -->
+                <div class="divide-y divide-gray-100">
+                    <!-- Student 1 (Active) -->
+                    <div class="p-4 bg-indigo-50/50 cursor-pointer border-l-4 border-primary">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center">
+                                <img src="https://ui-avatars.com/api/?name=Иван+Иванов&background=E0E7FF&color=4F46E5" class="w-10 h-10 rounded-full mr-3">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-sm">Иван Иванов</h3>
+                                    <p class="text-xs text-gray-500">11 класс • Цель: 90</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold text-gray-800">68</span>
+                                <span class="text-xs text-gray-400">/100</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mt-3">
+                            <span class="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">Прогноз: 85</span>
+                            <span class="text-xs text-gray-500"><i class="fas fa-fire text-orange-500"></i> 14 дней</span>
+                        </div>
+                    </div>
+
+                    <!-- Student 2 -->
+                    <div class="p-4 hover:bg-gray-50 cursor-pointer border-l-4 border-transparent transition">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center">
+                                <img src="https://ui-avatars.com/api/?name=Анна+Смирнова&background=FEF3C7&color=DB2777" class="w-10 h-10 rounded-full mr-3">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-sm">Анна Смирнова</h3>
+                                    <p class="text-xs text-gray-500">11 класс • Цель: 80</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold text-gray-800">54</span>
+                                <span class="text-xs text-gray-400">/100</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mt-3">
+                            <span class="text-xs font-medium px-2 py-1 bg-red-100 text-red-700 rounded" title="Отстает от графика">Прогноз: 65 <i class="fas fa-exclamation-triangle ml-1"></i></span>
+                            <span class="text-xs text-gray-500">Пропущено ДЗ</span>
+                        </div>
+                    </div>
+
+                    <!-- Student 3 -->
+                    <div class="p-4 hover:bg-gray-50 cursor-pointer border-l-4 border-transparent transition">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center">
+                                <img src="https://ui-avatars.com/api/?name=Егор+Петров&background=D1FAE5&color=D97706" class="w-10 h-10 rounded-full mr-3">
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-sm">Егор Петров</h3>
+                                    <p class="text-xs text-gray-500">10 класс • Цель: 75 (ОГЭ)</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold text-gray-800">70</span>
+                                <span class="text-xs text-gray-400">/100</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mt-3">
+                            <span class="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">Прогноз: 78</span>
+                            <span class="text-xs text-gray-500"><i class="fas fa-fire text-orange-500"></i> 5 дней</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Col: Student Details & Actions -->
+            <div class="flex-1 bg-gray-50 p-8 overflow-y-auto">
+                
+                <!-- Profile Header -->
+                <div class="flex justify-between items-start mb-6">
+                    <div class="flex items-center">
+                        <img src="https://ui-avatars.com/api/?name=Иван+Иванов&background=E0E7FF&color=4F46E5" class="w-16 h-16 rounded-full mr-4 border-2 border-white shadow-sm">
+                        <div>
+                            <div class="flex items-center">
+                                <h2 class="text-2xl font-bold text-gray-800">Иван Иванов</h2>
+                                <span class="ml-3 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded border border-yellow-200">Цель: 90</span>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-1">Родитель: Елена Иванова (+7 999 123-45-67)</p>
+                            <p class="text-xs text-gray-400 mt-1 flex items-center">
+                                Моя оценка: <span class="ml-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded font-medium cursor-pointer hover:bg-gray-50" title="Нажмите, чтобы изменить">80 - 88 баллов <i class="fas fa-pen ml-1 text-gray-300"></i></span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm flex items-center">
+                            <i class="fas fa-chart-line mr-2 text-primary"></i> Полная статистика
+                        </button>
+                        <button class="px-4 py-2 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg text-sm font-bold hover:bg-yellow-200 shadow-sm flex items-center">
+                            <i class="fas fa-star mr-2"></i> Дать +50 XP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Problem Areas (AI Analysis) & Payments Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <!-- AI Analysis (Takes 2/3 width) -->
+                    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-6 flex items-center">
+                            <i class="fas fa-robot text-primary mr-2"></i> Анализ ИИ: Проблемные темы (успешность выполнения)
+                        </h3>
+                        
+                        <!-- Horizontal Bar Chart -->
+                        <div class="space-y-5">
+                            <!-- Item 1 -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">Производная сложной функции</span>
+                                    <span class="text-sm font-bold text-red-600">35%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2.5">
+                                    <div class="bg-red-500 h-2.5 rounded-full" style="width: 35%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Ошибки в знаках при дифференцировании внутренней функции</p>
+                            </div>
+
+                            <!-- Item 2 -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">Стереометрия: Сечения</span>
+                                    <span class="text-sm font-bold text-orange-500">42%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2.5">
+                                    <div class="bg-orange-500 h-2.5 rounded-full" style="width: 42%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Трудности с построением линии пересечения плоскостей</p>
+                            </div>
+
+                            <!-- Item 3 -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">Параметры (Системы уравнений)</span>
+                                    <span class="text-sm font-bold text-yellow-500">50%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2.5">
+                                    <div class="bg-yellow-500 h-2.5 rounded-full" style="width: 50%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Пропуск граничных условий при графическом методе</p>
+                            </div>
+                            
+                            <!-- Item 4 (Good progress) -->
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">Тригонометрические уравнения</span>
+                                    <span class="text-sm font-bold text-green-500">85%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2.5">
+                                    <div class="bg-green-500 h-2.5 rounded-full" style="width: 85%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Тема усвоена хорошо, можно переходить к повторению</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Status (Takes 1/3 width) -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
+                        <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-6 flex items-center">
+                            <i class="fas fa-wallet text-secondary mr-2"></i> Статус оплаты (Родитель)
+                        </h3>
+                        
+                        <div class="flex-1 flex flex-col justify-center items-center text-center pb-4">
+                            <div class="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-2xl mb-3">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <h4 class="font-bold text-gray-800 text-lg">Оплачено</h4>
+                            <p class="text-sm text-gray-500">До 15 марта 2026</p>
+                        </div>
+                        
+                        <div class="border-t border-gray-100 pt-4 mt-auto">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span class="text-gray-500">Остаток занятий:</span>
+                                <span class="font-bold text-gray-800">6 шт.</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">План. списание:</span>
+                                <span class="font-bold text-gray-800">12 000 ₽</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions Tabs -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="flex border-b border-gray-200 bg-gray-50">
+                        <button class="flex-1 py-3 text-sm font-medium text-primary border-b-2 border-primary bg-white">
+                            <i class="fas fa-tasks mr-2"></i> Назначить задание
+                        </button>
+                        <button class="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition">
+                            <i class="fas fa-comment-dots mr-2"></i> Сообщение ученику
+                        </button>
+                        <button class="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition">
+                            <i class="fas fa-file-alt mr-2"></i> Отчет родителю
+                        </button>
+                    </div>
+
+                    <!-- Assign Task Content -->
+                    <div class="p-6">
+                        <!-- Message to Parent (Simulated view for demo) -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Написать короткий отчет родителю (Елене Ивановой)</label>
+                            <div class="relative">
+                                <textarea rows="4" class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Опишите успехи ученика, на что стоит обратить внимание..."></textarea>
+                                <button class="absolute right-3 bottom-3 text-gray-400 hover:text-primary transition" title="Сгенерировать с помощью ИИ">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between items-center bg-blue-50 rounded-lg p-4 mb-4">
+                            <div class="flex items-center text-blue-800 text-sm">
+                                <i class="fas fa-info-circle mr-2 text-lg"></i>
+                                <span>ИИ автоматически подготовил черновик отчета на основе прогресса за неделю.</span>
+                            </div>
+                            <button class="text-sm font-medium text-primary hover:underline">Вставить черновик</button>
+                        </div>
+
+                        <div class="flex justify-end space-x-3">
+                            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">Отмена</button>
+                            <button class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center">
+                                <i class="fas fa-paper-plane mr-2"></i> Отправить отчет в Telegram/WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборд Ученика - Подготовка к ЕГЭ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+            <i class="fas fa-graduation-cap text-primary text-2xl mr-2"></i>
+            <span class="text-xl font-bold text-gray-800">ExamPrep</span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="#" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg">
+                <i class="fas fa-home w-6"></i> Главная
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-dumbbell w-6"></i> Тренажеры
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-book w-6"></i> Справочник
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-chart-line w-6"></i> Статистика
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <i class="fas fa-trophy w-6"></i> Достижения
+            </a>
+        </nav>
+        <div class="p-4 border-t border-gray-200">
+            <div class="flex items-center">
+                <img src="https://ui-avatars.com/api/?name=Иван+Иванов&background=E0E7FF&color=4F46E5" alt="User" class="w-10 h-10 rounded-full">
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-gray-800">Иван Иванов</p>
+                    <p class="text-xs text-gray-500">Ученик 11 класса</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto">
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0">
+            <div class="flex space-x-4">
+                <button class="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium">Математика (Профиль)</button>
+                <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-md text-sm font-medium hover:bg-gray-200">Физика</button>
+            </div>
+            <div class="flex items-center space-x-6">
+                <div class="flex items-center text-secondary font-bold">
+                    <i class="fas fa-fire mr-2"></i> 14 дней в ударе
+                </div>
+                <div class="flex items-center bg-yellow-100 px-3 py-1 rounded-full text-yellow-700 font-bold text-sm">
+                    <i class="fas fa-star mr-1"></i> Уровень 12 (1450 XP)
+                </div>
+                <button class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-bell text-xl"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <div class="p-8 max-w-7xl mx-auto w-full">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">Доброе утро, Иван! 👋</h1>
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Текущий балл</p>
+                            <h3 class="text-3xl font-bold text-gray-800">68<span class="text-lg text-gray-400">/100</span></h3>
+                        </div>
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
+                            <i class="fas fa-chart-bar text-xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-sm text-secondary mt-4 flex items-center">
+                        <i class="fas fa-arrow-up mr-1"></i> +4 балла за месяц
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 border-l-4 border-l-primary relative overflow-hidden">
+                    <!-- Target Badge -->
+                    <div class="absolute top-0 right-0 bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-bl-lg flex items-center">
+                        <i class="fas fa-flag-checkered mr-1"></i> Моя цель: 90
+                    </div>
+
+                    <div class="flex justify-between items-start mt-2">
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Прогноз на экзамен</p>
+                            <h3 class="text-3xl font-bold text-primary">85<span class="text-lg text-gray-400">/100</span></h3>
+                        </div>
+                        <div class="p-3 bg-indigo-50 text-primary rounded-lg">
+                            <i class="fas fa-bullseye text-xl"></i>
+                        </div>
+                    </div>
+                    
+                    <p class="text-xs text-gray-500 mt-3 flex items-center">
+                        <i class="fas fa-user-tie mr-1 text-gray-400"></i> Оценка репетитора: 
+                        <span class="font-bold text-gray-700 ml-1">80 - 88 баллов</span>
+                    </p>
+                    
+                    <div class="w-full bg-gray-200 rounded-full h-2 mt-3 relative">
+                        <!-- Progress -->
+                        <div class="bg-primary h-2 rounded-full" style="width: 85%"></div>
+                        <!-- Target Marker -->
+                        <div class="absolute top-0 w-1 h-3 bg-yellow-500 -mt-0.5" style="left: 90%" title="Моя цель (90)"></div>
+                    </div>
+                    <p class="text-xs text-right mt-1 text-yellow-600 font-medium">Осталось 5 баллов до цели!</p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">До ЕГЭ осталось</p>
+                            <h3 class="text-3xl font-bold text-gray-800">142<span class="text-lg text-gray-400"> дня</span></h3>
+                        </div>
+                        <div class="p-3 bg-red-50 text-red-500 rounded-lg">
+                            <i class="fas fa-clock text-xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-4">Следующий пробник: 15 марта</p>
+                </div>
+            </div>
+
+            <!-- Performance Chart -->
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Динамика успеваемости и прогноз</h2>
+                    <select class="bg-gray-50 border border-gray-200 text-sm rounded-lg px-3 py-2 text-gray-700">
+                        <option>За все время</option>
+                        <option>За последние 3 месяца</option>
+                    </select>
+                </div>
+                <!-- Chart placeholder for demonstration -->
+                <div class="relative h-64 w-full bg-gray-50 rounded-lg border border-gray-100 p-4 flex flex-col justify-end overflow-hidden">
+                    
+                    <!-- Y-axis labels -->
+                    <div class="absolute left-4 top-4 bottom-8 flex flex-col justify-between text-xs text-gray-400 h-full py-2">
+                        <span>100</span>
+                        <span>80</span>
+                        <span>60</span>
+                        <span>40</span>
+                        <span>20</span>
+                        <span>0</span>
+                    </div>
+
+                    <!-- Chart Grid Lines -->
+                    <div class="absolute left-12 right-4 top-4 bottom-8 flex flex-col justify-between h-full py-2">
+                        <div class="w-full border-t border-gray-200 border-dashed"></div>
+                        <div class="w-full border-t border-gray-200 border-dashed"></div>
+                        <div class="w-full border-t border-gray-200 border-dashed"></div>
+                        <div class="w-full border-t border-gray-200 border-dashed"></div>
+                        <div class="w-full border-t border-gray-200 border-dashed"></div>
+                        <div class="w-full border-t border-gray-200"></div>
+                    </div>
+
+                    <!-- Trend lines & dots -->
+                    <div class="absolute left-12 right-4 top-4 bottom-8">
+                        <!-- Actual path (SVG for curve) -->
+                        <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+                            <!-- Actual Progress (Solid line) -->
+                            <path d="M 0,80 L 15,75 L 30,70 L 45,60 L 60,40 L 70,32" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <!-- Forecast (Dashed line) -->
+                            <path d="M 70,32 L 85,22 L 100,15" fill="none" stroke="#10B981" stroke-width="2" stroke-dasharray="4,4" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+
+                        <!-- Data Points -->
+                        <div class="absolute w-3 h-3 bg-primary rounded-full border-2 border-white shadow" style="left: 0%; bottom: 20%;"></div>
+                        <div class="absolute w-3 h-3 bg-primary rounded-full border-2 border-white shadow" style="left: 15%; bottom: 25%;"></div>
+                        <div class="absolute w-3 h-3 bg-primary rounded-full border-2 border-white shadow" style="left: 30%; bottom: 30%;"></div>
+                        <div class="absolute w-3 h-3 bg-primary rounded-full border-2 border-white shadow" style="left: 45%; bottom: 40%;"></div>
+                        <div class="absolute w-3 h-3 bg-primary rounded-full border-2 border-white shadow" style="left: 60%; bottom: 60%;"></div>
+                        
+                        <!-- Current Point -->
+                        <div class="absolute w-4 h-4 bg-white rounded-full border-4 border-primary shadow-md" style="left: 70%; bottom: 68%;">
+                            <div class="absolute -top-8 -left-3 bg-gray-800 text-white text-xs px-2 py-1 rounded">68</div>
+                        </div>
+
+                        <!-- Forecast Points -->
+                        <div class="absolute w-3 h-3 bg-white rounded-full border-2 border-secondary shadow" style="left: 85%; bottom: 78%;"></div>
+                        
+                        <!-- Goal Point -->
+                        <div class="absolute w-4 h-4 bg-white rounded-full border-4 border-secondary shadow-md" style="left: 100%; bottom: 85%;">
+                            <div class="absolute -top-8 -left-3 bg-secondary text-white text-xs px-2 py-1 rounded font-bold">85</div>
+                        </div>
+                    </div>
+
+                    <!-- X-axis labels -->
+                    <div class="absolute bottom-2 left-12 right-4 flex justify-between text-xs text-gray-500 px-2">
+                        <span>Сен</span>
+                        <span>Окт</span>
+                        <span>Ноя</span>
+                        <span>Дек</span>
+                        <span>Янв</span>
+                        <span class="font-bold text-gray-800">Фев (Сейчас)</span>
+                        <span class="text-secondary">Мар</span>
+                        <span class="text-secondary font-bold">ЕГЭ (Июнь)</span>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="absolute top-4 right-4 flex space-x-4">
+                        <div class="flex items-center text-xs text-gray-600">
+                            <div class="w-3 h-3 bg-primary rounded-full mr-2"></div>
+                            Фактический балл
+                        </div>
+                        <div class="flex items-center text-xs text-gray-600">
+                            <div class="w-3 h-1 bg-secondary mr-2"></div>
+                            Прогноз (ИИ)
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Two Column Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Left Col: Today's Plan -->
+                <div class="lg:col-span-2">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">План на сегодня</h2>
+                        <span class="text-sm font-medium text-primary bg-indigo-50 px-3 py-1 rounded-full">Интервальное повторение</span>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <!-- Task 1 -->
+                        <div class="p-5 border-b border-gray-100 flex items-center hover:bg-gray-50 transition">
+                            <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl shrink-0">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <h4 class="font-bold text-gray-800 line-through text-gray-400">Викторина: Формулы тригонометрии</h4>
+                                <p class="text-sm text-gray-500">Повторение • 10 вопросов</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-secondary font-bold">+50 XP</span>
+                                <p class="text-xs text-gray-400">Выполнено</p>
+                            </div>
+                        </div>
+
+                        <!-- Task 2 -->
+                        <div class="p-5 border-b border-gray-100 flex items-center bg-indigo-50/30">
+                            <div class="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center text-xl shrink-0 shadow-md">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <div class="flex items-center">
+                                    <h4 class="font-bold text-gray-800">Задача 16: Планиметрия</h4>
+                                    <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-medium">Сложное</span>
+                                </div>
+                                <p class="text-sm text-gray-500 mt-1">Решите на бумаге и загрузите фото для проверки ИИ</p>
+                            </div>
+                            <div class="text-right ml-4">
+                                <button class="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                                    Начать (+100 XP)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Task 3 -->
+                        <div class="p-5 flex items-center hover:bg-gray-50 transition">
+                            <div class="w-12 h-12 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-xl shrink-0">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <h4 class="font-bold text-gray-800">Тренажер: Логарифмы</h4>
+                                <p class="text-sm text-gray-500">Отработка новой темы • 15 минут</p>
+                            </div>
+                            <div class="text-right ml-4">
+                                <button class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                                    Перейти (+75 XP)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Col: Feedback & Gamification -->
+                <div class="space-y-6">
+                    <!-- Tutor Feedback -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 class="font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-comment-dots text-primary mr-2"></i> Сообщение от репетитора
+                        </h3>
+                        <div class="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 italic border-l-4 border-primary">
+                            "Вань, отличная работа с производными вчера! ИИ показал, что ты делаешь ошибку при вычислении сложной функции. Я добавила тебе в план на завтра 3 задачи на это правило. Так держать!"
+                        </div>
+                        <div class="mt-3 flex items-center text-sm text-gray-500">
+                            <img src="https://ui-avatars.com/api/?name=Мария+С.&background=FCE7F3&color=DB2777" class="w-6 h-6 rounded-full mr-2">
+                            Мария Сергеевна (вчера в 18:30)
+                        </div>
+                    </div>
+
+                    <!-- Progress tracking -->
+                    <div class="bg-gradient-to-br from-indigo-500 to-primary rounded-xl shadow-sm p-6 text-white relative overflow-hidden">
+                        <i class="fas fa-rocket absolute -right-4 -bottom-4 text-8xl text-white opacity-10"></i>
+                        <h3 class="font-bold mb-1">До следующего уровня</h3>
+                        <p class="text-indigo-100 text-sm mb-4">Осталось 50 XP до Уровня 13</p>
+                        
+                        <div class="w-full bg-indigo-900/50 rounded-full h-2.5 mb-2">
+                            <div class="bg-white h-2.5 rounded-full" style="width: 80%"></div>
+                        </div>
+                        <p class="text-xs text-indigo-100 text-right">1450 / 1500 XP</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>
