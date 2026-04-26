@@ -1,10 +1,28 @@
 import os
 import uuid
 import requests
+import imghdr
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+
+def get_extension_from_content(content):
+    """
+    Tries to detect image extension from raw bytes.
+    Returns .svg for SVG content, or uses imghdr for others.
+    Defaults to .jpg if unknown.
+    """
+    # Quick check for SVG
+    if b'<svg' in content[:1024]:
+        return '.svg'
+        
+    ext = imghdr.what(None, h=content)
+    if ext:
+        if ext == 'jpeg':
+            return '.jpg'
+        return f".{ext}"
+    return '.jpg'
 
 def download_and_replace_images(html_content, task_fipi_id, theme):
     """
@@ -41,22 +59,22 @@ def download_and_replace_images(html_content, task_fipi_id, theme):
             headers = {'User-Agent': 'Mozilla/5.0'}
             response = requests.get(img_url, headers=headers, timeout=10)
             if response.status_code == 200:
-                # Always use .gif for SdamGIA get_file endpoints as they often serve GIFs
-                # or use .jpg if we can't determine
-                parsed_url = urlparse(img_url)
-                ext = os.path.splitext(parsed_url.path)[1]
-                if not ext:
-                    if 'get_file' in img_url:
-                        ext = '.gif' # sdamgia heavily uses gifs
-                    else:
-                        ext = '.jpg'
+                # Always determine extension from the actual downloaded content
+                ext = get_extension_from_content(response.content)
                 
                 # Generate unique filename (we overwrite to avoid duplicating on re-imports)
                 filename = f"tasks/{task_fipi_id}_{theme}_{idx}{ext}"
                 
-                # Check if file exists, if so delete it first to avoid Django renaming it with random chars
+                # Check if file exists with this specific extension, if so delete it
                 if default_storage.exists(filename):
                     default_storage.delete(filename)
+                
+                # Also delete potential old versions with different extensions
+                for old_ext in ['.jpg', '.png', '.gif', '.svg']:
+                    if old_ext != ext:
+                        old_filename = f"tasks/{task_fipi_id}_{theme}_{idx}{old_ext}"
+                        if default_storage.exists(old_filename):
+                            default_storage.delete(old_filename)
                 
                 # Save file
                 saved_path = default_storage.save(filename, ContentFile(response.content))
