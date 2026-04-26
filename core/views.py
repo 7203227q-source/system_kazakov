@@ -1,9 +1,58 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse
-from .models import User, Payment, Task, Submission
+from django.contrib import messages
+from .models import User, Payment, Task, Submission, ExamFormat
 from .services import process_task_submission
+import csv
+import io
+import os
+import uuid
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from .models import TaskVariant, TaskType, Topic
+
+def download_and_replace_images(html_content, task_fipi_id, theme):
+    if not html_content:
+        return html_content
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    images = soup.find_all('img')
+    
+    if not images:
+        return html_content
+
+    for idx, img in enumerate(images):
+        img_url = img.get('src')
+        if not img_url or img_url.startswith('data:') or img_url.startswith('/media/'):
+            continue
+
+        if img_url.startswith('//'):
+            img_url = 'https:' + img_url
+        elif img_url.startswith('/'):
+            # Skip relative URLs if we don't know the domain
+            continue
+            
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(img_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                parsed_url = urlparse(img_url)
+                ext = os.path.splitext(parsed_url.path)[1]
+                if not ext:
+                    ext = '.jpg'
+                
+                filename = f"tasks/{task_fipi_id}_{theme}_{idx}{ext}"
+                saved_path = default_storage.save(filename, ContentFile(response.content))
+                img['src'] = f"/media/{saved_path}"
+        except Exception as e:
+            print(f"Failed to download image {img_url}: {e}")
+            
+    return str(soup)
 
 def login_view(request):
     """
@@ -80,10 +129,36 @@ def student_dashboard(request):
     return render(request, 'core/student_dashboard.html', {'recent_submissions': recent_submissions})
 
 @login_required
+def student_practice_submit(request, task_id):
+    """Обработка ответа ученика"""
+    if request.user.role != 'student' or request.method != 'POST':
+        return redirect('student_dashboard')
+        
+    task = get_object_or_404(Task, id=task_id)
+    user_answer = request.POST.get('answer', '')
+    
+    submission = process_task_submission(request.user, task, user_answer)
+    
+    # Store result in session for display
+    request.session['last_submission_id'] = submission.id
+    
+    return redirect('student_practice')
+
+@login_required
 def student_history(request):
     """История решений (Журнал) ученика"""
     submissions = Submission.objects.filter(student=request.user).select_related('task').order_by('-created_at')
     return render(request, 'core/student_history.html', {'submissions': submissions})
+
+@login_required
+def update_theme_view(request):
+    if request.method == 'POST':
+        theme = request.POST.get('theme')
+        if theme in dict(User.THEME_CHOICES):
+            request.user.preferred_theme = theme
+            request.user.save()
+            messages.success(request, f"Тема изменена на: {dict(User.THEME_CHOICES)[theme]}")
+    return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
 
 @login_required
 def tutor_dashboard(request):
@@ -117,16 +192,100 @@ def tutor_dashboard(request):
 def tutor_task_bank(request):
     """База заданий для репетитора (все задания системы)"""
     tasks = Task.objects.select_related('topic', 'task_type', 'task_type__exam_format').all()
-    
-    # Простейшая фильтрация
+
     search_query = request.GET.get('q', '')
+    # Since content is now in TaskVariant, we need to filter carefully.
+    # For simplicity, filter by fipi_id or subtype_tag first.
     if search_query:
-        tasks = tasks.filter(content__icontains=search_query)
-        
+        tasks = tasks.filter(subtype_tag__icontains=search_query) | tasks.filter(fipi_id__icontains=search_query)
+
     return render(request, 'core/tutor_task_bank.html', {
         'tasks': tasks,
         'search_query': search_query
     })
+
+@login_required
+def import_tasks_view(request):
+    if request.user.role not in ['tutor', 'admin']:
+        return redirect('login')
+
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        file_obj = request.FILES['csv_file']
+        exam_format_id = request.POST.get('exam_format')
+
+        if not exam_format_id:
+            messages.error(request, "Выберите формат экзамена.")
+            return redirect('import_tasks')
+
+        try:
+            exam_format = ExamFormat.objects.get(id=exam_format_id)
+            topic, _ = Topic.objects.get_or_create(subject=exam_format.subject, name="Задания из Открытого Банка")
+            
+            decoded_file = file_obj.read().decode('utf-8')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+
+            created_tasks = 0
+            updated_tasks = 0
+
+            for row in reader:
+                fipi_id = row.get('fipi_id', '').strip()
+                if not fipi_id:
+                    continue
+
+                type_number = int(row.get('type_number', 1))
+                subtype_tag = row.get('subtype_tag', '').strip()
+                difficulty = int(row.get('difficulty', 50))
+                correct_answer = row.get('correct_answer', '').strip()
+                theme = row.get('theme', 'classic').strip()
+                content = row.get('content', '').strip()
+                solution = row.get('solution', '').strip()
+
+                task_type, _ = TaskType.objects.get_or_create(
+                    exam_format=exam_format,
+                    number=type_number,
+                    defaults={'name': f"Тип {type_number}"}
+                )
+
+                task, created = Task.objects.update_or_create(
+                    fipi_id=fipi_id,
+                    defaults={
+                        'topic': topic,
+                        'task_type': task_type,
+                        'subtype_tag': subtype_tag,
+                        'difficulty': difficulty,
+                        'correct_answer': correct_answer,
+                        'exam_points': task_type.max_points
+                    }
+                )
+
+                if created:
+                    created_tasks += 1
+                else:
+                    updated_tasks += 1
+
+                # Download images and replace URLs
+                processed_content = download_and_replace_images(content, fipi_id, theme)
+                processed_solution = download_and_replace_images(solution, fipi_id, theme)
+
+                TaskVariant.objects.update_or_create(
+                    task=task,
+                    theme=theme,
+                    defaults={
+                        'content': processed_content,
+                        'solution': processed_solution
+                    }
+                )
+
+            messages.success(request, f"Успешно импортировано! Новых: {created_tasks}, Обновлено: {updated_tasks}")
+            return redirect('tutor_task_bank')
+
+        except Exception as e:
+            messages.error(request, f"Ошибка при импорте: {e}")
+            return redirect('import_tasks')
+
+    formats = ExamFormat.objects.filter(is_active=True)
+    return render(request, 'core/import_tasks.html', {'formats': formats})
 
 @login_required
 def tutor_student_history(request, student_id):

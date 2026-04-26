@@ -71,7 +71,7 @@
                 
                 <!-- Task Content -->
                 <div class="p-6 prose max-w-none text-lg">
-                    {{ task.content|safe }}
+                    {{ task.get_content_for_theme|safe }}
                 </div>
 
                 <!-- Answer Form -->

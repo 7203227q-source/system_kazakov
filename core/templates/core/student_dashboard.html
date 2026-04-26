@@ -67,6 +67,14 @@
                 <button class="text-gray-400 hover:text-gray-600">
                     <i class="fas fa-bell text-xl"></i>
                 </button>
+                <form method="POST" action="{% url 'update_theme' %}" class="ml-4 flex items-center">
+                    {% csrf_token %}
+                    <select name="theme" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-primary focus:border-primary">
+                        {% for theme_code, theme_name in user.THEME_CHOICES %}
+                            <option value="{{ theme_code }}" {% if user.preferred_theme == theme_code %}selected{% endif %}>{{ theme_name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
                 <a href="{% url 'logout' %}" class="text-red-500 hover:text-red-700 ml-6 flex items-center font-medium transition" title="Выйти">
                     <i class="fas fa-sign-out-alt text-xl mr-2"></i> Выйти
                 </a>

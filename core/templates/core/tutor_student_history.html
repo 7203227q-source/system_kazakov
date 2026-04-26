@@ -73,7 +73,7 @@
 
                         <!-- Task content snippet -->
                         <div class="text-sm text-gray-700 mb-4 bg-gray-50 p-3 rounded border border-gray-200 overflow-hidden" style="max-height: 100px;">
-                            {{ sub.task.content|safe }}
+                            {{ sub.task.get_content_for_theme|safe }}
                         </div>
 
                         <div class="flex items-center text-sm">

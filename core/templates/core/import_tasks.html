@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Импорт заданий - ExamPrep</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 p-8">
+
+    <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h2 class="text-lg font-bold text-gray-800">Массовый импорт заданий (CSV)</h2>
+            <a href="{% url 'tutor_task_bank' %}" class="text-sm text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i> Отмена</a>
+        </div>
+
+        <div class="p-6">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="mb-4 p-4 rounded-lg {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                <p class="font-bold mb-2"><i class="fas fa-info-circle mr-1"></i> Формат файла CSV должен содержать следующие колонки:</p>
+                <code class="block bg-white p-2 rounded border border-blue-100 mb-2">fipi_id, type_number, subtype_tag, difficulty, correct_answer, theme, content, solution</code>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li><b>fipi_id</b>: Уникальный номер (например, 123456)</li>
+                    <li><b>theme</b>: Тема задачи (classic, dota, cs2, ussr)</li>
+                    <li><b>content</b>: HTML-код условия. Теги &lt;img src="..."&gt; будут автоматически скачаны на сервер!</li>
+                </ul>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Формат экзамена</label>
+                    <select name="exam_format" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">-- Выберите формат --</option>
+                        {% for format in formats %}
+                            <option value="{{ format.id }}">{{ format.name }} ({{ format.year }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Файл CSV</label>
+                    <input type="file" name="csv_file" accept=".csv" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-primary hover:file:bg-indigo-100">
+                </div>
+
+                <div class="pt-4 border-t border-gray-100">
+                    <button type="submit" class="w-full bg-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i> Начать импорт
+                    </button>
+                    <p class="text-center text-xs text-gray-500 mt-2">Загрузка картинок может занять некоторое время</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>

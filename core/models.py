@@ -11,8 +11,15 @@ class User(AbstractUser):
         ('admin', 'Администратор'),
         ('unassigned', 'Не выбрана (из соцсети)')
     ]
+    THEME_CHOICES = [
+        ('classic', 'Классика'),
+        ('dota', 'Dota 2'),
+        ('cs2', 'CS2'),
+        ('ussr', 'СССР'),
+    ]
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='unassigned')
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон")
+    preferred_theme = models.CharField(max_length=20, choices=THEME_CHOICES, default='classic', verbose_name="Предпочитаемая тема")
     
     # Для учеников
     target_score = models.IntegerField(null=True, blank=True, verbose_name="Целевой балл")
@@ -78,17 +85,49 @@ class Task(models.Model):
     fipi_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="ID задания ФИПИ")
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='tasks')
     task_type = models.ForeignKey(TaskType, on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks', verbose_name="Тип задания (КИМ)")
-    
-    content = models.TextField(verbose_name="Условие задачи")
+    subtype_tag = models.CharField(max_length=200, null=True, blank=True, verbose_name="Подтип/Тег математической логики")
+
     correct_answer = models.TextField(verbose_name="Правильный ответ/решение")
     difficulty = models.IntegerField(default=50, verbose_name="Сложность (1-100)")
     exam_points = models.IntegerField(default=1, verbose_name="Балл на ЕГЭ")
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
+    def get_content_for_theme(self, theme='classic'):
+        variant = self.variants.filter(theme=theme).first()
+        if variant:
+            return variant.content
+        # Fallback to classic if preferred theme not found
+        classic = self.variants.filter(theme='classic').first()
+        if classic:
+            return classic.content
+        # Ultimate fallback (should not happen if db is consistent)
+        return "Условие задачи отсутствует."
+
+    def get_solution_for_theme(self, theme='classic'):
+        variant = self.variants.filter(theme=theme).first()
+        if variant and variant.solution:
+            return variant.solution
+        classic = self.variants.filter(theme='classic').first()
+        if classic and classic.solution:
+            return classic.solution
+        return ""
+
     def __str__(self):
         fipi_str = f" ({self.fipi_id})" if self.fipi_id else ""
         return f"Task {self.id}{fipi_str} ({self.topic.name})"
+
+class TaskVariant(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='variants')
+    theme = models.CharField(max_length=20, choices=User.THEME_CHOICES, default='classic', verbose_name="Тема (Сеттинг)")
+    content = models.TextField(verbose_name="Условие задачи с учетом темы")
+    solution = models.TextField(null=True, blank=True, verbose_name="Подробное решение")
+
+    class Meta:
+        unique_together = ('task', 'theme')
+
+    def __str__(self):
+        return f"Variant '{self.get_theme_display()}' for Task {self.task.id}"
 
 
 class SpacedRepetition(models.Model):

@@ -47,58 +47,58 @@
                     <p class="text-sm text-gray-500">Все задания системы, загруженные из открытых источников</p>
                 </div>
                 
-                <form method="GET" action="{% url 'tutor_task_bank' %}" class="flex gap-2">
-                    <div class="relative w-64">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="fas fa-search text-gray-400"></i>
+                <div class="flex space-x-4">
+                    <form method="GET" action="{% url 'tutor_task_bank' %}" class="flex gap-2">
+                        <div class="relative w-64">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-search text-gray-400"></i>
+                            </div>
+                            <input type="text" name="q" value="{{ search_query }}" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Поиск по тексту...">
                         </div>
-                        <input type="text" name="q" value="{{ search_query }}" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Поиск по тексту...">
-                    </div>
-                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                        Найти
-                    </button>
-                    {% if search_query %}
-                    <a href="{% url 'tutor_task_bank' %}" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center">
-                        <i class="fas fa-times"></i>
+                        <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                            Найти
+                        </button>
+                        {% if search_query %}
+                        <a href="{% url 'tutor_task_bank' %}" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center">
+                            <i class="fas fa-times"></i>
+                        </a>
+                        {% endif %}
+                    </form>
+                    <a href="{% url 'import_tasks' %}" class="bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 transition flex items-center shadow-sm">
+                        <i class="fas fa-file-import mr-2"></i> Импорт CSV
                     </a>
-                    {% endif %}
-                </form>
+                </div>
             </div>
 
             <div class="space-y-6">
                 {% for task in tasks %}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                        <div class="flex items-center">
-                            <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded mr-3">
-                                ID: {{ task.fipi_id|default:task.id }}
-                            </span>
-                            {% if task.task_type %}
-                            <span class="font-bold text-indigo-900 mr-2">{{ task.task_type.name }}</span>
-                            <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{{ task.task_type.exam_format.name }}</span>
-                            {% else %}
-                            <span class="font-bold text-indigo-900">{{ task.topic.name }}</span>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition">
+                    <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded">ID: {{ task.fipi_id|default:task.id }}</span>
+                            <h3 class="font-bold text-indigo-900">{{ task.task_type.name|default:"Без типа" }}</h3>
+                            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">{{ task.task_type.exam_format.name }}</span>
+                            {% if task.subtype_tag %}
+                                <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full"><i class="fas fa-tag mr-1"></i>{{ task.subtype_tag }}</span>
                             {% endif %}
                         </div>
-                        <div class="flex space-x-2">
-                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-bold">
-                                Сложность: {{ task.difficulty }}
-                            </span>
+                        <div class="flex items-center space-x-2">
+                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded">Сложность: {{ task.difficulty }}</span>
                         </div>
                     </div>
-                    
-                    <div class="p-6 prose max-w-none text-sm text-gray-800 border-b border-gray-100">
-                        {{ task.content|safe }}
-                    </div>
-
-                    <div class="px-6 py-3 bg-green-50/50 flex justify-between items-center">
-                        <div>
-                            <span class="text-xs text-gray-500 mr-2">Ответ:</span>
-                            <span class="font-mono font-bold text-green-700">{{ task.correct_answer }}</span>
+                    <div class="p-6">
+                        <div class="text-gray-800 mb-6 prose max-w-none">
+                            {{ task.get_content_for_theme|safe }}
                         </div>
-                        <button class="text-sm font-medium text-primary hover:underline">
-                            <i class="fas fa-plus mr-1"></i> Добавить в ДЗ
-                        </button>
+                        <div class="flex justify-between items-center pt-4 border-t border-gray-100">
+                            <div class="text-sm">
+                                <span class="text-gray-500 mr-2">Ответ:</span>
+                                <span class="font-bold text-green-600">{{ task.correct_answer }}</span>
+                            </div>
+                            <button class="text-primary hover:text-indigo-700 text-sm font-medium flex items-center transition">
+                                <i class="fas fa-plus mr-1"></i> Добавить в ДЗ
+                            </button>
+                        </div>
                     </div>
                 </div>
                 {% empty %}

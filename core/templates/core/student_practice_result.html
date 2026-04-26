@@ -61,7 +61,7 @@
                 </div>
                 
                 <div class="p-6 prose max-w-none text-lg border-b border-gray-100">
-                    {{ task.content|safe }}
+                    {{ task.get_content_for_theme|safe }}
                 </div>
 
                 <div class="p-6 flex flex-col sm:flex-row gap-6">
