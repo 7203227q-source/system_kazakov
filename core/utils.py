@@ -25,13 +25,12 @@ def download_and_replace_images(html_content, task_fipi_id, theme):
         if not img_url or img_url.startswith('data:') or img_url.startswith('/media/'):
             continue
 
-        # Handle relative URLs if any (assume they come from a known source or are absolute in CSV)
+        # Handle relative URLs if any
         if img_url.startswith('//'):
             img_url = 'https:' + img_url
         elif img_url.startswith('/'):
-            # If the CSV contains relative paths without a domain, we can't reliably download them
-            # unless we know the base domain. We'll skip them or assume they're already local.
-            continue
+            # If the CSV contains relative paths, assume they are from sdamgia.ru
+            img_url = 'https://math-ege.sdamgia.ru' + img_url
             
         try:
             headers = {'User-Agent': 'Mozilla/5.0'}
