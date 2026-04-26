@@ -1,4 +1,5 @@
 asgiref==3.11.1
+beautifulsoup4==4.14.3
 black==26.3.1
 certifi==2026.4.22
 cffi==2.0.0
@@ -31,6 +32,7 @@ python-dotenv==1.2.2
 pytokens==0.4.1
 requests==2.33.1
 ruff==0.15.8
+soupsieve==2.8.3
 sqlparse==0.5.5
 typing_extensions==4.15.0
 urllib3==2.6.3
