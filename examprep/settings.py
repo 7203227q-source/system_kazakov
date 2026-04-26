@@ -70,6 +70,9 @@ SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 ACCOUNT_ADAPTER = 'core.adapters.CustomAccountAdapter' # Наш кастомный адаптер для редиректа
 
+# Куда перенаправлять пользователя после успешного входа через Google
+LOGIN_REDIRECT_URL = '/select-role/'
+
 # Настройки провайдеров (Google)
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
