@@ -16,4 +16,5 @@ urlpatterns = [
     path('platform-admin/', views.admin_dashboard, name='admin_dashboard'),
     
     path('select-role/', views.role_selection_view, name='select_role'),
+    path('logout/', views.logout_view, name='logout'),
 ]

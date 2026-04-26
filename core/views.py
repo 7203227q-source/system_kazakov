@@ -232,3 +232,8 @@ def register_view(request):
         return redirect('student_dashboard')
 
     return render(request, 'core/register.html')
+from django.contrib.auth import logout
+def logout_view(request):
+    """Выход из системы"""
+    logout(request)
+    return redirect('login')
