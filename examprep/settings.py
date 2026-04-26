@@ -72,6 +72,7 @@ ACCOUNT_ADAPTER = 'core.adapters.CustomAccountAdapter' # Наш кастомны
 
 # Куда перенаправлять пользователя после успешного входа через Google
 LOGIN_REDIRECT_URL = '/select-role/'
+LOGOUT_REDIRECT_URL = '/'
 
 # Настройки провайдеров (Google)
 SOCIALACCOUNT_PROVIDERS = {
