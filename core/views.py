@@ -165,3 +165,67 @@ def parent_dashboard(request):
 def admin_dashboard(request):
     """Панель управления (кастомная для парсинга и пользователей)"""
     return render(request, 'core/admin_dashboard.html')
+
+@login_required
+def role_selection_view(request):
+    """Страница выбора роли для новых пользователей из соцсетей"""
+    # Если роль уже выбрана, не пускаем сюда
+    if request.user.role != 'unassigned':
+        if request.user.role == 'student':
+            return redirect('student_dashboard')
+        elif request.user.role == 'tutor':
+            return redirect('tutor_dashboard')
+        elif request.user.role == 'parent':
+            return redirect('parent_dashboard')
+        elif request.user.role == 'admin':
+            return redirect('admin_dashboard')
+
+    if request.method == 'POST':
+        selected_role = request.POST.get('role')
+        if selected_role in ['student', 'tutor', 'parent']:
+            request.user.role = selected_role
+            request.user.save()
+            
+            # Редирект после сохранения
+            if selected_role == 'student':
+                return redirect('student_dashboard')
+            elif selected_role == 'tutor':
+                return redirect('tutor_dashboard')
+            elif selected_role == 'parent':
+                return redirect('parent_dashboard')
+                
+    return render(request, 'core/select_role.html')
+    """
+    Регистрация ученика.
+    """
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        password = request.POST.get('password', '')
+        password_confirm = request.POST.get('password_confirm', '')
+
+        if not email or not password:
+            return render(request, 'core/register.html', {'error': 'Заполните обязательные поля'})
+            
+        if password != password_confirm:
+            return render(request, 'core/register.html', {'error': 'Пароли не совпадают'})
+            
+        if User.objects.filter(username=email).exists():
+            return render(request, 'core/register.html', {'error': 'Пользователь с таким email уже существует'})
+
+        # Создаем пользователя-ученика
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            role='student'
+        )
+        
+        # Сразу авторизуем
+        login(request, user)
+        return redirect('student_dashboard')
+
+    return render(request, 'core/register.html')

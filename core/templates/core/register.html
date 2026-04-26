@@ -1,0 +1,137 @@
+{% load socialaccount %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация - ExamPrep</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-primary px-8 py-10 text-center text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-white opacity-10"></div>
+            <div class="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full bg-white opacity-10"></div>
+            
+            <i class="fas fa-graduation-cap text-4xl mb-3"></i>
+            <h1 class="text-3xl font-bold mb-1">ExamPrep</h1>
+            <p class="text-indigo-100 text-sm">Умная подготовка к ЕГЭ и ОГЭ</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200">
+            <a href="{% url 'login' %}" class="flex-1 text-center py-4 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 transition focus:outline-none">
+                Вход
+            </a>
+            <a href="{% url 'register' %}" class="flex-1 text-center py-4 text-sm font-bold text-primary border-b-2 border-primary bg-white focus:outline-none">
+                Регистрация
+            </a>
+        </div>
+
+        <!-- Form Content -->
+        <div class="p-8">
+            <form action="{% url 'register' %}" method="POST" class="space-y-4">
+                {% csrf_token %}
+                
+                {% if error %}
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                    <p class="text-sm text-red-700">{{ error }}</p>
+                </div>
+                {% endif %}
+
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- First Name Input -->
+                    <div>
+                        <label for="first_name" class="block text-sm font-medium text-gray-700 mb-1">Имя</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                            <input type="text" id="first_name" name="first_name" required class="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="Иван">
+                        </div>
+                    </div>
+
+                    <!-- Last Name Input -->
+                    <div>
+                        <label for="last_name" class="block text-sm font-medium text-gray-700 mb-1">Фамилия</label>
+                        <div class="relative">
+                            <input type="text" id="last_name" name="last_name" required class="block w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="Иванов">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Input -->
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-envelope text-gray-400"></i>
+                        </div>
+                        <input type="email" id="email" name="email" required class="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="student@example.com">
+                    </div>
+                </div>
+
+                <!-- Password Input -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-gray-400"></i>
+                        </div>
+                        <input type="password" id="password" name="password" required class="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="••••••••">
+                    </div>
+                </div>
+
+                <!-- Password Confirm Input -->
+                <div>
+                    <label for="password_confirm" class="block text-sm font-medium text-gray-700 mb-1">Повторите пароль</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-gray-400"></i>
+                        </div>
+                        <input type="password" id="password_confirm" name="password_confirm" required class="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="••••••••">
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition mt-2">
+                    Создать аккаунт ученика
+                </button>
+            </form>
+            
+            <!-- Social Login -->
+            <div class="mt-6">
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-200"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-2 bg-white text-gray-500">Или зарегистрироваться через</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 grid grid-cols-2 gap-3">
+                    <a href="{% provider_login_url 'google' %}" class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/archive/c/c1/20210618182605%21Google_%22G%22_logo.svg" class="h-5 w-5 mr-2" alt="Google">
+                        Google
+                    </a>
+                    <a href="{% provider_login_url 'vk' %}" class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                        <i class="fab fa-vk text-blue-600 text-lg mr-2 mt-0.5"></i>
+                        VK ID
+                    </a>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</body>
+</html>

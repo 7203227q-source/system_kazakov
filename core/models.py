@@ -4,13 +4,14 @@ from django.utils import timezone
 from datetime import timedelta
 
 class User(AbstractUser):
-    ROLE_CHOICES = (
+    ROLE_CHOICES = [
         ('student', 'Ученик'),
         ('tutor', 'Репетитор'),
         ('parent', 'Родитель'),
-        ('admin', 'Админ'),
-    )
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
+        ('admin', 'Администратор'),
+        ('unassigned', 'Не выбрана (из соцсети)')
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='unassigned')
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон")
     
     # Для учеников

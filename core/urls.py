@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('', views.login_view, name='login'),
+    path('register/', views.register_view, name='register'),
     path('student/', views.student_dashboard, name='student_dashboard'),
     path('student/practice/', views.student_practice, name='student_practice'),
     path('student/history/', views.student_history, name='student_history'),
@@ -13,4 +14,6 @@ urlpatterns = [
     
     path('parent/', views.parent_dashboard, name='parent_dashboard'),
     path('platform-admin/', views.admin_dashboard, name='admin_dashboard'),
+    
+    path('select-role/', views.role_selection_view, name='select_role'),
 ]

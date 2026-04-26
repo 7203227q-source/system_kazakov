@@ -1,3 +1,4 @@
+{% load socialaccount %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -36,12 +37,12 @@
 
         <!-- Tabs -->
         <div class="flex border-b border-gray-200">
-            <button class="flex-1 py-4 text-sm font-bold text-primary border-b-2 border-primary bg-white focus:outline-none">
+            <a href="{% url 'login' %}" class="flex-1 text-center py-4 text-sm font-bold text-primary border-b-2 border-primary bg-white focus:outline-none">
                 Вход
-            </button>
-            <button class="flex-1 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 transition focus:outline-none">
+            </a>
+            <a href="{% url 'register' %}" class="flex-1 text-center py-4 text-sm font-medium text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 transition focus:outline-none">
                 Регистрация
-            </button>
+            </a>
         </div>
 
         <!-- Form Content -->
@@ -152,14 +153,14 @@
                 </div>
 
                 <div class="mt-6 grid grid-cols-2 gap-3">
-                    <button class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                    <a href="{% provider_login_url 'google' %}" class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
                         <img src="https://upload.wikimedia.org/wikipedia/commons/archive/c/c1/20210618182605%21Google_%22G%22_logo.svg" class="h-5 w-5 mr-2" alt="Google">
                         Google
-                    </button>
-                    <button class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                    </a>
+                    <a href="{% provider_login_url 'vk' %}" class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
                         <i class="fab fa-vk text-blue-600 text-lg mr-2 mt-0.5"></i>
                         VK ID
-                    </button>
+                    </a>
                 </div>
             </div>
             
