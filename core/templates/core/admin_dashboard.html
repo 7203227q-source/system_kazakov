@@ -59,6 +59,9 @@
         <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
             <h1 class="text-xl font-bold text-gray-800">Управление пользователями</h1>
             <div class="flex items-center space-x-4">
+                <a href="{% url 'import_tasks' %}" class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition flex items-center shadow-sm">
+                    <i class="fas fa-file-import mr-2"></i> Загрузить задания (CSV)
+                </a>
                 <button class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center shadow-sm">
                     <i class="fas fa-user-plus mr-2"></i> Добавить пользователя
                 </button>

@@ -55,7 +55,7 @@
                     <label class="block text-sm font-medium text-gray-700 mb-2">Я вхожу как:</label>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="relative flex cursor-pointer rounded-lg border bg-indigo-50 border-primary p-3 shadow-sm focus:outline-none">
-                            <input type="radio" name="role" value="student" class="sr-only" checked onchange="document.getElementById('email').value='student_ivan'">
+                            <input type="radio" name="role" value="student" class="sr-only" checked onchange="document.getElementById('email').value='student_ivan'; document.getElementById('password').value='1'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-user-graduate text-primary text-xl mb-1"></i>
@@ -64,7 +64,7 @@
                             </span>
                         </label>
                         <label class="relative flex cursor-pointer rounded-lg border bg-white border-gray-200 p-3 hover:bg-gray-50 focus:outline-none transition">
-                            <input type="radio" name="role" value="tutor" class="sr-only" onchange="document.getElementById('email').value='tutor_maria'">
+                            <input type="radio" name="role" value="tutor" class="sr-only" onchange="document.getElementById('email').value='tutor_maria'; document.getElementById('password').value='1'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-chalkboard-teacher text-gray-400 text-xl mb-1"></i>
@@ -73,7 +73,7 @@
                             </span>
                         </label>
                         <label class="relative flex cursor-pointer rounded-lg border bg-white border-gray-200 p-3 hover:bg-gray-50 focus:outline-none transition">
-                            <input type="radio" name="role" value="parent" class="sr-only" onchange="document.getElementById('email').value='parent_elena'">
+                            <input type="radio" name="role" value="parent" class="sr-only" onchange="document.getElementById('email').value='parent_elena'; document.getElementById('password').value='1'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-user-friends text-gray-400 text-xl mb-1"></i>
@@ -82,7 +82,7 @@
                             </span>
                         </label>
                         <label class="relative flex cursor-pointer rounded-lg border bg-white border-gray-200 p-3 hover:bg-gray-50 focus:outline-none transition">
-                            <input type="radio" name="role" value="admin" class="sr-only" onchange="document.getElementById('email').value='admin'">
+                            <input type="radio" name="role" value="admin" class="sr-only" onchange="document.getElementById('email').value='admin'; document.getElementById('password').value='123123'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-shield-alt text-gray-400 text-xl mb-1"></i>

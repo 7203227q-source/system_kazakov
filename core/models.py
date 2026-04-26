@@ -21,6 +21,10 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон")
     preferred_theme = models.CharField(max_length=20, choices=THEME_CHOICES, default='classic', verbose_name="Предпочитаемая тема")
     
+    # Для связи учеников и репетиторов
+    invite_code = models.CharField(max_length=10, unique=True, null=True, blank=True, verbose_name="Код-приглашение")
+    role_assigned_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата назначения роли (для триала)")
+
     # Для учеников
     target_score = models.IntegerField(null=True, blank=True, verbose_name="Целевой балл")
     xp = models.IntegerField(default=0, verbose_name="Опыт (XP)")
@@ -31,8 +35,18 @@ class User(AbstractUser):
     tutors = models.ManyToManyField('self', symmetrical=False, related_name='students', blank=True, limit_choices_to={'role': 'tutor'})
     parents = models.ManyToManyField('self', symmetrical=False, related_name='children', blank=True, limit_choices_to={'role': 'parent'})
 
+class TutorStudentLink(models.Model):
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='linked_students', verbose_name="Репетитор")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='linked_tutors', verbose_name="Ученик")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('tutor', 'student')
+        verbose_name = "Связь Репетитор-Ученик"
+        verbose_name_plural = "Связи Репетитор-Ученик"
+
     def __str__(self):
-        return f"{self.get_full_name()} ({self.get_role_display()})"
+        return f"{self.tutor.username} -> {self.student.username}"
 
 
 class Subject(models.Model):

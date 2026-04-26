@@ -125,6 +125,20 @@ def student_practice(request):
 @login_required
 def student_dashboard(request):
     """Дашборд Ученика"""
+    if request.user.role != 'student':
+        return redirect('login')
+        
+    if request.method == 'POST' and 'invite_code' in request.POST:
+        code = request.POST.get('invite_code').strip().upper()
+        try:
+            tutor = User.objects.get(invite_code=code, role='tutor')
+            TutorStudentLink.objects.get_or_create(tutor=tutor, student=request.user)
+            request.user.tutors.add(tutor)
+            messages.success(request, f"Вы успешно подключились к репетитору: {tutor.get_full_name() or tutor.username}")
+        except User.DoesNotExist:
+            messages.error(request, "Репетитор с таким кодом не найден.")
+        return redirect('student_dashboard')
+
     recent_submissions = Submission.objects.filter(student=request.user).order_by('-created_at')[:5]
     return render(request, 'core/student_dashboard.html', {'recent_submissions': recent_submissions})
 
@@ -206,7 +220,7 @@ def tutor_task_bank(request):
 
 @login_required
 def import_tasks_view(request):
-    if request.user.role not in ['tutor', 'admin']:
+    if request.user.role != 'admin':
         return redirect('login')
 
     if request.method == 'POST' and request.FILES.get('csv_file'):
@@ -218,67 +232,13 @@ def import_tasks_view(request):
             return redirect('import_tasks')
 
         try:
-            exam_format = ExamFormat.objects.get(id=exam_format_id)
-            topic, _ = Topic.objects.get_or_create(subject=exam_format.subject, name="Задания из Открытого Банка")
+            # Let's import the logic from services_csv
+            from .services_csv import import_tasks_from_csv
             
-            decoded_file = file_obj.read().decode('utf-8')
-            io_string = io.StringIO(decoded_file)
-            reader = csv.DictReader(io_string)
-
-            created_tasks = 0
-            updated_tasks = 0
-
-            for row in reader:
-                fipi_id = row.get('fipi_id', '').strip()
-                if not fipi_id:
-                    continue
-
-                type_number = int(row.get('type_number', 1))
-                subtype_tag = row.get('subtype_tag', '').strip()
-                difficulty = int(row.get('difficulty', 50))
-                correct_answer = row.get('correct_answer', '').strip()
-                theme = row.get('theme', 'classic').strip()
-                content = row.get('content', '').strip()
-                solution = row.get('solution', '').strip()
-
-                task_type, _ = TaskType.objects.get_or_create(
-                    exam_format=exam_format,
-                    number=type_number,
-                    defaults={'name': f"Тип {type_number}"}
-                )
-
-                task, created = Task.objects.update_or_create(
-                    fipi_id=fipi_id,
-                    defaults={
-                        'topic': topic,
-                        'task_type': task_type,
-                        'subtype_tag': subtype_tag,
-                        'difficulty': difficulty,
-                        'correct_answer': correct_answer,
-                        'exam_points': task_type.max_points
-                    }
-                )
-
-                if created:
-                    created_tasks += 1
-                else:
-                    updated_tasks += 1
-
-                # Download images and replace URLs
-                processed_content = download_and_replace_images(content, fipi_id, theme)
-                processed_solution = download_and_replace_images(solution, fipi_id, theme)
-
-                TaskVariant.objects.update_or_create(
-                    task=task,
-                    theme=theme,
-                    defaults={
-                        'content': processed_content,
-                        'solution': processed_solution
-                    }
-                )
+            created_tasks, updated_tasks = import_tasks_from_csv(file_obj, exam_format_id)
 
             messages.success(request, f"Успешно импортировано! Новых: {created_tasks}, Обновлено: {updated_tasks}")
-            return redirect('tutor_task_bank')
+            return redirect('admin_dashboard')
 
         except Exception as e:
             messages.error(request, f"Ошибка при импорте: {e}")
@@ -326,6 +286,14 @@ def admin_dashboard(request):
     """Дашборд Администратора"""
     return render(request, 'core/admin_dashboard.html')
 
+import random
+import string
+from django.utils import timezone
+from .models import TutorStudentLink
+
+def generate_invite_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
 @login_required
 def role_selection_view(request):
     """Страница выбора роли для новых пользователей из соцсетей"""
@@ -344,6 +312,10 @@ def role_selection_view(request):
         selected_role = request.POST.get('role')
         if selected_role in ['student', 'tutor', 'parent']:
             request.user.role = selected_role
+            if selected_role == 'tutor':
+                # Generate invite code and set trial start
+                request.user.invite_code = generate_invite_code()
+                request.user.role_assigned_at = timezone.now()
             request.user.save()
             
             # Редирект после сохранения
@@ -376,20 +348,20 @@ def register_view(request):
         if User.objects.filter(username=email).exists():
             return render(request, 'core/register.html', {'error': 'Пользователь с таким email уже существует'})
 
-        # Создаем пользователя-ученика
+        # Создаем пользователя без роли
         user = User.objects.create_user(
             username=email,
             email=email,
             password=password,
             first_name=first_name,
             last_name=last_name,
-            role='student'
+            role='unassigned'
         )
         
         # Сразу авторизуем
         backend = 'django.contrib.auth.backends.ModelBackend'
         login(request, user, backend=backend)
-        return redirect('student_dashboard')
+        return redirect('select_role')
 
     return render(request, 'core/register.html')
 from django.contrib.auth import logout
