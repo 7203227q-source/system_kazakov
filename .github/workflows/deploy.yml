@@ -1,0 +1,36 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute deployment commands via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            # Переходим в папку с проектом
+            cd /var/www/system_kazakov
+            
+            # Подтягиваем свежий код из GitHub
+            git pull origin main
+            
+            # Активируем виртуальное окружение
+            source venv/bin/activate
+            
+            # Устанавливаем новые зависимости
+            pip install -r requirements.txt
+            
+            # Применяем миграции БД и собираем статику
+            python manage.py migrate
+            python manage.py collectstatic --noinput
+            
+            # Перезапускаем сервис Gunicorn
+            sudo systemctl restart examprep
