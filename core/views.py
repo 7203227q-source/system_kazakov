@@ -228,7 +228,8 @@ def register_view(request):
         )
         
         # Сразу авторизуем
-        login(request, user)
+        backend = 'django.contrib.auth.backends.ModelBackend'
+        login(request, user, backend=backend)
         return redirect('student_dashboard')
 
     return render(request, 'core/register.html')
