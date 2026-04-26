@@ -29,14 +29,14 @@
             <span class="text-xl font-bold">ExamPrep <span class="text-xs text-gray-400 font-normal">Admin</span></span>
         </div>
         <nav class="flex-1 px-4 py-6 space-y-2">
-            <a href="#" class="flex items-center px-4 py-3 bg-gray-800 text-white rounded-lg">
+            <a href="{% url 'admin_dashboard' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-users-cog w-6 text-gray-400"></i> Пользователи
+            </a>
+            <a href="{% url 'import_tasks' %}" class="flex items-center px-4 py-3 bg-gray-800 text-white rounded-lg">
                 <i class="fas fa-database w-6 text-indigo-400"></i> База заданий
             </a>
             <a href="#" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-credit-card w-6 text-gray-400"></i> Биллинг и Платежи
-            </a>
-            <a href="#" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
-                <i class="fas fa-users-cog w-6 text-gray-400"></i> Пользователи
             </a>
             <a href="#" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-chart-pie w-6 text-gray-400"></i> Статистика платформы
@@ -57,7 +57,7 @@
     <main class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50">
         <!-- Header -->
         <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
-            <h1 class="text-xl font-bold text-gray-800">Управление пользователями</h1>
+            <h1 class="text-xl font-bold text-gray-800">База заданий и импорт</h1>
             <div class="flex items-center space-x-4">
                 <a href="{% url 'import_tasks' %}" class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition flex items-center shadow-sm">
                     <i class="fas fa-file-import mr-2"></i> Загрузить задания (CSV)
@@ -73,6 +73,15 @@
 
         <!-- Dashboard Content -->
         <div class="flex-1 overflow-y-auto p-8">
+            {% if messages %}
+            <div class="max-w-7xl mx-auto mb-6 space-y-2">
+                {% for message in messages %}
+                <div class="p-4 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             <div class="max-w-7xl mx-auto space-y-6">
                 
                 <!-- Quick Stats Row -->
