@@ -115,6 +115,10 @@ class Task(models.Model):
         classic = self.variants.filter(theme='classic').first()
         if classic:
             return classic.content
+        # Try to get the first available variant if neither theme nor classic is found
+        any_variant = self.variants.first()
+        if any_variant:
+            return any_variant.content
         # Ultimate fallback (should not happen if db is consistent)
         return "Условие задачи отсутствует."
 

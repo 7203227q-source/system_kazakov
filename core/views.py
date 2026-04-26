@@ -248,7 +248,7 @@ def import_tasks_view(request):
             created_tasks, updated_tasks = import_tasks_from_csv(file_obj, exam_format_id)
 
             messages.success(request, f"Успешно импортировано! Новых: {created_tasks}, Обновлено: {updated_tasks}")
-            return redirect('admin_dashboard')
+            return redirect('import_tasks') # Redirect back to import tasks page to show the message
 
         except Exception as e:
             messages.error(request, f"Ошибка при импорте: {e}")
