@@ -41,14 +41,22 @@ def download_and_replace_images(html_content, task_fipi_id, theme):
             headers = {'User-Agent': 'Mozilla/5.0'}
             response = requests.get(img_url, headers=headers, timeout=10)
             if response.status_code == 200:
-                # Extract extension from URL or use .jpg as default
+                # Always use .gif for SdamGIA get_file endpoints as they often serve GIFs
+                # or use .jpg if we can't determine
                 parsed_url = urlparse(img_url)
                 ext = os.path.splitext(parsed_url.path)[1]
                 if not ext:
-                    ext = '.jpg'
+                    if 'get_file' in img_url:
+                        ext = '.gif' # sdamgia heavily uses gifs
+                    else:
+                        ext = '.jpg'
                 
-                # Generate unique filename
+                # Generate unique filename (we overwrite to avoid duplicating on re-imports)
                 filename = f"tasks/{task_fipi_id}_{theme}_{idx}{ext}"
+                
+                # Check if file exists, if so delete it first to avoid Django renaming it with random chars
+                if default_storage.exists(filename):
+                    default_storage.delete(filename)
                 
                 # Save file
                 saved_path = default_storage.save(filename, ContentFile(response.content))
