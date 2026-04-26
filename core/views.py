@@ -162,8 +162,9 @@ def parent_dashboard(request):
     }
     return render(request, 'core/parent_dashboard.html', context)
 
+@login_required
 def admin_dashboard(request):
-    """Панель управления (кастомная для парсинга и пользователей)"""
+    """Дашборд Администратора"""
     return render(request, 'core/admin_dashboard.html')
 
 @login_required
@@ -195,8 +196,10 @@ def role_selection_view(request):
                 return redirect('parent_dashboard')
                 
     return render(request, 'core/select_role.html')
+
+def register_view(request):
     """
-    Регистрация ученика.
+    Регистрация ученика по почте.
     """
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
