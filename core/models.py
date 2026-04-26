@@ -170,6 +170,17 @@ class SpacedRepetition(models.Model):
         return f"SRS: {self.student.username} -> Task {self.task.id} (Next: {self.next_review_date})"
 
 
+class Assignment(models.Model):
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_assignments', verbose_name="Репетитор")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assignments', verbose_name="Ученик")
+    title = models.CharField(max_length=200, verbose_name="Название (например, Вариант №1)")
+    tasks = models.ManyToManyField(Task, related_name='assignments', verbose_name="Задания")
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_completed = models.BooleanField(default=False, verbose_name="Завершено")
+
+    def __str__(self):
+        return f"{self.title} для {self.student.username}"
+
 class Submission(models.Model):
     """
     Решения учеников, загруженные для ИИ-проверки

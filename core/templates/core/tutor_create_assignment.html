@@ -1,0 +1,99 @@
+{% extends "core/base.html" %}
+
+{% block title %}Создать вариант | ExamPrep{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+            <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
+            <span class="text-xl font-bold text-gray-800">ExamPrep</span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-users w-6"></i> Мои ученики
+            </a>
+            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-database w-6"></i> База заданий
+            </a>
+            <a href="{% url 'tutor_create_assignment' %}" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg transition">
+                <i class="fas fa-file-alt w-6"></i> Создать вариант
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-robot w-6"></i> Проверка (ИИ)
+            </a>
+            <div class="mt-8 border-t border-gray-200 pt-4">
+                <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt w-6"></i> Выйти
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-8">
+        <div class="max-w-4xl mx-auto">
+            {% if messages %}
+            <div class="mb-6 space-y-2">
+                {% for message in messages %}
+                <div class="p-4 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Генератор вариантов</h1>
+            <p class="text-sm text-gray-500 mb-8">Соберите вариант из случайных задач по нужным типам.</p>
+
+            <form method="POST" action="{% url 'tutor_create_assignment' %}" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                {% csrf_token %}
+                
+                <div class="p-6 border-b border-gray-100 space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Название варианта</label>
+                        <input type="text" name="title" placeholder="Например: Домашняя работа №1 (Планиметрия)" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Кому назначить</label>
+                        <select name="student_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required>
+                            <option value="">-- Выберите ученика --</option>
+                            {% for student in students %}
+                            <option value="{{ student.id }}">{{ student.get_full_name|default:student.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="p-6 bg-gray-50">
+                    <h3 class="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wider">Структура варианта</h3>
+                    <p class="text-xs text-gray-500 mb-6">Укажите количество задач каждого типа, которые нужно включить в вариант.</p>
+                    
+                    <div class="space-y-3">
+                        {% for t_type in task_types %}
+                        <div class="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
+                            <div class="flex-1">
+                                <span class="font-medium text-gray-800 text-sm">{{ t_type.name }}</span>
+                                <span class="text-xs text-gray-400 ml-2">({{ t_type.exam_format.name }})</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs text-gray-500">Кол-во:</span>
+                                <input type="number" name="type_{{ t_type.id }}" min="0" max="20" value="0" class="w-16 border border-gray-300 rounded-md px-2 py-1 text-center focus:ring-primary focus:border-primary text-sm font-bold">
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="p-6 border-t border-gray-100 flex justify-end">
+                    <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center shadow-sm">
+                        <i class="fas fa-magic mr-2"></i> Сгенерировать и отправить ученику
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+{% endblock %}

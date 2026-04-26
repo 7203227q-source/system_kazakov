@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse
 from django.contrib import messages
-from .models import User, Payment, Task, Submission, ExamFormat
+from .models import User, Payment, Task, Submission, ExamFormat, Assignment
 from .services import process_task_submission
 import csv
 import io
@@ -140,7 +140,54 @@ def student_dashboard(request):
         return redirect('student_dashboard')
 
     recent_submissions = Submission.objects.filter(student=request.user).order_by('-created_at')[:5]
-    return render(request, 'core/student_dashboard.html', {'recent_submissions': recent_submissions})
+    pending_assignments = Assignment.objects.filter(student=request.user, is_completed=False).order_by('-created_at')
+    
+    return render(request, 'core/student_dashboard.html', {
+        'recent_submissions': recent_submissions,
+        'pending_assignments': pending_assignments
+    })
+
+@login_required
+def student_solve_assignment(request, assignment_id):
+    """Решение варианта (ДЗ) учеником"""
+    if request.user.role != 'student':
+        return redirect('student_dashboard')
+        
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
+    
+    if assignment.is_completed:
+        messages.info(request, "Этот вариант уже решен.")
+        return redirect('student_dashboard')
+
+    tasks = assignment.tasks.all()
+    
+    if request.method == 'POST':
+        correct_count = 0
+        for task in tasks:
+            user_answer = request.POST.get(f'answer_{task.id}', '').strip()
+            is_correct = (user_answer.lower() == task.correct_answer.lower())
+            
+            # Сохраняем попытку
+            Submission.objects.create(
+                student=request.user,
+                task=task,
+                user_answer=user_answer,
+                is_correct=is_correct,
+                score=task.exam_points if is_correct else 0
+            )
+            
+            if is_correct:
+                correct_count += 1
+                request.user.xp += 10
+                
+        request.user.save()
+        assignment.is_completed = True
+        assignment.save()
+        
+        messages.success(request, f"Вариант завершен! Вы решили правильно {correct_count} из {tasks.count()} задач.")
+        return redirect('student_dashboard')
+
+    return render(request, 'core/student_solve_assignment.html', {'assignment': assignment, 'tasks': tasks})
 
 @login_required
 def student_practice_submit(request, task_id):
@@ -201,6 +248,57 @@ def tutor_dashboard(request):
         'recent_mistakes': recent_mistakes,
     }
     return render(request, 'core/tutor_dashboard.html', context)
+
+@login_required
+def tutor_create_assignment(request):
+    """Страница создания варианта репетитором"""
+    if request.user.role != 'tutor':
+        return redirect('login')
+
+    students = request.user.students.all()
+    task_types = TaskType.objects.all().order_by('number')
+
+    if request.method == 'POST':
+        student_id = request.POST.get('student_id')
+        title = request.POST.get('title', 'Новый вариант')
+        
+        if not student_id:
+            messages.error(request, "Выберите ученика")
+            return redirect('tutor_create_assignment')
+            
+        student = get_object_or_404(User, id=student_id, role='student')
+        
+        # Collect tasks
+        selected_tasks = []
+        for t_type in task_types:
+            count_str = request.POST.get(f'type_{t_type.id}', '0')
+            try:
+                count = int(count_str)
+                if count > 0:
+                    # Get random tasks of this type
+                    tasks_of_type = list(Task.objects.filter(task_type=t_type).order_by('?')[:count])
+                    selected_tasks.extend(tasks_of_type)
+            except ValueError:
+                pass
+                
+        if not selected_tasks:
+            messages.error(request, "Выберите хотя бы одно задание для варианта")
+            return redirect('tutor_create_assignment')
+            
+        assignment = Assignment.objects.create(
+            tutor=request.user,
+            student=student,
+            title=title
+        )
+        assignment.tasks.add(*selected_tasks)
+        
+        messages.success(request, f"Вариант '{title}' успешно создан и отправлен ученику {student.get_full_name() or student.username}!")
+        return redirect('tutor_dashboard')
+
+    return render(request, 'core/tutor_create_assignment.html', {
+        'students': students,
+        'task_types': task_types
+    })
 
 @login_required
 def tutor_task_bank(request):
