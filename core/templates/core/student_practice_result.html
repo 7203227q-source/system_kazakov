@@ -75,6 +75,17 @@
                     </div>
                     {% endif %}
                 </div>
+
+                {% if task.get_solution_for_theme %}
+                <div class="bg-indigo-50 border-t border-indigo-100 p-6 text-left">
+                    <button onclick="document.getElementById('solution-content').classList.toggle('hidden')" class="text-indigo-700 font-bold text-sm hover:text-indigo-900 transition flex items-center">
+                        <i class="fas fa-lightbulb mr-2"></i> Показать подробное решение
+                    </button>
+                    <div id="solution-content" class="hidden mt-4 prose max-w-none text-gray-800 text-sm">
+                        {{ task.get_solution_for_theme|safe }}
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <div class="flex justify-center space-x-4">
