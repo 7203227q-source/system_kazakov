@@ -212,20 +212,32 @@ def tutor_task_bank(request):
 
     search_query = request.GET.get('q', '')
     type_filter = request.GET.get('type', '')
+    subtype_filter = request.GET.get('subtype', '')
 
     if search_query:
         tasks = tasks.filter(subtype_tag__icontains=search_query) | tasks.filter(fipi_id__icontains=search_query)
         
     if type_filter:
         tasks = tasks.filter(task_type__id=type_filter)
+        
+    if subtype_filter:
+        tasks = tasks.filter(subtype_tag=subtype_filter)
 
     task_types = TaskType.objects.all().order_by('number')
+    
+    # Get unique subtype_tags for the selected type, or all if no type selected
+    subtypes_query = Task.objects.exclude(subtype_tag__isnull=True).exclude(subtype_tag__exact='')
+    if type_filter:
+        subtypes_query = subtypes_query.filter(task_type__id=type_filter)
+    subtypes = subtypes_query.values_list('subtype_tag', flat=True).distinct().order_by('subtype_tag')
 
     return render(request, 'core/tutor_task_bank.html', {
         'tasks': tasks,
         'search_query': search_query,
         'task_types': task_types,
         'type_filter': type_filter,
+        'subtypes': subtypes,
+        'subtype_filter': subtype_filter,
     })
 
 @login_required
