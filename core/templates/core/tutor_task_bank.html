@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>База заданий - ExamPrep</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+            <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
+            <span class="text-xl font-bold text-gray-800">ExamPrep</span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-users w-6"></i> Мои ученики
+            </a>
+            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg transition">
+                <i class="fas fa-database w-6"></i> База заданий
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-robot w-6"></i> Проверка (ИИ)
+            </a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto">
+        <div class="p-8 max-w-6xl mx-auto w-full">
+            
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Банк заданий</h1>
+                    <p class="text-sm text-gray-500">Все задания системы, загруженные из открытых источников</p>
+                </div>
+                
+                <form method="GET" action="{% url 'tutor_task_bank' %}" class="flex gap-2">
+                    <div class="relative w-64">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input type="text" name="q" value="{{ search_query }}" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Поиск по тексту...">
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                        Найти
+                    </button>
+                    {% if search_query %}
+                    <a href="{% url 'tutor_task_bank' %}" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center">
+                        <i class="fas fa-times"></i>
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="space-y-6">
+                {% for task in tasks %}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <div class="flex items-center">
+                            <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded mr-3">
+                                ID: {{ task.fipi_id|default:task.id }}
+                            </span>
+                            {% if task.task_type %}
+                            <span class="font-bold text-indigo-900 mr-2">{{ task.task_type.name }}</span>
+                            <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{{ task.task_type.exam_format.name }}</span>
+                            {% else %}
+                            <span class="font-bold text-indigo-900">{{ task.topic.name }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex space-x-2">
+                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-bold">
+                                Сложность: {{ task.difficulty }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 prose max-w-none text-sm text-gray-800 border-b border-gray-100">
+                        {{ task.content|safe }}
+                    </div>
+
+                    <div class="px-6 py-3 bg-green-50/50 flex justify-between items-center">
+                        <div>
+                            <span class="text-xs text-gray-500 mr-2">Ответ:</span>
+                            <span class="font-mono font-bold text-green-700">{{ task.correct_answer }}</span>
+                        </div>
+                        <button class="text-sm font-medium text-primary hover:underline">
+                            <i class="fas fa-plus mr-1"></i> Добавить в ДЗ
+                        </button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+                    <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
+                    <h2 class="text-xl font-bold text-gray-800 mb-2">Ничего не найдено</h2>
+                    <p class="text-gray-500">Попробуйте изменить параметры поиска или сбросить фильтр.</p>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>

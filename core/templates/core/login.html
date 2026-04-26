@@ -47,13 +47,14 @@
         <!-- Form Content -->
         <div class="p-8">
             <form action="#" method="POST" class="space-y-5">
+                {% csrf_token %}
                 
                 <!-- Role Selection (Optional for Login, but good for demo) -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Я вхожу как:</label>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="relative flex cursor-pointer rounded-lg border bg-indigo-50 border-primary p-3 shadow-sm focus:outline-none">
-                            <input type="radio" name="role" value="student" class="sr-only" checked>
+                            <input type="radio" name="role" value="student" class="sr-only" checked onchange="document.getElementById('email').value='student_ivan'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-user-graduate text-primary text-xl mb-1"></i>
@@ -62,7 +63,7 @@
                             </span>
                         </label>
                         <label class="relative flex cursor-pointer rounded-lg border bg-white border-gray-200 p-3 hover:bg-gray-50 focus:outline-none transition">
-                            <input type="radio" name="role" value="tutor" class="sr-only">
+                            <input type="radio" name="role" value="tutor" class="sr-only" onchange="document.getElementById('email').value='tutor_maria'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-chalkboard-teacher text-gray-400 text-xl mb-1"></i>
@@ -71,7 +72,7 @@
                             </span>
                         </label>
                         <label class="relative flex cursor-pointer rounded-lg border bg-white border-gray-200 p-3 hover:bg-gray-50 focus:outline-none transition">
-                            <input type="radio" name="role" value="parent" class="sr-only">
+                            <input type="radio" name="role" value="parent" class="sr-only" onchange="document.getElementById('email').value='parent_elena'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-user-friends text-gray-400 text-xl mb-1"></i>
@@ -80,7 +81,7 @@
                             </span>
                         </label>
                         <label class="relative flex cursor-pointer rounded-lg border bg-white border-gray-200 p-3 hover:bg-gray-50 focus:outline-none transition">
-                            <input type="radio" name="role" value="admin" class="sr-only">
+                            <input type="radio" name="role" value="admin" class="sr-only" onchange="document.getElementById('email').value='admin'">
                             <span class="flex flex-1 items-center justify-center">
                                 <span class="flex flex-col items-center">
                                     <i class="fas fa-shield-alt text-gray-400 text-xl mb-1"></i>
@@ -91,14 +92,20 @@
                     </div>
                 </div>
 
+                {% if error %}
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                    <p class="text-sm text-red-700">{{ error }}</p>
+                </div>
+                {% endif %}
+
                 <!-- Email Input -->
                 <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email или Телефон</label>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email или Логин</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <i class="fas fa-envelope text-gray-400"></i>
                         </div>
-                        <input type="text" id="email" class="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="ivan@example.com">
+                        <input type="text" id="email" name="username" class="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="Логин или Email">
                     </div>
                 </div>
 
@@ -112,7 +119,7 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <i class="fas fa-lock text-gray-400"></i>
                         </div>
-                        <input type="password" id="password" class="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="••••••••">
+                        <input type="password" id="password" name="password" class="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="••••••••">
                         <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
                             <i class="fas fa-eye"></i>
                         </button>

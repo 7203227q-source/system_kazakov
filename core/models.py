@@ -34,6 +34,37 @@ class Subject(models.Model):
         return self.name
 
 
+class ExamFormat(models.Model):
+    """
+    Формат экзамена (например, 'ЕГЭ 2024 Профиль', 'ОГЭ 2024')
+    Позволяет гибко менять структуру экзамена каждый год.
+    """
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='exam_formats')
+    name = models.CharField(max_length=100, verbose_name="Название формата (ЕГЭ/ОГЭ)")
+    year = models.IntegerField(verbose_name="Год экзамена")
+    is_active = models.BooleanField(default=True, verbose_name="Актуальный формат")
+    
+    def __str__(self):
+        return f"{self.name} ({self.year})"
+
+
+class TaskType(models.Model):
+    """
+    Конкретный тип/номер задания в определенном формате экзамена.
+    Например: "Задание №1. Планиметрия", "Задание №12. Уравнения"
+    """
+    exam_format = models.ForeignKey(ExamFormat, on_delete=models.CASCADE, related_name='task_types')
+    number = models.IntegerField(verbose_name="Номер в КИМе")
+    name = models.CharField(max_length=200, verbose_name="Краткое описание типа")
+    max_points = models.IntegerField(default=1, verbose_name="Максимальный балл")
+    
+    class Meta:
+        ordering = ['number']
+        
+    def __str__(self):
+        return f"№{self.number} - {self.name} ({self.exam_format})"
+
+
 class Topic(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='topics')
     name = models.CharField(max_length=200, verbose_name="Тема")
@@ -43,7 +74,10 @@ class Topic(models.Model):
 
 
 class Task(models.Model):
+    fipi_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="ID задания ФИПИ")
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='tasks')
+    task_type = models.ForeignKey(TaskType, on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks', verbose_name="Тип задания (КИМ)")
+    
     content = models.TextField(verbose_name="Условие задачи")
     correct_answer = models.TextField(verbose_name="Правильный ответ/решение")
     difficulty = models.IntegerField(default=50, verbose_name="Сложность (1-100)")
@@ -52,7 +86,8 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"Task {self.id} ({self.topic.name})"
+        fipi_str = f" ({self.fipi_id})" if self.fipi_id else ""
+        return f"Task {self.id}{fipi_str} ({self.topic.name})"
 
 
 class SpacedRepetition(models.Model):
@@ -83,6 +118,9 @@ class Submission(models.Model):
     """
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='submissions')
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    
+    is_correct = models.BooleanField(null=True, blank=True, verbose_name="Правильно ли решено")
+    user_answer = models.TextField(blank=True, null=True, verbose_name="Ответ ученика")
     
     image_url = models.URLField(blank=True, null=True, verbose_name="Ссылка на фото решения")
     recognized_text = models.TextField(blank=True, null=True, verbose_name="Распознанный текст (ИИ)")

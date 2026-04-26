@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Журнал решений - ExamPrep</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+        <div class="h-16 flex items-center px-6 border-b border-gray-200">
+            <i class="fas fa-graduation-cap text-primary text-2xl mr-2"></i>
+            <span class="text-xl font-bold text-gray-800">ExamPrep</span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="{% url 'student_dashboard' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-home w-6"></i> Главная
+            </a>
+            <a href="{% url 'student_practice' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-dumbbell w-6"></i> Тренажер
+            </a>
+            <a href="{% url 'student_history' %}" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg transition">
+                <i class="fas fa-history w-6"></i> Журнал решений
+            </a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto p-8">
+        <div class="max-w-4xl mx-auto w-full">
+            
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">Журнал учебных сессий</h1>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <!-- Filters -->
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex gap-4">
+                    <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-primary shadow-sm">Все задачи</button>
+                    <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">Только ошибки</button>
+                </div>
+
+                <div class="divide-y divide-gray-100">
+                    {% for sub in submissions %}
+                    <div class="p-6 hover:bg-gray-50 transition cursor-pointer">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center">
+                                {% if sub.is_correct %}
+                                <div class="w-8 h-8 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-sm mr-3">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                                {% else %}
+                                <div class="w-8 h-8 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-sm mr-3">
+                                    <i class="fas fa-times"></i>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <h4 class="font-bold text-gray-800 text-sm">
+                                        Задание {{ sub.task.fipi_id|default:sub.task.id }}
+                                    </h4>
+                                    <p class="text-xs text-gray-500">{{ sub.task.topic.name }}</p>
+                                </div>
+                            </div>
+                            <span class="text-xs text-gray-400">{{ sub.created_at|date:"d M H:i" }}</span>
+                        </div>
+
+                        <!-- Task content snippet -->
+                        <div class="text-sm text-gray-700 mb-4 bg-gray-50 p-3 rounded border border-gray-200 overflow-hidden" style="max-height: 100px;">
+                            {{ sub.task.content|safe }}
+                        </div>
+
+                        <div class="flex items-center text-sm">
+                            <span class="text-gray-500 mr-2">Ваш ответ:</span>
+                            <span class="font-mono font-bold {% if sub.is_correct %}text-green-600{% else %}text-red-600 line-through{% endif %} mr-4">
+                                {{ sub.user_answer|default:"(пусто)" }}
+                            </span>
+                            
+                            {% if not sub.is_correct %}
+                            <span class="text-gray-500 mr-2">Правильный:</span>
+                            <span class="font-mono font-bold text-green-600">
+                                {{ sub.task.correct_answer }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="p-12 text-center text-gray-500">
+                        <i class="fas fa-book-open text-4xl text-gray-300 mb-4"></i>
+                        <p>Вы пока не решили ни одной задачи.</p>
+                        <a href="{% url 'student_practice' %}" class="mt-4 inline-block text-primary font-bold hover:underline">Перейти в тренажер</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>

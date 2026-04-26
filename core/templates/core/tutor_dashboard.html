@@ -28,14 +28,14 @@
             <span class="text-xl font-bold text-gray-800">ExamPrep</span>
         </div>
         <nav class="flex-1 px-4 py-6 space-y-2">
-            <a href="#" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg">
+            <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg">
                 <i class="fas fa-users w-6"></i> Мои ученики
             </a>
-            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                <i class="fas fa-tasks w-6"></i> База заданий
+            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-database w-6"></i> База заданий
             </a>
-            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                <i class="fas fa-file-signature w-6"></i> Проверка (ИИ)
+            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-robot w-6"></i> Проверка (ИИ)
             </a>
             <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg">
                 <i class="fas fa-comments w-6"></i> Сообщения
@@ -44,10 +44,10 @@
         </nav>
         <div class="p-4 border-t border-gray-200">
             <div class="flex items-center">
-                <img src="https://ui-avatars.com/api/?name=Мария+С.&background=FCE7F3&color=DB2777" alt="User" class="w-10 h-10 rounded-full">
+                <img src="https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&background=FCE7F3&color=DB2777" alt="User" class="w-10 h-10 rounded-full">
                 <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-800">Мария Сергеевна</p>
-                    <p class="text-xs text-gray-500">Репетитор (Математика)</p>
+                    <p class="text-sm font-medium text-gray-800">{{ user.get_full_name|default:user.username }}</p>
+                    <p class="text-xs text-gray-500">{{ user.get_role_display }}</p>
                 </div>
             </div>
         </div>
@@ -81,84 +81,44 @@
 
                 <!-- Student List -->
                 <div class="divide-y divide-gray-100">
-                    <!-- Student 1 (Active) -->
-                    <div class="p-4 bg-indigo-50/50 cursor-pointer border-l-4 border-primary">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center">
-                                <img src="https://ui-avatars.com/api/?name=Иван+Иванов&background=E0E7FF&color=4F46E5" class="w-10 h-10 rounded-full mr-3">
-                                <div>
-                                    <h3 class="font-bold text-gray-800 text-sm">Иван Иванов</h3>
-                                    <p class="text-xs text-gray-500">11 класс • Цель: 90</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-lg font-bold text-gray-800">68</span>
-                                <span class="text-xs text-gray-400">/100</span>
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">Прогноз: 85</span>
-                            <span class="text-xs text-gray-500"><i class="fas fa-fire text-orange-500"></i> 14 дней</span>
-                        </div>
-                    </div>
-
-                    <!-- Student 2 -->
-                    <div class="p-4 hover:bg-gray-50 cursor-pointer border-l-4 border-transparent transition">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center">
-                                <img src="https://ui-avatars.com/api/?name=Анна+Смирнова&background=FEF3C7&color=DB2777" class="w-10 h-10 rounded-full mr-3">
-                                <div>
-                                    <h3 class="font-bold text-gray-800 text-sm">Анна Смирнова</h3>
-                                    <p class="text-xs text-gray-500">11 класс • Цель: 80</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-lg font-bold text-gray-800">54</span>
-                                <span class="text-xs text-gray-400">/100</span>
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-xs font-medium px-2 py-1 bg-red-100 text-red-700 rounded" title="Отстает от графика">Прогноз: 65 <i class="fas fa-exclamation-triangle ml-1"></i></span>
-                            <span class="text-xs text-gray-500">Пропущено ДЗ</span>
-                        </div>
-                    </div>
-
-                    <!-- Student 3 -->
-                    <div class="p-4 hover:bg-gray-50 cursor-pointer border-l-4 border-transparent transition">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center">
-                                <img src="https://ui-avatars.com/api/?name=Егор+Петров&background=D1FAE5&color=D97706" class="w-10 h-10 rounded-full mr-3">
-                                <div>
-                                    <h3 class="font-bold text-gray-800 text-sm">Егор Петров</h3>
-                                    <p class="text-xs text-gray-500">10 класс • Цель: 75 (ОГЭ)</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-lg font-bold text-gray-800">70</span>
-                                <span class="text-xs text-gray-400">/100</span>
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center mt-3">
-                            <span class="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">Прогноз: 78</span>
-                            <span class="text-xs text-gray-500"><i class="fas fa-fire text-orange-500"></i> 5 дней</span>
-                        </div>
-                    </div>
+                    {% for student in students %}
+                     <a href="?student_id={{ student.id }}" class="block p-4 hover:bg-gray-50 cursor-pointer border-l-4 {% if selected_student.id == student.id %}border-primary bg-indigo-50/50{% else %}border-transparent{% endif %} transition">
+                         <div class="flex justify-between items-start mb-2">
+                             <div class="flex items-center">
+                                 <img src="https://ui-avatars.com/api/?name={{ student.get_full_name|urlencode }}&background=E0E7FF&color=4F46E5" class="w-10 h-10 rounded-full mr-3">
+                                 <div>
+                                     <h3 class="font-bold text-gray-800 text-sm">{{ student.get_full_name }}</h3>
+                                     <p class="text-xs text-gray-500">Уровень {{ student.level }} • Цель: {{ student.target_score }}</p>
+                                 </div>
+                             </div>
+                             <div class="text-right">
+                                 <span class="text-lg font-bold text-gray-800">{{ student.xp }} XP</span>
+                             </div>
+                         </div>
+                         <div class="flex justify-between items-center mt-3">
+                             <span class="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">Прогноз: 85</span>
+                             <span class="text-xs text-gray-500"><i class="fas fa-fire text-orange-500"></i> {{ student.current_streak }} дней</span>
+                         </div>
+                     </a>
+                     {% empty %}
+                    <div class="p-4 text-center text-gray-500 text-sm">У вас пока нет учеников.</div>
+                    {% endfor %}
                 </div>
             </div>
 
             <!-- Right Col: Student Details & Actions -->
             <div class="flex-1 bg-gray-50 p-8 overflow-y-auto">
-                
+                {% if selected_student %}
                 <!-- Profile Header -->
                 <div class="flex justify-between items-start mb-6">
                     <div class="flex items-center">
-                        <img src="https://ui-avatars.com/api/?name=Иван+Иванов&background=E0E7FF&color=4F46E5" class="w-16 h-16 rounded-full mr-4 border-2 border-white shadow-sm">
+                        <img src="https://ui-avatars.com/api/?name={{ selected_student.get_full_name|urlencode }}&background=E0E7FF&color=4F46E5" class="w-16 h-16 rounded-full mr-4 border-2 border-white shadow-sm">
                         <div>
                             <div class="flex items-center">
-                                <h2 class="text-2xl font-bold text-gray-800">Иван Иванов</h2>
-                                <span class="ml-3 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded border border-yellow-200">Цель: 90</span>
+                                <h2 class="text-2xl font-bold text-gray-800">{{ selected_student.get_full_name }}</h2>
+                                <span class="ml-3 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded border border-yellow-200">Цель: {{ selected_student.target_score|default:"Не указана" }}</span>
                             </div>
-                            <p class="text-sm text-gray-500 mt-1">Родитель: Елена Иванова (+7 999 123-45-67)</p>
+                            <p class="text-sm text-gray-500 mt-1">Телефон: {{ selected_student.phone|default:"Не указан" }}</p>
                             <p class="text-xs text-gray-400 mt-1 flex items-center">
                                 Моя оценка: <span class="ml-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded font-medium cursor-pointer hover:bg-gray-50" title="Нажмите, чтобы изменить">80 - 88 баллов <i class="fas fa-pen ml-1 text-gray-300"></i></span>
                             </p>
@@ -168,6 +128,9 @@
                         <button class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm flex items-center">
                             <i class="fas fa-chart-line mr-2 text-primary"></i> Полная статистика
                         </button>
+                        <a href="{% url 'tutor_student_history' selected_student.id %}" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm flex items-center">
+                            <i class="fas fa-history mr-2 text-indigo-500"></i> Журнал решений
+                        </a>
                         <button class="px-4 py-2 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg text-sm font-bold hover:bg-yellow-200 shadow-sm flex items-center">
                             <i class="fas fa-star mr-2"></i> Дать +50 XP
                         </button>
@@ -179,58 +142,29 @@
                     <!-- AI Analysis (Takes 2/3 width) -->
                     <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-6 flex items-center">
-                            <i class="fas fa-robot text-primary mr-2"></i> Анализ ИИ: Проблемные темы (успешность выполнения)
+                            <i class="fas fa-robot text-primary mr-2"></i> Недавние ошибки ученика (Тренажер)
                         </h3>
                         
-                        <!-- Horizontal Bar Chart -->
-                        <div class="space-y-5">
-                            <!-- Item 1 -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">Производная сложной функции</span>
-                                    <span class="text-sm font-bold text-red-600">35%</span>
+                        <div class="space-y-4">
+                            {% for mistake in recent_mistakes %}
+                            <div class="p-4 border border-red-100 bg-red-50/30 rounded-lg">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm font-bold text-gray-800">Задание {{ mistake.task.fipi_id|default:mistake.task.id }}</span>
+                                    <span class="text-xs text-gray-500">{{ mistake.created_at|date:"d M H:i" }}</span>
                                 </div>
-                                <div class="w-full bg-gray-100 rounded-full h-2.5">
-                                    <div class="bg-red-500 h-2.5 rounded-full" style="width: 35%"></div>
+                                <div class="text-xs text-gray-600 mb-2 truncate">{{ mistake.task.content|striptags }}</div>
+                                <div class="flex items-center text-xs">
+                                    <span class="text-red-500 line-through mr-2">{{ mistake.user_answer }}</span>
+                                    <i class="fas fa-arrow-right text-gray-400 mr-2"></i>
+                                    <span class="text-green-600 font-bold">{{ mistake.task.correct_answer }}</span>
                                 </div>
-                                <p class="text-xs text-gray-500 mt-1">Ошибки в знаках при дифференцировании внутренней функции</p>
                             </div>
-
-                            <!-- Item 2 -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">Стереометрия: Сечения</span>
-                                    <span class="text-sm font-bold text-orange-500">42%</span>
-                                </div>
-                                <div class="w-full bg-gray-100 rounded-full h-2.5">
-                                    <div class="bg-orange-500 h-2.5 rounded-full" style="width: 42%"></div>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-1">Трудности с построением линии пересечения плоскостей</p>
+                            {% empty %}
+                            <div class="text-center text-gray-500 py-4">
+                                <i class="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
+                                <p class="text-sm">Нет недавних ошибок в тренажере.</p>
                             </div>
-
-                            <!-- Item 3 -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">Параметры (Системы уравнений)</span>
-                                    <span class="text-sm font-bold text-yellow-500">50%</span>
-                                </div>
-                                <div class="w-full bg-gray-100 rounded-full h-2.5">
-                                    <div class="bg-yellow-500 h-2.5 rounded-full" style="width: 50%"></div>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-1">Пропуск граничных условий при графическом методе</p>
-                            </div>
-                            
-                            <!-- Item 4 (Good progress) -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">Тригонометрические уравнения</span>
-                                    <span class="text-sm font-bold text-green-500">85%</span>
-                                </div>
-                                <div class="w-full bg-gray-100 rounded-full h-2.5">
-                                    <div class="bg-green-500 h-2.5 rounded-full" style="width: 85%"></div>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-1">Тема усвоена хорошо, можно переходить к повторению</p>
-                            </div>
+                            {% endfor %}
                         </div>
                     </div>
 
@@ -241,23 +175,41 @@
                         </h3>
                         
                         <div class="flex-1 flex flex-col justify-center items-center text-center pb-4">
-                            <div class="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-2xl mb-3">
-                                <i class="fas fa-check"></i>
-                            </div>
-                            <h4 class="font-bold text-gray-800 text-lg">Оплачено</h4>
-                            <p class="text-sm text-gray-500">До 15 марта 2026</p>
+                            {% if recent_payment %}
+                                {% if recent_payment.status == 'paid' %}
+                                <div class="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-2xl mb-3">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-800 text-lg">Оплачено</h4>
+                                <p class="text-sm text-gray-500">До {{ recent_payment.paid_at|date:"d E Y" }}</p>
+                                {% elif recent_payment.status == 'pending' %}
+                                <div class="w-16 h-16 bg-yellow-100 text-yellow-500 rounded-full flex items-center justify-center text-2xl mb-3">
+                                    <i class="fas fa-hourglass-half"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-800 text-lg">Ожидает оплаты</h4>
+                                <p class="text-sm text-gray-500">Сумма: {{ recent_payment.amount }} ₽</p>
+                                {% else %}
+                                <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-2xl mb-3">
+                                    <i class="fas fa-times"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-800 text-lg">Ошибка</h4>
+                                {% endif %}
+                            {% else %}
+                                <div class="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center text-2xl mb-3">
+                                    <i class="fas fa-question"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-800 text-lg">Нет данных</h4>
+                            {% endif %}
                         </div>
                         
+                        {% if recent_payment %}
                         <div class="border-t border-gray-100 pt-4 mt-auto">
                             <div class="flex justify-between text-sm mb-2">
-                                <span class="text-gray-500">Остаток занятий:</span>
-                                <span class="font-bold text-gray-800">6 шт.</span>
-                            </div>
-                            <div class="flex justify-between text-sm">
-                                <span class="text-gray-500">План. списание:</span>
-                                <span class="font-bold text-gray-800">12 000 ₽</span>
+                                <span class="text-gray-500">Оплачено занятий:</span>
+                                <span class="font-bold text-gray-800">{{ recent_payment.lessons_credited }} шт.</span>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -304,6 +256,11 @@
                         </div>
                     </div>
                 </div>
+                {% else %}
+                <div class="flex items-center justify-center h-full text-gray-500">
+                    <p>Выберите ученика из списка слева для просмотра деталей.</p>
+                </div>
+                {% endif %}
 
             </div>
         </div>
