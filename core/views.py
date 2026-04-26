@@ -205,17 +205,27 @@ def tutor_dashboard(request):
 @login_required
 def tutor_task_bank(request):
     """База заданий для репетитора (все задания системы)"""
+    if request.user.role not in ['tutor', 'admin']:
+        return redirect('login')
+
     tasks = Task.objects.select_related('topic', 'task_type', 'task_type__exam_format').all()
 
     search_query = request.GET.get('q', '')
-    # Since content is now in TaskVariant, we need to filter carefully.
-    # For simplicity, filter by fipi_id or subtype_tag first.
+    type_filter = request.GET.get('type', '')
+
     if search_query:
         tasks = tasks.filter(subtype_tag__icontains=search_query) | tasks.filter(fipi_id__icontains=search_query)
+        
+    if type_filter:
+        tasks = tasks.filter(task_type__id=type_filter)
+
+    task_types = TaskType.objects.all().order_by('number')
 
     return render(request, 'core/tutor_task_bank.html', {
         'tasks': tasks,
-        'search_query': search_query
+        'search_query': search_query,
+        'task_types': task_types,
+        'type_filter': type_filter,
     })
 
 @login_required

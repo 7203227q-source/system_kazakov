@@ -15,6 +15,28 @@
 <body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
 
     <!-- Sidebar -->
+    {% if user.role == 'admin' %}
+    <aside class="w-64 bg-gray-900 text-white flex flex-col shrink-0">
+        <div class="h-16 flex items-center px-6 border-b border-gray-700 bg-gray-900">
+            <i class="fas fa-shield-alt text-indigo-400 text-2xl mr-2"></i>
+            <span class="text-xl font-bold">ExamPrep <span class="text-xs text-gray-400 font-normal">Admin</span></span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="{% url 'admin_dashboard' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-users-cog w-6 text-gray-400"></i> Пользователи
+            </a>
+            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 bg-gray-800 text-white rounded-lg">
+                <i class="fas fa-database w-6 text-indigo-400"></i> База заданий
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-credit-card w-6 text-gray-400"></i> Биллинг и Платежи
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-chart-pie w-6 text-gray-400"></i> Статистика платформы
+            </a>
+        </nav>
+    </aside>
+    {% else %}
     <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
         <div class="h-16 flex items-center px-6 border-b border-gray-200">
             <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
@@ -37,6 +59,7 @@
             </div>
         </nav>
     </aside>
+    {% endif %}
 
     <main class="flex-1 flex flex-col h-screen overflow-y-auto">
         <div class="p-8 max-w-6xl mx-auto w-full">
@@ -49,16 +72,26 @@
                 
                 <div class="flex space-x-4">
                     <form method="GET" action="{% url 'tutor_task_bank' %}" class="flex gap-2">
+                        <!-- Type Filter -->
+                        <select name="type" class="block w-48 py-2 px-3 border border-gray-300 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" onchange="this.form.submit()">
+                            <option value="">Все типы заданий</option>
+                            {% for t in task_types %}
+                            <option value="{{ t.id }}" {% if type_filter == t.id|stringformat:"s" %}selected{% endif %}>
+                                {{ t.name|truncatechars:35 }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        
                         <div class="relative w-64">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <i class="fas fa-search text-gray-400"></i>
                             </div>
-                            <input type="text" name="q" value="{{ search_query }}" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Поиск по тексту...">
+                            <input type="text" name="q" value="{{ search_query }}" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Поиск по тексту или ID...">
                         </div>
                         <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
                             Найти
                         </button>
-                        {% if search_query %}
+                        {% if search_query or type_filter %}
                         <a href="{% url 'tutor_task_bank' %}" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center">
                             <i class="fas fa-times"></i>
                         </a>
