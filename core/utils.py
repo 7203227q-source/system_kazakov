@@ -22,6 +22,11 @@ def download_and_replace_images(html_content, task_fipi_id, theme):
 
     for idx, img in enumerate(images):
         img_url = img.get('src')
+        
+        # Clean up the URL from extra quotes that might come from CSV escaping
+        if img_url:
+            img_url = img_url.strip('"\'')
+            
         if not img_url or img_url.startswith('data:') or img_url.startswith('/media/'):
             continue
 
