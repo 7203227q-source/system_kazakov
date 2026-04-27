@@ -210,16 +210,56 @@ def student_check_assignment_task(request, assignment_id, task_id):
     })
 
 @login_required
+def student_assignment_summary(request, assignment_id):
+    """Итоговое резюме по завершенному варианту для ученика"""
+    if request.user.role != 'student':
+        return redirect('login')
+        
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
+    
+    if not assignment.is_completed:
+        return redirect('student_solve_assignment', assignment_id=assignment.id)
+        
+    tasks = assignment.tasks.all()
+    submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
+    
+    tasks_list = []
+    correct_count = 0
+    total_score = 0
+    max_score = 0
+    
+    for task in tasks:
+        sub = submissions.get(task.id)
+        if sub and sub.is_correct:
+            correct_count += 1
+            total_score += task.exam_points
+        max_score += task.exam_points
+        
+        tasks_list.append({
+            'task': task,
+            'submission': sub,
+        })
+        
+    success_rate = int((correct_count / tasks.count()) * 100) if tasks.count() > 0 else 0
+    
+    return render(request, 'core/student_assignment_summary.html', {
+        'assignment': assignment,
+        'tasks_list': tasks_list,
+        'correct_count': correct_count,
+        'total_tasks': tasks.count(),
+        'success_rate': success_rate,
+        'total_score': total_score,
+        'max_score': max_score
+    })
+@login_required
 def student_solve_assignment(request, assignment_id):
-    """Решение варианта (ДЗ) учеником"""
     if request.user.role != 'student':
         return redirect('student_dashboard')
         
     assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
     
     if assignment.is_completed:
-        messages.info(request, "Этот вариант уже решен.")
-        return redirect('student_dashboard')
+        return redirect('student_assignment_summary', assignment_id=assignment.id)
 
     tasks = assignment.tasks.all()
     
@@ -270,7 +310,7 @@ def student_solve_assignment(request, assignment_id):
         assignment.save()
         
         messages.success(request, f"Вариант завершен! Вы решили правильно {correct_count} из {tasks.count()} задач.")
-        return redirect('student_dashboard')
+        return redirect('student_assignment_summary', assignment_id=assignment.id)
 
     # GET: Загружаем сохраненные ответы ученика, чтобы подставить в поля
     saved_submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}

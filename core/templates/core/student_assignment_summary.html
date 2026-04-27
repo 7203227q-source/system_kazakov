@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты: {{ assignment.title }} | Система Казакова</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["$", "$"], ["\\(", "\\)"]],
+                displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+                processEscapes: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] overflow-y-auto">
+<div class="min-h-[100dvh] bg-gray-50 p-4 sm:p-8 w-full">
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Итоги варианта</h1>
+                <p class="text-sm text-gray-500">{{ assignment.title }}</p>
+            </div>
+            <a href="{% url 'student_dashboard' %}" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm flex items-center">
+                <i class="fas fa-home mr-2"></i> <span class="hidden sm:inline">На главную</span>
+            </a>
+        </div>
+
+        <!-- Summary Stats Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 mb-8 text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 {% if success_rate >= 80 %}bg-green-500{% elif success_rate >= 50 %}bg-yellow-400{% else %}bg-red-500{% endif %}"></div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Ваш результат: <span class="{% if success_rate >= 80 %}text-green-600{% elif success_rate >= 50 %}text-yellow-500{% else %}text-red-500{% endif %}">{{ success_rate }}%</span></h2>
+            
+            <div class="flex flex-wrap justify-center gap-6 mt-6">
+                <div class="bg-gray-50 rounded-xl px-6 py-4 border border-gray-100 min-w-[120px]">
+                    <p class="text-xs text-gray-500 font-bold uppercase mb-1">Решено задач</p>
+                    <p class="text-3xl font-black text-gray-800">{{ correct_count }}<span class="text-lg text-gray-400">/{{ total_tasks }}</span></p>
+                </div>
+                <div class="bg-indigo-50 rounded-xl px-6 py-4 border border-indigo-100 min-w-[120px]">
+                    <p class="text-xs text-indigo-800 font-bold uppercase mb-1">Первичный балл</p>
+                    <p class="text-3xl font-black text-primary">{{ total_score }}<span class="text-lg text-indigo-300">/{{ max_score }}</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Task List -->
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Подробный разбор</h3>
+        <div class="space-y-6">
+            {% for item in tasks_list %}
+            <div class="bg-white rounded-xl shadow-sm border {% if item.submission and item.submission.is_correct %}border-green-200{% else %}border-red-200{% endif %} overflow-hidden task-card">
+                <div class="{% if item.submission and item.submission.is_correct %}bg-green-50{% else %}bg-red-50{% endif %} px-6 py-3 flex justify-between items-center border-b {% if item.submission and item.submission.is_correct %}border-green-100{% else %}border-red-100{% endif %}">
+                    <div class="flex items-center space-x-3">
+                        {% if item.submission and item.submission.is_correct %}
+                            <i class="fas fa-check-circle text-green-600 text-lg"></i>
+                            <span class="text-sm font-bold text-green-800">Задача №{{ forloop.counter }} (Верно)</span>
+                        {% else %}
+                            <i class="fas fa-times-circle text-red-500 text-lg"></i>
+                            <span class="text-sm font-bold text-red-800">Задача №{{ forloop.counter }} (Ошибка)</span>
+                        {% endif %}
+                    </div>
+                    {% if item.task.task_type %}
+                    <span class="bg-white/60 text-gray-800 text-xs font-bold px-2 py-1 rounded-md shadow-sm">
+                        {{ item.task.task_type.name }}
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <div class="p-6 prose max-w-none text-gray-800 border-b border-gray-100 task-content">
+                    {{ item.task.get_content_for_theme|safe }}
+                </div>
+                
+                <div class="bg-gray-50 p-4 sm:p-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Ваш ответ:</p>
+                            <div class="font-mono text-lg bg-white px-3 py-2 rounded-lg border border-gray-200 {% if not item.submission or not item.submission.user_answer %}text-gray-400 italic{% endif %}">
+                                {% if item.submission and item.submission.user_answer %}
+                                    {{ item.submission.user_answer }}
+                                {% else %}
+                                    (нет ответа)
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-green-700 uppercase tracking-wider mb-1">Правильный ответ:</p>
+                            <div class="font-mono text-lg bg-green-50 px-3 py-2 rounded-lg border border-green-200 text-green-800">
+                                {{ item.task.correct_answer }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" onclick="toggleSolution({{ item.task.id }})" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center transition">
+                        <i class="fas fa-lightbulb mr-2"></i> Показать решение
+                    </button>
+                    
+                    <div id="solution_{{ item.task.id }}" class="hidden mt-4 pt-4 border-t border-gray-200 prose max-w-none text-gray-800">
+                        {% if item.task.variants.first.solution %}
+                            {{ item.task.variants.first.solution|safe }}
+                        {% else %}
+                            <p class="text-gray-500 italic">Подробное решение для этой задачи пока не добавлено.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</div>
+
+<script>
+    function toggleSolution(taskId) {
+        const solDiv = document.getElementById(`solution_${taskId}`);
+        solDiv.classList.toggle('hidden');
+    }
+</script>
+{% include "core/image_modal.html" %}
+</body>
+</html>
