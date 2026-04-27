@@ -1,7 +1,15 @@
-<aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0 h-full overflow-hidden">
-    <div class="h-16 flex items-center px-6 border-b border-gray-200">
-        <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
-        <span class="text-xl font-bold text-gray-800">Система Казакова</span>
+<!-- Mobile Overlay -->
+<div id="mobile-sidebar-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
+
+<aside id="tutor-sidebar" class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0 h-full overflow-hidden fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+    <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200">
+        <div class="flex items-center">
+            <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
+            <span class="text-xl font-bold text-gray-800">Система Казакова</span>
+        </div>
+        <button class="md:hidden text-gray-500 hover:text-gray-700" onclick="toggleSidebar()">
+            <i class="fas fa-times text-xl"></i>
+        </button>
     </div>
     <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto min-h-0">
         <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 {% if active_page == 'dashboard' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
@@ -12,9 +20,6 @@
         </a>
         <a href="{% url 'tutor_create_assignment' %}" class="flex items-center px-4 py-3 {% if active_page == 'create_assignment' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
             <i class="fas fa-file-alt w-6"></i> Создать вариант
-        </a>
-        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-            <i class="fas fa-robot w-6"></i> Проверка (ИИ)
         </a>
         <a href="{% url 'chat_index' %}" class="flex items-center px-4 py-3 {% if active_page == 'chat' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition" id="sidebar-chat-link">
             <i class="fas fa-comments w-6"></i> Сообщения

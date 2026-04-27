@@ -21,6 +21,7 @@ if student:
     if task:
         print("Selected Task:", task.id)
         print("Topic:", task.topic.name)
+        print("Task Type:", task.task_type)
         print("Subject:", task.topic.subject.name)
     else:
         print("No task found!")
