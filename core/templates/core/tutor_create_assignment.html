@@ -64,17 +64,27 @@
                     
                     <div class="space-y-4">
                         {% for group in grouped_data %}
-                        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm type-group">
-                            <div class="bg-gray-100/50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                                <h4 class="font-bold text-gray-800 text-sm">{{ group.type.name }}</h4>
-                                <span class="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm">Всего задач: {{ group.total_count }}</span>
+                        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm type-group mb-4">
+                            <!-- Header (Accordion Toggle) -->
+                            <div class="bg-gray-100/50 px-4 py-3 border-b border-gray-200 flex justify-between items-center cursor-pointer select-none group-header hover:bg-gray-200/50 transition">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-chevron-down text-gray-400 transition-transform duration-200 transform -rotate-90 group-chevron w-4 text-center"></i>
+                                    <input type="checkbox" class="master-checkbox w-4 h-4 text-primary bg-white border-gray-300 rounded focus:ring-primary" checked onclick="event.stopPropagation(); toggleMasterCheckbox(this)">
+                                    <h4 class="font-bold text-gray-800 text-sm">{{ group.type.name }}</h4>
+                                </div>
+                                <span class="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm pointer-events-none">Всего задач: {{ group.total_count }}</span>
                             </div>
-                            <div class="divide-y divide-gray-100">
+                            
+                            <!-- Subtypes List (Hidden by default) -->
+                            <div class="divide-y divide-gray-100 subtypes-list hidden">
                                 {% for subtype in group.subtypes %}
-                                <div class="p-4 flex items-center justify-between hover:bg-gray-50 transition">
-                                    <div class="flex-1 pr-4">
-                                        <span class="text-sm text-gray-700 font-medium">{{ subtype.name }}</span>
-                                        <span class="text-xs text-gray-400 ml-2 inline-block">(Доступно: {{ subtype.count }})</span>
+                                <div class="p-4 flex items-center justify-between hover:bg-gray-50 transition subtype-row">
+                                    <div class="flex-1 pr-4 flex items-center space-x-3">
+                                        <input type="checkbox" class="subtype-checkbox w-4 h-4 text-primary bg-white border-gray-300 rounded focus:ring-primary" checked onchange="updateMasterCheckbox(this)">
+                                        <div>
+                                            <span class="text-sm text-gray-700 font-medium">{{ subtype.name }}</span>
+                                            <span class="text-xs text-gray-400 ml-2 inline-block">(Доступно: {{ subtype.count }})</span>
+                                        </div>
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <input type="hidden" name="subtype_name_{{ subtype.idx }}" value="{{ subtype.original_name|default:'' }}">
@@ -109,6 +119,44 @@
 </div>
 
 <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Accordion toggle logic
+        document.querySelectorAll('.group-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                // Ignore clicks on checkboxes
+                if (e.target.tagName === 'INPUT') return;
+                
+                const list = header.nextElementSibling;
+                const chevron = header.querySelector('.group-chevron');
+                
+                list.classList.toggle('hidden');
+                if (list.classList.contains('hidden')) {
+                    chevron.classList.add('-rotate-90');
+                } else {
+                    chevron.classList.remove('-rotate-90');
+                }
+            });
+        });
+    });
+
+    function toggleMasterCheckbox(masterCb) {
+        const group = masterCb.closest('.type-group');
+        const childCbs = group.querySelectorAll('.subtype-checkbox');
+        childCbs.forEach(cb => cb.checked = masterCb.checked);
+    }
+
+    function updateMasterCheckbox(childCb) {
+        const group = childCb.closest('.type-group');
+        const masterCb = group.querySelector('.master-checkbox');
+        const childCbs = Array.from(group.querySelectorAll('.subtype-checkbox'));
+        
+        const allChecked = childCbs.every(cb => cb.checked);
+        const someChecked = childCbs.some(cb => cb.checked);
+        
+        masterCb.checked = allChecked;
+        masterCb.indeterminate = someChecked && !allChecked;
+    }
+
     function updateCount(idx, delta) {
         const input = document.getElementById(`subtype_count_${idx}`);
         let val = parseInt(input.value) || 0;
@@ -126,18 +174,25 @@
             input.value = 0;
         });
 
-        // Теперь для каждой группы (Типа задачи) выбираем ровно одну случайную тему
+        // Теперь для каждой группы (Типа задачи) выбираем ровно одну случайную тему ИЗ ВЫДЕЛЕННЫХ ГАЛОЧКОЙ
         const groups = document.querySelectorAll('.type-group');
         groups.forEach(group => {
-            const availableInputs = Array.from(group.querySelectorAll('.task-counter')).filter(input => {
+            // Собираем все ряды подтем в этой группе
+            const subtypeRows = Array.from(group.querySelectorAll('.subtype-row'));
+            
+            // Оставляем только те, где стоит галочка И есть доступные задачи
+            const availableRows = subtypeRows.filter(row => {
+                const cb = row.querySelector('.subtype-checkbox');
+                const input = row.querySelector('.task-counter');
                 const max = parseInt(input.max) || 0;
-                return max > 0;
+                return cb && cb.checked && max > 0;
             });
             
-            if (availableInputs.length > 0) {
-                // Выбираем случайную подтему из доступных
-                const randomIndex = Math.floor(Math.random() * availableInputs.length);
-                availableInputs[randomIndex].value = 1;
+            if (availableRows.length > 0) {
+                // Выбираем случайную подтему из отмеченных
+                const randomIndex = Math.floor(Math.random() * availableRows.length);
+                const selectedInput = availableRows[randomIndex].querySelector('.task-counter');
+                selectedInput.value = 1;
             }
         });
     }
