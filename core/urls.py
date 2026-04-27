@@ -15,6 +15,9 @@ urlpatterns = [
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
     path('tutor/tasks/', views.tutor_task_bank, name='tutor_task_bank'),
     path('tutor/create-assignment/', views.tutor_create_assignment, name='tutor_create_assignment'),
+    path('tutor/assignment/<int:assignment_id>/preview/', views.tutor_preview_assignment, name='tutor_preview_assignment'),
+    path('tutor/assignment/<int:assignment_id>/publish/', views.tutor_publish_assignment, name='tutor_publish_assignment'),
+    path('tutor/assignment/<int:assignment_id>/regenerate/<int:task_id>/', views.tutor_regenerate_task, name='tutor_regenerate_task'),
     path('tutor/tasks/import/', views.import_tasks_view, name='import_tasks'),
 
     path('parent/', views.parent_dashboard, name='parent_dashboard'),

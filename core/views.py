@@ -241,11 +241,15 @@ def tutor_dashboard(request):
         # Вытягиваем последние ошибки ученика для отображения
         recent_mistakes = Submission.objects.filter(student=selected_student, is_correct=False).select_related('task').order_by('-created_at')[:5]
     
+    # Check if there are draft assignments we might want to resume or delete
+    drafts = Assignment.objects.filter(tutor=request.user, is_draft=True)
+    
     context = {
         'students': students,
         'selected_student': selected_student,
         'recent_payment': recent_payment,
         'recent_mistakes': recent_mistakes,
+        'drafts': drafts,
     }
     return render(request, 'core/tutor_dashboard.html', context)
 
@@ -288,17 +292,80 @@ def tutor_create_assignment(request):
         assignment = Assignment.objects.create(
             tutor=request.user,
             student=student,
-            title=title
+            title=title,
+            is_draft=True
         )
         assignment.tasks.add(*selected_tasks)
         
-        messages.success(request, f"Вариант '{title}' успешно создан и отправлен ученику {student.get_full_name() or student.username}!")
-        return redirect('tutor_dashboard')
+        return redirect('tutor_preview_assignment', assignment_id=assignment.id)
 
     return render(request, 'core/tutor_create_assignment.html', {
         'students': students,
         'task_types': task_types
     })
+
+@login_required
+def tutor_preview_assignment(request, assignment_id):
+    """Предварительный просмотр сгенерированного варианта"""
+    if request.user.role != 'tutor':
+        return redirect('login')
+
+    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
+    tasks_qs = assignment.tasks.all()
+    
+    # Расчет статистики по ученику
+    success_rates = {}
+    from django.db.models import OuterRef, Subquery
+    from .models import SpacedRepetition
+    sq = SpacedRepetition.objects.filter(student=assignment.student, task_id=OuterRef('pk')).values('interval')[:1]
+    tasks_qs = tasks_qs.annotate(student_interval=Subquery(sq))
+    
+    for t_type in TaskType.objects.all():
+        subs = Submission.objects.filter(student=assignment.student, task__task_type=t_type)
+        total = subs.count()
+        if total > 0:
+            correct = subs.filter(is_correct=True).count()
+            success_rates[t_type.id] = round((correct / total) * 100)
+        else:
+            success_rates[t_type.id] = None
+            
+    tasks = list(tasks_qs)
+    for task in tasks:
+        task.student_success_rate = success_rates.get(task.task_type_id)
+        
+    return render(request, 'core/tutor_preview_assignment.html', {
+        'assignment': assignment,
+        'tasks': tasks
+    })
+
+@login_required
+def tutor_publish_assignment(request, assignment_id):
+    """Публикация варианта для ученика"""
+    if request.method == 'POST' and request.user.role == 'tutor':
+        assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
+        assignment.is_draft = False
+        assignment.save()
+        messages.success(request, f"Вариант '{assignment.title}' успешно опубликован для {assignment.student.get_full_name() or assignment.student.username}!")
+    return redirect('tutor_dashboard')
+
+@login_required
+def tutor_regenerate_task(request, assignment_id, task_id):
+    """Замена одной задачи в варианте на случайную того же типа"""
+    if request.method == 'POST' and request.user.role == 'tutor':
+        assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
+        old_task = get_object_or_404(Task, id=task_id)
+        
+        if old_task in assignment.tasks.all():
+            new_task = Task.objects.filter(task_type=old_task.task_type).exclude(id__in=assignment.tasks.all()).order_by('?').first()
+            if new_task:
+                assignment.tasks.remove(old_task)
+                assignment.tasks.add(new_task)
+                messages.success(request, "Задача успешно заменена на аналогичную.")
+            else:
+                messages.error(request, "Больше нет доступных задач этого типа.")
+        
+        return redirect('tutor_preview_assignment', assignment_id=assignment.id)
+    return redirect('tutor_dashboard')
 
 @login_required
 def tutor_task_bank(request):

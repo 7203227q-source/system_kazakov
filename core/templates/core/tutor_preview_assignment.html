@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Предпросмотр варианта | ExamPrep</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["$", "$"], ["\\(", "\\)"]],
+                displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+                processEscapes: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen overflow-y-auto">
+<div class="min-h-screen bg-gray-50 p-8 w-full">
+    <div class="max-w-5xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Предпросмотр: {{ assignment.title }}</h1>
+                <p class="text-sm text-gray-500">Ученик: {{ assignment.student.get_full_name|default:assignment.student.username }}</p>
+            </div>
+            <div class="flex space-x-4">
+                <a href="{% url 'tutor_create_assignment' %}" class="text-gray-500 hover:text-gray-700 font-medium px-4 py-2 border border-gray-300 rounded-lg bg-white transition">
+                    Отмена
+                </a>
+                <form method="POST" action="{% url 'tutor_publish_assignment' assignment.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-primary text-white font-medium px-6 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+                        Опубликовать ученику
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+            <div class="p-4 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="space-y-6">
+            {% for task in tasks %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-bold text-gray-800">Задача №{{ forloop.counter }}</span>
+                        {% if task.task_type %}
+                        <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full">
+                            {{ task.task_type.name }}
+                        </span>
+                        {% endif %}
+                        <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full">
+                            Сложность: {{ task.difficulty }}
+                        </span>
+                    </div>
+                    <form method="POST" action="{% url 'tutor_regenerate_task' assignment.id task.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center transition" title="Заменить на случайную такого же типа">
+                            <i class="fas fa-sync-alt mr-1"></i> Заменить задачу
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="px-6 py-3 bg-indigo-50/30 border-b border-gray-100 flex space-x-6 text-sm">
+                    <div class="flex items-center">
+                        <i class="fas fa-chart-line text-gray-400 mr-2"></i>
+                        <span class="text-gray-600">Решаемость типа у ученика: 
+                            <span class="font-bold {% if task.student_success_rate >= 70 %}text-green-600{% elif task.student_success_rate < 40 %}text-red-600{% else %}text-yellow-600{% endif %}">
+                                {% if task.student_success_rate is not None %}{{ task.student_success_rate }}%{% else %}Нет данных{% endif %}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-calendar-alt text-gray-400 mr-2"></i>
+                        <span class="text-gray-600">Интервал: 
+                            <span class="font-bold text-indigo-600">
+                                {% if task.student_interval is not None %}{{ task.student_interval }} дней{% else %}Новая{% endif %}
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="p-6 prose max-w-none text-gray-800">
+                    {{ task.get_content_for_theme|safe }}
+                </div>
+                
+                <div class="bg-gray-50 border-t border-gray-100 px-6 py-4 flex justify-between items-center">
+                    <div class="text-sm">
+                        <span class="text-gray-500 mr-2">Ответ:</span>
+                        <span class="font-bold text-green-600">{{ task.correct_answer }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+</body>
+</html>

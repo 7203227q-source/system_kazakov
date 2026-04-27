@@ -177,6 +177,7 @@ class Assignment(models.Model):
     tasks = models.ManyToManyField(Task, related_name='assignments', verbose_name="Задания")
     created_at = models.DateTimeField(auto_now_add=True)
     is_completed = models.BooleanField(default=False, verbose_name="Завершено")
+    is_draft = models.BooleanField(default=False, verbose_name="Черновик (на стадии сборки)")
 
     def __str__(self):
         return f"{self.title} для {self.student.username}"

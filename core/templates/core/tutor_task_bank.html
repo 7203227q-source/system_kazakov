@@ -83,6 +83,16 @@
                 
                 <div class="flex space-x-4">
                     <form method="GET" action="{% url 'tutor_task_bank' %}" class="flex flex-wrap gap-2 justify-end">
+                        <!-- Student Filter -->
+                        <select name="student_id" class="block w-48 py-2 px-3 border border-gray-300 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" onchange="this.form.submit()">
+                            <option value="">Все ученики</option>
+                            {% for student in request.user.students.all %}
+                            <option value="{{ student.id }}" {% if request.GET.student_id == student.id|stringformat:"s" %}selected{% endif %}>
+                                {{ student.get_full_name|default:student.username }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
                         <!-- Type Filter -->
                         <select name="type" class="block w-48 py-2 px-3 border border-gray-300 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" onchange="this.form.submit()">
                             <option value="">Все типы заданий</option>
@@ -134,9 +144,31 @@
                             {% endif %}
                         </div>
                         <div class="flex items-center space-x-2">
-                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded">Сложность: {{ task.difficulty }}</span>
+                            <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full">Сложность: {{ task.difficulty }}</span>
                         </div>
                     </div>
+
+                    {% if request.GET.student_id %}
+                    <div class="px-6 py-3 bg-indigo-50/30 border-b border-gray-100 flex space-x-6 text-sm">
+                        <div class="flex items-center">
+                            <i class="fas fa-chart-line text-gray-400 mr-2"></i>
+                            <span class="text-gray-600">Решаемость типа: 
+                                <span class="font-bold {% if task.student_success_rate >= 70 %}text-green-600{% elif task.student_success_rate < 40 %}text-red-600{% else %}text-yellow-600{% endif %}">
+                                    {% if task.student_success_rate is not None %}{{ task.student_success_rate }}%{% else %}Нет данных{% endif %}
+                                </span>
+                            </span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-calendar-alt text-gray-400 mr-2"></i>
+                            <span class="text-gray-600">Интервал: 
+                                <span class="font-bold text-indigo-600">
+                                    {% if task.student_interval is not None %}{{ task.student_interval }} дней{% else %}Новая{% endif %}
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div class="p-6">
                         <div class="text-gray-800 mb-6 prose max-w-none">
                             {{ task.get_content_for_theme|safe }}
