@@ -1,0 +1,63 @@
+<!-- Image Lightbox Modal -->
+<div id="image-modal" class="fixed inset-0 z-[100] hidden bg-black/80 flex items-center justify-center p-4 opacity-0 transition-opacity duration-300 backdrop-blur-sm cursor-zoom-out">
+    <button onclick="closeImageModal()" class="absolute top-6 right-6 text-white hover:text-gray-300 text-4xl focus:outline-none">&times;</button>
+    <img id="modal-image" src="" alt="Увеличенное изображение" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl transform scale-95 transition-transform duration-300 cursor-default bg-white p-2">
+</div>
+
+<script>
+    function openImageModal(src) {
+        const modal = document.getElementById('image-modal');
+        const modalImg = document.getElementById('modal-image');
+        modalImg.src = src;
+        modal.classList.remove('hidden');
+        // Force browser to process the 'hidden' removal before applying opacity transitions
+        void modal.offsetWidth;
+        modal.classList.remove('opacity-0');
+        modalImg.classList.remove('scale-95');
+        modalImg.classList.add('scale-100');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    function closeImageModal() {
+        const modal = document.getElementById('image-modal');
+        const modalImg = document.getElementById('modal-image');
+        modal.classList.add('opacity-0');
+        modalImg.classList.remove('scale-100');
+        modalImg.classList.add('scale-95');
+        document.body.style.overflow = ''; // Restore background scrolling
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300); // Wait for fade out transition
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Find all images inside prose (task content/solutions)
+        const images = document.querySelectorAll('.prose img');
+        images.forEach(img => {
+            // Only attach to images that are likely content (not tiny icons)
+            img.classList.add('cursor-zoom-in', 'hover:opacity-80', 'transition-opacity', 'rounded');
+            img.title = "Нажмите для увеличения";
+            img.addEventListener('click', (e) => {
+                e.preventDefault();
+                openImageModal(img.src);
+            });
+        });
+
+        // Close on background click
+        const modal = document.getElementById('image-modal');
+        if(modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeImageModal();
+                }
+            });
+        }
+        
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+                closeImageModal();
+            }
+        });
+    });
+</script>
