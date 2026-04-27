@@ -275,6 +275,23 @@ class TaskLog(models.Model):
     def __str__(self):
         return f"Log: {self.student.username} -> Task {self.task.id} (Score: {self.score})"
 
+class Message(models.Model):
+    """Модель сообщения для внутреннего чата"""
+    sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)
+    receiver = models.ForeignKey(User, related_name='received_messages', on_delete=models.CASCADE)
+    content = models.TextField(blank=True, null=True, verbose_name="Текст сообщения")
+    attachment = models.FileField(upload_to='chat_attachments/', blank=True, null=True, verbose_name="Вложение (Файл/Фото)")
+    is_read = models.BooleanField(default=False, verbose_name="Прочитано")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Время отправки")
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Сообщение"
+        verbose_name_plural = "Сообщения"
+
+    def __str__(self):
+        return f"From {self.sender.username} to {self.receiver.username} at {self.created_at}"
+
 
 class Payment(models.Model):
     parent = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_made', limit_choices_to={'role': 'parent'}, verbose_name="Родитель")

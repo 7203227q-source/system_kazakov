@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сообщения | Система Казакова</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden font-sans">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white shadow-sm z-20 h-16 shrink-0 flex items-center px-4 md:px-6 justify-between border-b border-gray-200">
+        <div class="flex items-center">
+            <a href="javascript:history.back()" class="text-gray-500 hover:text-indigo-600 transition mr-4">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </a>
+            <i class="fas fa-comments text-indigo-600 text-2xl mr-3"></i>
+            <h1 class="text-xl font-bold text-gray-800 hidden sm:block">Сообщения</h1>
+        </div>
+        <div class="flex items-center">
+            <span class="text-sm font-medium text-gray-600 mr-4">{{ user.get_full_name|default:user.username }}</span>
+            <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">
+                {{ user.first_name|make_list|first|default:user.username|make_list|first|upper }}
+            </div>
+        </div>
+    </header>
+
+<div class="flex-1 flex bg-gray-50 transition-all duration-300 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Dialogs List (Sidebar) -->
+        <div class="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col {% if active_dialog %}hidden md:flex{% endif %}">
+            <div class="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-gray-800">Сообщения</h2>
+                <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full">{{ dialogs|length }}</span>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto">
+                {% if dialogs %}
+                    {% for d in dialogs %}
+                    <a href="{% url 'chat_dialog' d.user.id %}" class="flex items-center p-4 border-b border-gray-100 hover:bg-indigo-50 transition cursor-pointer relative {% if active_dialog.id == d.user.id %}bg-indigo-50 border-l-4 border-l-primary{% endif %}">
+                        <div class="relative shrink-0">
+                            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-lg">
+                                {{ d.user.first_name|make_list|first|default:d.user.username|make_list|first|upper }}
+                            </div>
+                            {% if d.unread_count > 0 %}
+                            <div class="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-sm">
+                                {{ d.unread_count }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="ml-4 flex-1 min-w-0">
+                            <div class="flex justify-between items-baseline mb-1">
+                                <h3 class="text-sm font-bold text-gray-800 truncate">{{ d.user.get_full_name|default:d.user.username }}</h3>
+                                {% if d.last_message %}
+                                <span class="text-[10px] text-gray-400 whitespace-nowrap ml-2">{{ d.last_message.created_at|date:"H:i" }}</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-xs {% if d.unread_count > 0 %}text-gray-800 font-bold{% else %}text-gray-500{% endif %} truncate">
+                                {% if d.last_message %}
+                                    {% if d.last_message.sender == request.user %}
+                                        <span class="text-indigo-400 mr-1">Вы:</span>
+                                    {% endif %}
+                                    {% if d.last_message.attachment %}
+                                        <i class="fas fa-paperclip mr-1"></i> Файл
+                                    {% else %}
+                                        {{ d.last_message.content }}
+                                    {% endif %}
+                                {% else %}
+                                    Нет сообщений
+                                {% endif %}
+                            </p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-8 text-center text-gray-500 flex flex-col items-center">
+                        <i class="fas fa-comments text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-sm">У вас пока нет контактов для переписки.</p>
+                        {% if user.role == 'student' %}
+                            <p class="text-xs mt-2">Привяжите репетитора на главной странице.</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="flex-1 flex flex-col bg-gray-50 h-full {% if not active_dialog %}hidden md:flex{% endif %}">
+            {% if active_dialog %}
+                <!-- Chat Header -->
+                <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center shadow-sm z-10">
+                    <a href="{% url 'chat_index' %}" class="md:hidden text-gray-400 hover:text-gray-600 mr-4">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </a>
+                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-lg mr-4">
+                        {{ active_dialog.first_name|make_list|first|default:active_dialog.username|make_list|first|upper }}
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800 leading-tight">{{ active_dialog.get_full_name|default:active_dialog.username }}</h2>
+                        <p class="text-xs text-green-500 font-medium">
+                            {% if active_dialog.role == 'tutor' %}Репетитор
+                            {% elif active_dialog.role == 'student' %}Ученик
+                            {% elif active_dialog.role == 'parent' %}Родитель
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Messages Area -->
+                <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4" style="background-image: url('https://www.transparenttextures.com/patterns/cubes.png');">
+                    <!-- Messages will be loaded via AJAX here -->
+                    <div class="text-center text-gray-400 text-sm py-4" id="loading-spinner">
+                        <i class="fas fa-circle-notch fa-spin mr-2"></i> Загрузка истории...
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="bg-white border-t border-gray-200 p-4">
+                    <form id="chat-form" class="flex items-end space-x-2 relative" onsubmit="sendMessage(event)">
+                        {% csrf_token %}
+                        
+                        <!-- File Upload Preview -->
+                        <div id="file-preview-container" class="hidden absolute bottom-full mb-2 left-0 right-0 bg-white border border-gray-200 rounded-lg p-3 shadow-lg flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-file-alt text-indigo-500 text-2xl mr-3" id="file-icon"></i>
+                                <span class="text-sm font-medium text-gray-700 truncate max-w-xs" id="file-name">filename.jpg</span>
+                            </div>
+                            <button type="button" onclick="clearFile()" class="text-gray-400 hover:text-red-500 transition">
+                                <i class="fas fa-times-circle text-lg"></i>
+                            </button>
+                        </div>
+
+                        <!-- Attachment Button -->
+                        <label class="cursor-pointer p-3 text-gray-400 hover:text-indigo-600 transition bg-gray-50 rounded-full shrink-0">
+                            <i class="fas fa-paperclip text-lg"></i>
+                            <input type="file" id="chat-attachment" class="hidden" onchange="handleFileSelect(event)">
+                        </label>
+
+                        <!-- Textarea -->
+                        <div class="flex-1 relative">
+                            <textarea id="chat-input" rows="1" class="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white resize-none transition" placeholder="Напишите сообщение..." style="min-height: 44px; max-height: 120px;" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                        </div>
+
+                        <!-- Send Button -->
+                        <button type="submit" id="send-btn" class="p-3 bg-primary text-white rounded-full hover:bg-indigo-700 transition shrink-0 shadow-sm flex items-center justify-center w-12 h-12 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            {% else %}
+                <!-- Empty State for Desktop -->
+                <div class="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+                    <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-comments text-4xl text-gray-300"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-700 mb-2">Выберите диалог</h2>
+                    <p class="text-sm max-w-md">Выберите собеседника из списка слева, чтобы начать общение.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if active_dialog %}
+<script>
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const fileInput = document.getElementById('chat-attachment');
+    const sendBtn = document.getElementById('send-btn');
+    const activeUserId = {{ active_dialog.id }};
+    let lastMessageId = 0;
+    let pollingInterval;
+
+    // Load initial messages
+    function fetchMessages() {
+        fetch(`/chat/api/messages/${activeUserId}/?after=${lastMessageId}`)
+            .then(res => res.json())
+            .then(data => {
+                const spinner = document.getElementById('loading-spinner');
+                if(spinner) spinner.remove();
+
+                if (data.messages && data.messages.length > 0) {
+                    let wasAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop <= chatMessages.clientHeight + 50;
+                    
+                    data.messages.forEach(msg => {
+                        appendMessageToDOM(msg);
+                        lastMessageId = msg.id; // Update last known message
+                    });
+
+                    // Auto scroll if we were at the bottom
+                    if (wasAtBottom || data.messages.length > 5) {
+                        scrollToBottom();
+                    }
+                }
+            })
+            .catch(err => console.error("Polling error:", err));
+    }
+
+    function appendMessageToDOM(msg) {
+        const div = document.createElement('div');
+        div.className = `flex ${msg.is_mine ? 'justify-end' : 'justify-start'} animate-fade-in-up`;
+        
+        let attachmentHtml = '';
+        if (msg.attachment_url) {
+            if (msg.is_image) {
+                attachmentHtml = `<div class="mb-2"><img src="${msg.attachment_url}" class="rounded-lg max-w-[200px] cursor-pointer hover:opacity-90" onclick="openImageModal(this.src)"></div>`;
+            } else {
+                attachmentHtml = `
+                    <a href="${msg.attachment_url}" target="_blank" class="flex items-center p-3 bg-white/20 rounded-lg mb-2 hover:bg-white/30 transition text-sm font-medium">
+                        <i class="fas fa-file-download text-xl mr-3"></i>
+                        <span class="truncate max-w-[150px]">Скачать вложение</span>
+                    </a>`;
+            }
+        }
+
+        const contentHtml = msg.content ? `<p class="text-sm whitespace-pre-wrap leading-relaxed">${escapeHtml(msg.content)}</p>` : '';
+
+        div.innerHTML = `
+            <div class="max-w-[75%] rounded-2xl p-4 shadow-sm ${msg.is_mine ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm'}">
+                ${attachmentHtml}
+                ${contentHtml}
+                <div class="text-[10px] mt-1.5 text-right ${msg.is_mine ? 'text-indigo-200' : 'text-gray-400'} font-medium">
+                    ${msg.created_at} ${msg.is_mine ? '<i class="fas fa-check ml-1"></i>' : ''}
+                </div>
+            </div>
+        `;
+        chatMessages.appendChild(div);
+    }
+
+    // Send Message
+    async function sendMessage(e) {
+        e.preventDefault();
+        
+        const content = chatInput.value.trim();
+        const file = fileInput.files[0];
+        
+        if (!content && !file) return;
+        
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+
+        const formData = new FormData();
+        formData.append('content', content);
+        if (file) formData.append('attachment', file);
+        
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        try {
+            const res = await fetch(`/chat/api/send/${activeUserId}/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf },
+                body: formData
+            });
+            
+            if (res.ok) {
+                chatInput.value = '';
+                chatInput.style.height = '44px';
+                clearFile();
+                // Immediately fetch to show the new message
+                fetchMessages();
+            }
+        } catch (err) {
+            alert('Ошибка отправки сообщения. Проверьте интернет.');
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        }
+    }
+
+    // File handling UI
+    function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (file) {
+            document.getElementById('file-preview-container').classList.remove('hidden');
+            document.getElementById('file-name').textContent = file.name;
+            
+            const icon = document.getElementById('file-icon');
+            if (file.type.startsWith('image/')) {
+                icon.className = 'fas fa-image text-pink-500 text-2xl mr-3';
+            } else if (file.type === 'application/pdf') {
+                icon.className = 'fas fa-file-pdf text-red-500 text-2xl mr-3';
+            } else {
+                icon.className = 'fas fa-file-alt text-indigo-500 text-2xl mr-3';
+            }
+            chatInput.focus();
+        }
+    }
+
+    function clearFile() {
+        fileInput.value = '';
+        document.getElementById('file-preview-container').classList.add('hidden');
+    }
+
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Utils
+    function escapeHtml(unsafe) {
+        return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+    }
+
+    // Allow Enter to send (Shift+Enter for new line)
+    chatInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage(e);
+        }
+    });
+
+    // Start Polling
+    fetchMessages(); // Initial fetch
+    pollingInterval = setInterval(fetchMessages, 3000); // Poll every 3 seconds
+
+</script>
+{% endif %}
+
+{% include "core/image_modal.html" %}
+</body>
+</html>

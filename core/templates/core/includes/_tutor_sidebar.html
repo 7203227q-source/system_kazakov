@@ -16,9 +16,9 @@
         <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
             <i class="fas fa-robot w-6"></i> Проверка (ИИ)
         </a>
-        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+        <a href="{% url 'chat_index' %}" class="flex items-center px-4 py-3 {% if active_page == 'chat' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition" id="sidebar-chat-link">
             <i class="fas fa-comments w-6"></i> Сообщения
-            <span class="ml-auto bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">3</span>
+            <span id="global-unread-badge" class="hidden ml-auto bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">0</span>
         </a>
         <div class="mt-8 border-t border-gray-200 pt-4">
             <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg transition">
