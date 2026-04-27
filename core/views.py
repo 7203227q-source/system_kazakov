@@ -42,19 +42,23 @@ def admin_system_status(request):
     return render(request, 'core/admin_system.html', context)
 
 import random
-import qrcode
 import base64
 from io import BytesIO
 from django.core.files.base import ContentFile
 
 def generate_qr_base64(url):
-    qr = qrcode.QRCode(version=1, box_size=4, border=4)
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    try:
+        import qrcode
+        qr = qrcode.QRCode(version=1, box_size=4, border=4)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    except ImportError:
+        # Fallback if qrcode library is not installed on the server
+        return ""
 import csv
 import os
 import uuid
