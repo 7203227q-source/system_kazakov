@@ -52,6 +52,41 @@
             </div>
         </div>
 
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider">Сводка по задачам</h3>
+                <span class="text-xs text-gray-500">Ответ ученика → Верный ответ</span>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for item in tasks_list %}
+                <div class="px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 {% if item.submission and item.submission.is_correct %}bg-green-50/40{% else %}bg-red-50/40{% endif %}">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-sm font-black {% if item.submission and item.submission.is_correct %}text-green-700{% else %}text-red-700{% endif %}">№{{ forloop.counter }}</span>
+                        <span class="text-sm text-gray-800 truncate">
+                            {% if item.task.task_type %}
+                                Тип {{ item.task.task_type.number }} — {{ item.task.task_type.name }}
+                            {% else %}
+                                Без типа
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <div class="text-gray-600">
+                            <span class="text-xs text-gray-500 mr-1">Ответ:</span>
+                            <span class="font-mono font-bold {% if item.submission and item.submission.is_correct %}text-green-700{% else %}text-red-700{% endif %}">
+                                {% if item.submission and item.submission.user_answer %}{{ item.submission.user_answer }}{% else %}—{% endif %}
+                            </span>
+                        </div>
+                        <div class="text-gray-600">
+                            <span class="text-xs text-gray-500 mr-1">Верный:</span>
+                            <span class="font-mono font-bold text-green-700">{{ item.task.correct_answer }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
         <!-- Detailed Task List -->
         <h3 class="text-lg font-bold text-gray-800 mb-4">Подробный разбор</h3>
         <div class="space-y-6">
