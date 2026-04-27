@@ -90,8 +90,10 @@ def student_practice(request):
         user_answer = request.POST.get('answer', '').strip()
         task = get_object_or_404(Task, id=task_id)
         
-        # Простейшая логика проверки
-        is_correct = (user_answer.lower() == task.correct_answer.lower())
+        # Простейшая логика проверки (с учетом точек и запятых)
+        norm_user_answer = user_answer.lower().replace(',', '.')
+        norm_correct_answer = task.correct_answer.lower().replace(',', '.')
+        is_correct = (norm_user_answer == norm_correct_answer)
         grade = 5 if is_correct else 1
         
         # Сохраняем попытку
@@ -166,7 +168,11 @@ def student_solve_assignment(request, assignment_id):
         correct_count = 0
         for task in tasks:
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
-            is_correct = (user_answer.lower() == task.correct_answer.lower())
+            
+            # Нормализация: заменяем запятые на точки для сравнения
+            norm_user_answer = user_answer.lower().replace(',', '.')
+            norm_correct_answer = task.correct_answer.lower().replace(',', '.')
+            is_correct = (norm_user_answer == norm_correct_answer)
             
             # Сохраняем попытку
             Submission.objects.create(
@@ -390,6 +396,11 @@ def tutor_bulk_uniqualize(request):
         # --- МЕСТО ДЛЯ ИНТЕГРАЦИИ ВАШЕГО API (NANOBANANA / OPENAI) ---
         # Здесь вы можете пройтись циклом по tasks, отправить их текст и картинки в API,
         # получить уникализированный текст/картинки и сохранить обратно в базу.
+        #
+        # ВАЖНОЕ УСЛОВИЕ ДЛЯ ПРОМПТА ИИ:
+        # "Перепиши эту задачу с другими числами. Ответ на новую задачу обязательно должен быть
+        # конечной десятичной дробью или целым числом, никаких бесконечных дробей в ответе быть не должно."
+        # -----------------------------------------------------------
         
         for task in tasks:
             # Для примера: добавляем пометку в текст задачи
