@@ -142,80 +142,88 @@ def update_student_analytics(student, subject):
 def get_adaptive_task_for_student(student):
     """
     Алгоритм интервального повторения (Адаптивный Тренажер).
-    Выбирает наиболее подходящую задачу для ученика на основе:
-    1. Ошибок в прошлых попытках.
-    2. Времени, прошедшего с последней попытки по теме (Кривая забывания).
-    3. Новых тем, которые еще не решались.
+    Детализированный уровень: Topic + task_type + конкретные затыки.
     """
-    # Получаем предметы, которые ученик добавил в профиль
     active_subjects = student.subject_profiles.values_list('subject_id', flat=True)
     
-    # Если предметов нет, берем просто случайную задачу из базы
     if not active_subjects:
         return Task.objects.order_by('?').first()
         
-    # 1. Собираем статистику по темам
-    topics = Topic.objects.filter(subject_id__in=active_subjects).annotate(
-        last_practiced=Max('tasks__task_logs__created_at', filter=Q(tasks__task_logs__student=student)),
-        total_attempts=Count('tasks__task_logs', filter=Q(tasks__task_logs__student=student)),
-        # Упрощенно: считаем долю правильных решений (для задач с 1 баллом). 
-        # Если score > 0, считаем правильным
-        correct_attempts=Count('tasks__task_logs', filter=Q(tasks__task_logs__student=student, tasks__task_logs__score__gt=0))
+    # 1. Группируем по уникальным парам (topic_id, task_type)
+    # Используем модель Task как базовую для агрегации
+    subtopics = Task.objects.filter(topic__subject_id__in=active_subjects).values('topic_id', 'task_type').annotate(
+        last_practiced=Max('task_logs__created_at', filter=Q(task_logs__student=student)),
+        total_attempts=Count('task_logs', filter=Q(task_logs__student=student)),
+        correct_attempts=Count('task_logs', filter=Q(task_logs__student=student, task_logs__score__gt=0))
     )
     
     now = timezone.now()
-    topic_priorities = []
+    subtopic_priorities = []
     
-    for topic in topics:
+    for st in subtopics:
         priority = 0.0
         
-        if topic.total_attempts == 0:
-            # Новая тема - высокий приоритет, чтобы ученик прошел весь материал
+        if st['total_attempts'] == 0:
+            # Новый подтип - высокий приоритет
             priority = 2.0
         else:
-            # 2. Фактор забывания (Forgetting Factor)
-            days_since = (now - topic.last_practiced).days
-            # Чем больше дней прошло, тем выше приоритет (капаем по 0.1 в день, максимум 1.5)
+            # 2. Фактор забывания
+            days_since = (now - st['last_practiced']).days if st['last_practiced'] else 0
             forgetting_factor = min(1.5, days_since * 0.1)
             
-            # 3. Фактор ошибок (Error Factor)
-            accuracy = topic.correct_attempts / topic.total_attempts
-            error_factor = 1.0 - accuracy # От 0.0 (всё решил верно) до 1.0 (всё решил неверно)
+            # 3. Фактор ошибок
+            accuracy = st['correct_attempts'] / st['total_attempts']
+            error_factor = 1.0 - accuracy 
             
-            # Если тема решена недавно и без ошибок, приоритет будет около 0
-            priority = forgetting_factor + (error_factor * 1.5) # Ошибки важнее
+            priority = forgetting_factor + (error_factor * 1.5)
             
-        topic_priorities.append({
-            'topic': topic,
+        subtopic_priorities.append({
+            'topic_id': st['topic_id'],
+            'task_type': st['task_type'],
             'priority': priority
         })
         
-    if not topic_priorities:
+    if not subtopic_priorities:
         return Task.objects.order_by('?').first()
         
-    # Сортируем темы по приоритету (по убыванию)
-    topic_priorities.sort(key=lambda x: x['priority'], reverse=True)
+    # Сортируем подтипы по приоритету
+    subtopic_priorities.sort(key=lambda x: x['priority'], reverse=True)
     
-    # Берем Топ-3 тем, чтобы добавить случайности
-    top_topics = [item['topic'] for item in topic_priorities[:3]]
-    selected_topic = random.choice(top_topics)
+    # Берем Топ-3 самых "больных" подтипов
+    top_subtopics = subtopic_priorities[:3]
+    selected_subtopic = random.choice(top_subtopics)
     
-    # 4. Выбор задачи внутри темы
-    # Ищем задачу, которую ученик еще не решал правильно
-    unsolved_tasks = Task.objects.filter(topic=selected_topic).exclude(
-        task_logs__student=student, task_logs__score__gt=0
+    # 4. Выбор задачи внутри подтипа (Spaced Repetition для конкретной задачи)
+    base_query = Task.objects.filter(
+        topic_id=selected_subtopic['topic_id'], 
+        task_type=selected_subtopic['task_type']
     )
     
+    # Шаг А: Есть ли в этом подтипе задача, в которой ученик ошибался, 
+    # и которую он давно не повторял? (Конкретный "затык")
+    failed_tasks = base_query.filter(
+        task_logs__student=student,
+        task_logs__score=0 # Была ошибка
+    ).annotate(
+        last_failed=Max('task_logs__created_at')
+    ).order_by('last_failed')
+    
+    # Если есть старая ошибка, подкидываем её снова (Spaced Repetition)
+    if failed_tasks.exists():
+        # Берем ту, где ошибался дольше всего назад
+        return failed_tasks.first()
+    
+    # Шаг Б: Ищем задачу, которую вообще не решали
+    unsolved_tasks = base_query.exclude(task_logs__student=student)
     if unsolved_tasks.exists():
         return unsolved_tasks.order_by('?').first()
         
-    # Если все задачи решены правильно, берем ту, которую он решал дольше всего назад
-    oldest_solved_task = Task.objects.filter(topic=selected_topic, task_logs__student=student).annotate(
+    # Шаг В: Если всё решено и ошибок нет, берем самую старую решенную для повторения
+    oldest_solved = base_query.filter(task_logs__student=student).annotate(
         last_log=Max('task_logs__created_at')
     ).order_by('last_log').first()
     
-    if oldest_solved_task:
-        return oldest_solved_task
+    if oldest_solved:
+        return oldest_solved
         
-    # Fallback
-    return Task.objects.filter(topic=selected_topic).order_by('?').first()
+    return base_query.order_by('?').first()
