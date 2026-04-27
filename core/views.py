@@ -736,15 +736,72 @@ def import_tasks_view(request):
     formats = ExamFormat.objects.filter(is_active=True)
     return render(request, 'core/import_tasks.html', {'formats': formats})
 
+from django.utils.timezone import localtime
+
 @login_required
 def tutor_student_history(request, student_id):
-    """История решений конкретного ученика для репетитора"""
+    """История решений конкретного ученика для репетитора (группировка по дням)"""
+    if request.user.role not in ['tutor', 'admin']:
+        return redirect('login')
+        
     student = get_object_or_404(User, id=student_id, role='student')
-    submissions = Submission.objects.filter(student=student).select_related('task').order_by('-created_at')
     
+    # Get all submissions ordered by date
+    submissions = Submission.objects.filter(student=student).select_related('task', 'task__task_type', 'assignment').order_by('-created_at')
+    
+    days_data = {}
+    
+    for sub in submissions:
+        # Get local date for grouping
+        date_obj = localtime(sub.created_at).date()
+        
+        if date_obj not in days_data:
+            days_data[date_obj] = {
+                'date': date_obj,
+                'assignments': {},
+                'practice_submissions': []
+            }
+            
+        if sub.assignment_id:
+            # It's an assignment task
+            if sub.assignment_id not in days_data[date_obj]['assignments']:
+                days_data[date_obj]['assignments'][sub.assignment_id] = {
+                    'assignment': sub.assignment,
+                    'submissions': [],
+                    'correct_count': 0,
+                    'total_count': 0,
+                }
+            
+            days_data[date_obj]['assignments'][sub.assignment_id]['submissions'].append(sub)
+            days_data[date_obj]['assignments'][sub.assignment_id]['total_count'] += 1
+            if sub.is_correct:
+                days_data[date_obj]['assignments'][sub.assignment_id]['correct_count'] += 1
+        else:
+            # It's practice/spaced repetition
+            days_data[date_obj]['practice_submissions'].append(sub)
+            
+    # Convert to a list of days and sort (newest first)
+    history_days = []
+    for d in sorted(days_data.keys(), reverse=True):
+        day_info = days_data[d]
+        
+        # Calculate practice stats
+        prac_total = len(day_info['practice_submissions'])
+        prac_correct = sum(1 for s in day_info['practice_submissions'] if s.is_correct)
+        
+        history_days.append({
+            'date': d,
+            'assignments': list(day_info['assignments'].values()),
+            'practice': {
+                'submissions': day_info['practice_submissions'],
+                'total_count': prac_total,
+                'correct_count': prac_correct
+            }
+        })
+
     return render(request, 'core/tutor_student_history.html', {
         'student': student,
-        'submissions': submissions
+        'history_days': history_days
     })
 
 @login_required
