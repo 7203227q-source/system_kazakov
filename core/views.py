@@ -422,6 +422,10 @@ def tutor_task_bank(request):
     if request.user.role not in ['tutor', 'admin']:
         return redirect('login')
 
+    if request.user.role == 'tutor' and not request.user.invite_code:
+        request.user.invite_code = generate_invite_code()
+        request.user.save(update_fields=['invite_code'])
+
     tasks = Task.objects.select_related('topic', 'task_type', 'task_type__exam_format').all()
 
     search_query = request.GET.get('q', '')

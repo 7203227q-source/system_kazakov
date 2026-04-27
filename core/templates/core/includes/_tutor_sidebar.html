@@ -1,0 +1,62 @@
+<aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
+    <div class="h-16 flex items-center px-6 border-b border-gray-200">
+        <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
+        <span class="text-xl font-bold text-gray-800">ExamPrep</span>
+    </div>
+    <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 {% if active_page == 'dashboard' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
+            <i class="fas fa-users w-6"></i> Мои ученики
+        </a>
+        <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 {% if active_page == 'tasks' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
+            <i class="fas fa-database w-6"></i> База заданий
+        </a>
+        <a href="{% url 'tutor_create_assignment' %}" class="flex items-center px-4 py-3 {% if active_page == 'create_assignment' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
+            <i class="fas fa-file-alt w-6"></i> Создать вариант
+        </a>
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+            <i class="fas fa-robot w-6"></i> Проверка (ИИ)
+        </a>
+        <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+            <i class="fas fa-comments w-6"></i> Сообщения
+            <span class="ml-auto bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">3</span>
+        </a>
+        <div class="mt-8 border-t border-gray-200 pt-4">
+            <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg transition">
+                <i class="fas fa-sign-out-alt w-6"></i> Выйти
+            </a>
+        </div>
+    </nav>
+    <div class="p-4 border-t border-gray-200 bg-white">
+        <div class="flex items-center mb-3">
+            <img src="https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&background=FCE7F3&color=DB2777" alt="User" class="w-10 h-10 rounded-full">
+            <div class="ml-3">
+                <p class="text-sm font-medium text-gray-800 truncate w-32">{{ user.get_full_name|default:user.username }}</p>
+                <p class="text-xs text-gray-500">{{ user.get_role_display }}</p>
+            </div>
+        </div>
+        <div class="mt-4 border-t border-gray-100 pt-4">
+            <p class="text-xs text-gray-500 mb-1">Код для учеников:</p>
+            <div class="flex items-center justify-between bg-gray-100 rounded-lg p-2 border border-gray-200">
+                <span class="font-mono text-sm font-bold text-primary tracking-wider" id="invite-code">{{ user.invite_code|default:"ПУСТО" }}</span>
+                <button onclick="copyInviteCode()" class="text-gray-500 hover:text-primary transition p-1" title="Скопировать">
+                    <i class="fas fa-copy" id="copy-icon"></i>
+                </button>
+            </div>
+        </div>
+        <script>
+        function copyInviteCode() {
+            const code = document.getElementById('invite-code').innerText;
+            if (code === "ПУСТО") return;
+            navigator.clipboard.writeText(code).then(() => {
+                const icon = document.getElementById('copy-icon');
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check', 'text-green-500');
+                setTimeout(() => {
+                    icon.classList.remove('fa-check', 'text-green-500');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+        }
+        </script>
+    </div>
+</aside>

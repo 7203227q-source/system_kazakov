@@ -23,25 +23,7 @@
 <body class="bg-gray-50 font-sans text-gray-800 h-screen flex overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        <div class="h-16 flex items-center px-6 border-b border-gray-200">
-            <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
-            <span class="text-xl font-bold text-gray-800">ExamPrep</span>
-        </div>
-        <nav class="flex-1 px-4 py-6 space-y-2">
-            <a href="{% url 'tutor_dashboard' %}?student_id={{ student.id }}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <i class="fas fa-arrow-left w-6"></i> Назад к профилю
-            </a>
-            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition mt-4 border-t border-gray-100 pt-4">
-                <i class="fas fa-database w-6"></i> База заданий
-            </a>
-            <div class="mt-8 border-t border-gray-200 pt-4">
-                <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg transition">
-                    <i class="fas fa-sign-out-alt w-6"></i> Выйти
-                </a>
-            </div>
-        </nav>
-    </aside>
+    {% include 'core/includes/_tutor_sidebar.html' with active_page='dashboard' %}
 
     <main class="flex-1 flex flex-col h-screen overflow-y-auto p-8">
         <div class="max-w-4xl mx-auto w-full">
