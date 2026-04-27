@@ -918,13 +918,20 @@ def role_selection_view(request):
     if request.method == 'POST':
         selected_role = request.POST.get('role')
         if selected_role in ['student', 'tutor', 'parent']:
-            request.user.role = selected_role
+            # Validate tutor phone
             if selected_role == 'tutor':
+                phone = request.POST.get('phone', '').strip()
+                if not phone:
+                    messages.error(request, "Для регистрации репетитором необходимо указать контактный телефон.")
+                    return render(request, 'core/select_role.html')
+                request.user.phone = phone
                 # Generate invite code and set trial start
                 request.user.invite_code = generate_invite_code()
                 request.user.role_assigned_at = timezone.now()
+
+            request.user.role = selected_role
             request.user.save()
-            
+
             # Редирект после сохранения
             if selected_role == 'student':
                 return redirect('student_dashboard')
