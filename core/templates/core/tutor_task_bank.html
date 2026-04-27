@@ -98,7 +98,7 @@
                             <option value="">Все типы заданий</option>
                             {% for t in task_types %}
                             <option value="{{ t.id }}" {% if type_filter == t.id|stringformat:"s" %}selected{% endif %}>
-                                {{ t.name|truncatechars:35 }}
+                                {{ t.name|truncatechars:35 }} ({{ t.task_count }})
                             </option>
                             {% endfor %}
                         </select>
@@ -107,8 +107,8 @@
                         <select name="subtype" class="block w-56 py-2 px-3 border border-gray-300 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" onchange="this.form.submit()">
                             <option value="">Все темы / подтипы</option>
                             {% for s in subtypes %}
-                            <option value="{{ s }}" {% if subtype_filter == s %}selected{% endif %}>
-                                {{ s|truncatechars:40 }}
+                            <option value="{{ s.subtype_tag }}" {% if subtype_filter == s.subtype_tag %}selected{% endif %}>
+                                {{ s.subtype_tag|truncatechars:40 }} ({{ s.task_count }})
                             </option>
                             {% endfor %}
                         </select>
@@ -131,12 +131,15 @@
                 </div>
             </div>
 
-            <div class="space-y-6">
-                {% for task in tasks %}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition">
-                    <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                        <div class="flex items-center space-x-3">
-                            <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded">ID: {{ task.fipi_id|default:task.id }}</span>
+            <div class="space-y-6 mb-24">
+                <form id="bulk-action-form" method="POST" action="{% url 'tutor_bulk_uniqualize' %}">
+                    {% csrf_token %}
+                    {% for task in tasks %}
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition mb-6">
+                        <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" name="task_ids" value="{{ task.id }}" class="task-checkbox w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2 mr-2">
+                                <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded">ID: {{ task.fipi_id|default:task.id }}</span>
                             <h3 class="font-bold text-indigo-900">{{ task.task_type.name|default:"Без типа" }}</h3>
                             <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">{{ task.task_type.exam_format.name }}</span>
                             {% if task.subtype_tag %}
@@ -202,17 +205,57 @@
                         {% endif %}
                     </div>
                 </div>
-                {% empty %}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-                    <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
-                    <h2 class="text-xl font-bold text-gray-800 mb-2">Ничего не найдено</h2>
-                    <p class="text-gray-500">Попробуйте изменить параметры поиска или сбросить фильтр.</p>
+                    {% empty %}
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+                        <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
+                        <h2 class="text-xl font-bold text-gray-800 mb-2">Ничего не найдено</h2>
+                        <p class="text-gray-500">Попробуйте изменить параметры поиска или сбросить фильтр.</p>
+                    </div>
+                    {% endfor %}
+                </form>
+            </div>
+
+            <!-- Floating Action Bar for Bulk Actions -->
+            <div id="bulk-action-bar" class="fixed bottom-0 left-0 right-0 lg:left-64 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] p-4 transform translate-y-full transition-transform duration-300 z-40">
+                <div class="max-w-6xl mx-auto flex justify-between items-center px-4">
+                    <div class="flex items-center space-x-4">
+                        <span id="selected-count" class="font-bold text-indigo-900 bg-indigo-100 px-3 py-1 rounded-full">Выбрано: 0</span>
+                    </div>
+                    <div class="flex space-x-4">
+                        <button type="button" onclick="document.querySelectorAll('.task-checkbox').forEach(cb => cb.checked = false); updateBulkActionBar();" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition">Отмена</button>
+                        <button form="bulk-action-form" type="submit" class="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-bold shadow-md hover:from-purple-700 hover:to-indigo-700 transition flex items-center">
+                            <i class="fas fa-magic mr-2"></i> Уникализировать через ИИ
+                        </button>
+                    </div>
                 </div>
-                {% endfor %}
             </div>
 
         </div>
     </main>
+
+    <script>
+        function updateBulkActionBar() {
+            const checkboxes = document.querySelectorAll('.task-checkbox');
+            const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            const bar = document.getElementById('bulk-action-bar');
+            const countDisplay = document.getElementById('selected-count');
+            
+            countDisplay.textContent = `Выбрано: ${selectedCount}`;
+            
+            if (selectedCount > 0) {
+                bar.classList.remove('translate-y-full');
+            } else {
+                bar.classList.add('translate-y-full');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const checkboxes = document.querySelectorAll('.task-checkbox');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', updateBulkActionBar);
+            });
+        });
+    </script>
 
 {% include "core/image_modal.html" %}
 </body>

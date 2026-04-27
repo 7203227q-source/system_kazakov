@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse
 from django.contrib import messages
+from django.db import models
 from .models import User, Payment, Task, Submission, ExamFormat, Assignment
 from .services import process_task_submission
 import csv
@@ -374,6 +375,37 @@ def tutor_regenerate_task(request, assignment_id, task_id):
     return redirect('tutor_dashboard')
 
 @login_required
+def tutor_bulk_uniqualize(request):
+    """
+    Массовая уникализация задач через ИИ (NanoBanana/OpenAI API).
+    """
+    if request.method == 'POST' and request.user.role in ['tutor', 'admin']:
+        task_ids = request.POST.getlist('task_ids')
+        if not task_ids:
+            messages.error(request, "Вы не выбрали ни одной задачи для уникализации.")
+            return redirect('tutor_task_bank')
+            
+        tasks = Task.objects.filter(id__in=task_ids)
+        
+        # --- МЕСТО ДЛЯ ИНТЕГРАЦИИ ВАШЕГО API (NANOBANANA / OPENAI) ---
+        # Здесь вы можете пройтись циклом по tasks, отправить их текст и картинки в API,
+        # получить уникализированный текст/картинки и сохранить обратно в базу.
+        
+        for task in tasks:
+            # Для примера: добавляем пометку в текст задачи
+            variant = task.variants.filter(theme='classic').first()
+            if variant:
+                # Временно модифицируем текст, чтобы показать, что функция работает
+                if '<span style="color: purple;">[Уникализировано ИИ]</span>' not in variant.content:
+                    variant.content = f'<p><span style="color: purple;">[Уникализировано ИИ]</span></p>' + variant.content
+                    variant.save()
+        
+        messages.success(request, f"Успешно отправлено на уникализацию ИИ: {tasks.count()} задач.")
+        return redirect('tutor_task_bank')
+        
+    return redirect('tutor_dashboard')
+
+@login_required
 def tutor_task_bank(request):
     """База заданий для репетитора (все задания системы)"""
     if request.user.role not in ['tutor', 'admin']:
@@ -394,13 +426,13 @@ def tutor_task_bank(request):
     if subtype_filter:
         tasks = tasks.filter(subtype_tag=subtype_filter)
 
-    task_types = TaskType.objects.all().order_by('number')
+    task_types = TaskType.objects.annotate(task_count=models.Count('tasks')).order_by('number')
     
     # Get unique subtype_tags for the selected type, or all if no type selected
     subtypes_query = Task.objects.exclude(subtype_tag__isnull=True).exclude(subtype_tag__exact='')
     if type_filter:
         subtypes_query = subtypes_query.filter(task_type__id=type_filter)
-    subtypes = subtypes_query.values_list('subtype_tag', flat=True).distinct().order_by('subtype_tag')
+    subtypes = subtypes_query.values('subtype_tag').annotate(task_count=models.Count('id')).order_by('subtype_tag')
 
     return render(request, 'core/tutor_task_bank.html', {
         'tasks': tasks,

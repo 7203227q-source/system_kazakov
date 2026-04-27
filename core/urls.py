@@ -14,6 +14,7 @@ urlpatterns = [
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
     path('tutor/tasks/', views.tutor_task_bank, name='tutor_task_bank'),
+    path('tutor/tasks/uniqualize/', views.tutor_bulk_uniqualize, name='tutor_bulk_uniqualize'),
     path('tutor/create-assignment/', views.tutor_create_assignment, name='tutor_create_assignment'),
     path('tutor/assignment/<int:assignment_id>/preview/', views.tutor_preview_assignment, name='tutor_preview_assignment'),
     path('tutor/assignment/<int:assignment_id>/publish/', views.tutor_publish_assignment, name='tutor_publish_assignment'),
