@@ -1,7 +1,8 @@
 import datetime
 from django.utils import timezone
-from django.db.models import Avg, F, Count
-from .models import TaskLog, DailySnapshot, StudentSubjectProfile, Submission, Assignment
+from django.db.models import Avg, F, Count, Max, Q
+from .models import TaskLog, DailySnapshot, StudentSubjectProfile, Submission, Assignment, Task, Topic
+import random
 
 ALPHA = 0.25  # Коэффициент экспоненциального сглаживания (EMA)
 
@@ -137,3 +138,84 @@ def update_student_analytics(student, subject):
     profile.save(update_fields=['trust_factor'])
     
     return snapshot
+
+def get_adaptive_task_for_student(student):
+    """
+    Алгоритм интервального повторения (Адаптивный Тренажер).
+    Выбирает наиболее подходящую задачу для ученика на основе:
+    1. Ошибок в прошлых попытках.
+    2. Времени, прошедшего с последней попытки по теме (Кривая забывания).
+    3. Новых тем, которые еще не решались.
+    """
+    # Получаем предметы, которые ученик добавил в профиль
+    active_subjects = student.subject_profiles.values_list('subject_id', flat=True)
+    
+    # Если предметов нет, берем просто случайную задачу из базы
+    if not active_subjects:
+        return Task.objects.order_by('?').first()
+        
+    # 1. Собираем статистику по темам
+    topics = Topic.objects.filter(subject_id__in=active_subjects).annotate(
+        last_practiced=Max('tasks__task_logs__created_at', filter=Q(tasks__task_logs__student=student)),
+        total_attempts=Count('tasks__task_logs', filter=Q(tasks__task_logs__student=student)),
+        # Упрощенно: считаем долю правильных решений (для задач с 1 баллом). 
+        # Если score > 0, считаем правильным
+        correct_attempts=Count('tasks__task_logs', filter=Q(tasks__task_logs__student=student, tasks__task_logs__score__gt=0))
+    )
+    
+    now = timezone.now()
+    topic_priorities = []
+    
+    for topic in topics:
+        priority = 0.0
+        
+        if topic.total_attempts == 0:
+            # Новая тема - высокий приоритет, чтобы ученик прошел весь материал
+            priority = 2.0
+        else:
+            # 2. Фактор забывания (Forgetting Factor)
+            days_since = (now - topic.last_practiced).days
+            # Чем больше дней прошло, тем выше приоритет (капаем по 0.1 в день, максимум 1.5)
+            forgetting_factor = min(1.5, days_since * 0.1)
+            
+            # 3. Фактор ошибок (Error Factor)
+            accuracy = topic.correct_attempts / topic.total_attempts
+            error_factor = 1.0 - accuracy # От 0.0 (всё решил верно) до 1.0 (всё решил неверно)
+            
+            # Если тема решена недавно и без ошибок, приоритет будет около 0
+            priority = forgetting_factor + (error_factor * 1.5) # Ошибки важнее
+            
+        topic_priorities.append({
+            'topic': topic,
+            'priority': priority
+        })
+        
+    if not topic_priorities:
+        return Task.objects.order_by('?').first()
+        
+    # Сортируем темы по приоритету (по убыванию)
+    topic_priorities.sort(key=lambda x: x['priority'], reverse=True)
+    
+    # Берем Топ-3 тем, чтобы добавить случайности
+    top_topics = [item['topic'] for item in topic_priorities[:3]]
+    selected_topic = random.choice(top_topics)
+    
+    # 4. Выбор задачи внутри темы
+    # Ищем задачу, которую ученик еще не решал правильно
+    unsolved_tasks = Task.objects.filter(topic=selected_topic).exclude(
+        task_logs__student=student, task_logs__score__gt=0
+    )
+    
+    if unsolved_tasks.exists():
+        return unsolved_tasks.order_by('?').first()
+        
+    # Если все задачи решены правильно, берем ту, которую он решал дольше всего назад
+    oldest_solved_task = Task.objects.filter(topic=selected_topic, task_logs__student=student).annotate(
+        last_log=Max('task_logs__created_at')
+    ).order_by('last_log').first()
+    
+    if oldest_solved_task:
+        return oldest_solved_task
+        
+    # Fallback
+    return Task.objects.filter(topic=selected_topic).order_by('?').first()

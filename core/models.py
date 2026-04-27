@@ -260,7 +260,7 @@ class DailySnapshot(models.Model):
 class TaskLog(models.Model):
     """Детальный лог решения каждой задачи для аналитики"""
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_logs')
-    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='task_logs')
     submission = models.ForeignKey(Submission, on_delete=models.SET_NULL, null=True, blank=True, related_name='task_logs')
     assignment = models.ForeignKey(Assignment, on_delete=models.SET_NULL, null=True, blank=True, related_name='task_logs')
     

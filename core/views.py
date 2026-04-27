@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.db import models
 from .models import User, Payment, Task, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot
 import time
-from .analytics import record_task_log
+from .analytics import record_task_log, get_adaptive_task_for_student
 from .services import process_task_submission
 from .system_info import get_system_metrics, check_gemini_api, check_openai_api
 
@@ -151,8 +151,8 @@ def student_practice(request):
         is_correct = (norm_user_answer == norm_correct_answer)
         grade = 5 if is_correct else 1
         
-        # Сохраняем попытку
-        Submission.objects.create(
+        # Сохраняем попытку в TaskLog через аналитику (чтобы учелся EMA и статистика)
+        submission = Submission.objects.create(
             student=request.user,
             task=task,
             user_answer=user_answer,
@@ -160,17 +160,22 @@ def student_practice(request):
             score=task.exam_points if is_correct else 0
         )
         
-        # Обновляем алгоритм интервального повторения
-        process_task_submission(request.user, task, grade)
-
+        # Время решения в тренажере не замеряем строго, ставим заглушку 60с для избежания аномалии
+        record_task_log(request.user, task, submission, None, 60)
+        
         # Даем XP за правильный ответ
         xp_gained = 0
         if is_correct:
             xp_gained = max(1, int(task.difficulty / 5))
-            request.user.xp += xp_gained
-            request.user.save()
+            # Обновляем XP в профиле предмета
+            profile, _ = StudentSubjectProfile.objects.get_or_create(
+                student=request.user,
+                subject=task.topic.subject
+            )
+            profile.xp += xp_gained
+            profile.level = (profile.xp // 100) + 1
+            profile.save()
 
-        # Показываем результат (можно через messages, но тут для простоты сразу рендерим с ответом)
         return render(request, 'core/student_practice_result.html', {
             'task': task,
             'user_answer': user_answer,
@@ -178,9 +183,8 @@ def student_practice(request):
             'xp_gained': xp_gained
         })
     
-    # GET запрос: выбираем случайную задачу, которую еще не решали, или просто случайную
-    # В идеале здесь должен быть алгоритм выбора задачи по SpacedRepetition
-    task = Task.objects.order_by('?').first()
+    # GET запрос: выбираем задачу с помощью алгоритма интервального повторения
+    task = get_adaptive_task_for_student(request.user)
     return render(request, 'core/student_practice.html', {'task': task})
 
 @login_required
