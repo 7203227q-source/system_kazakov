@@ -58,13 +58,13 @@
                             <p class="text-xs text-gray-500 mt-1">Укажите количество задач каждой темы.</p>
                         </div>
                         <button type="button" onclick="selectAllOne()" class="text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-lg font-bold transition flex items-center shadow-sm">
-                            <i class="fas fa-check-double mr-2"></i> Выбрать по 1 из всех тем
+                            <i class="fas fa-check-double mr-2"></i> Собрать вариант (по 1 задаче каждого типа)
                         </button>
                     </div>
                     
                     <div class="space-y-4">
                         {% for group in grouped_data %}
-                        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm type-group">
                             <div class="bg-gray-100/50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                                 <h4 class="font-bold text-gray-800 text-sm">{{ group.type.name }}</h4>
                                 <span class="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm">Всего задач: {{ group.total_count }}</span>
@@ -120,11 +120,24 @@
     }
 
     function selectAllOne() {
-        const inputs = document.querySelectorAll('.task-counter');
-        inputs.forEach(input => {
-            const max = parseInt(input.max) || 0;
-            if (max > 0) {
-                input.value = 1;
+        // Сначала сбрасываем все счетчики в 0
+        const allInputs = document.querySelectorAll('.task-counter');
+        allInputs.forEach(input => {
+            input.value = 0;
+        });
+
+        // Теперь для каждой группы (Типа задачи) выбираем ровно одну случайную тему
+        const groups = document.querySelectorAll('.type-group');
+        groups.forEach(group => {
+            const availableInputs = Array.from(group.querySelectorAll('.task-counter')).filter(input => {
+                const max = parseInt(input.max) || 0;
+                return max > 0;
+            });
+            
+            if (availableInputs.length > 0) {
+                // Выбираем случайную подтему из доступных
+                const randomIndex = Math.floor(Math.random() * availableInputs.length);
+                availableInputs[randomIndex].value = 1;
             }
         });
     }
