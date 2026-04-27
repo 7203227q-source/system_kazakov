@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Загрузка решения | Система Казакова</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen flex flex-col justify-center items-center p-4">
+    
+    <div id="upload-container" class="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-gray-100 p-6 text-center">
+        <div class="w-16 h-16 bg-indigo-100 text-primary rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+            <i class="fas fa-camera"></i>
+        </div>
+        <h1 class="text-xl font-bold text-gray-800 mb-2">Загрузите решение</h1>
+        <p class="text-sm text-gray-500 mb-6">Сделайте четкое фото вашей тетради с решением задачи.</p>
+        
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="file-input" name="image" accept="image/*" capture="environment" class="hidden">
+            <button type="button" onclick="document.getElementById('file-input').click()" class="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-md hover:bg-indigo-700 transition flex items-center justify-center">
+                <i class="fas fa-upload mr-2"></i> Выбрать фото
+            </button>
+        </form>
+        
+        <div id="preview-container" class="hidden mt-6">
+            <img id="image-preview" class="w-full h-auto rounded-lg border border-gray-200 mb-4" src="" alt="Предпросмотр">
+            <button id="submit-btn" class="w-full bg-green-500 text-white py-3 rounded-xl font-bold text-lg shadow-md hover:bg-green-600 transition">
+                Отправить решение
+            </button>
+            <button onclick="resetForm()" class="w-full mt-2 text-gray-500 py-2 font-medium">Переснять</button>
+        </div>
+        
+        <div id="loading" class="hidden mt-4">
+            <i class="fas fa-spinner fa-spin text-primary text-2xl"></i>
+            <p class="text-sm text-gray-500 mt-2">Загрузка...</p>
+        </div>
+    </div>
+    
+    <div id="success-container" class="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center hidden">
+        <div class="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">
+            <i class="fas fa-check"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Отлично!</h1>
+        <p class="text-gray-500 mb-6">Фото успешно загружено. Вы можете вернуться к компьютеру и продолжить решение варианта.</p>
+        <button onclick="window.close()" class="bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-gray-200">Закрыть окно</button>
+    </div>
+
+<script>
+    const fileInput = document.getElementById('file-input');
+    const previewContainer = document.getElementById('preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const uploadForm = document.getElementById('upload-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const uploadContainer = document.getElementById('upload-container');
+    const successContainer = document.getElementById('success-container');
+    const loading = document.getElementById('loading');
+    
+    fileInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+                document.querySelector('#upload-form button').classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+            }
+            reader.readAsDataURL(this.files[0]);
+        }
+    });
+    
+    function resetForm() {
+        fileInput.value = '';
+        imagePreview.src = '';
+        previewContainer.classList.add('hidden');
+        document.querySelector('#upload-form button').classList.remove('hidden');
+    }
+    
+    submitBtn.addEventListener('click', async () => {
+        if (!fileInput.files[0]) return;
+        
+        submitBtn.disabled = true;
+        loading.classList.remove('hidden');
+        
+        const formData = new FormData();
+        formData.append('image', fileInput.files[0]);
+        
+        // Disable CSRF for this specific token-based mobile endpoint in view using @csrf_exempt
+        try {
+            const response = await fetch('/upload/{{ token }}/', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                uploadContainer.classList.add('hidden');
+                successContainer.classList.remove('hidden');
+            } else {
+                alert('Произошла ошибка при загрузке. Попробуйте еще раз.');
+                resetForm();
+            }
+        } catch (error) {
+            alert('Ошибка соединения.');
+            resetForm();
+        } finally {
+            submitBtn.disabled = false;
+            loading.classList.add('hidden');
+        }
+    });
+</script>
+</body>
+</html>

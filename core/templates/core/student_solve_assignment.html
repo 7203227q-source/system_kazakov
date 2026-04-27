@@ -50,6 +50,98 @@
                         {{ task.get_content_for_theme|safe }}
                     </div>
                     <div class="bg-indigo-50 border-t border-indigo-100 p-4 sm:p-6">
+                        {% if task.needs_photo %}
+                        
+                        <!-- Блок для загрузки решения через QR (Развернутая часть или Черновик) -->
+                        <div class="flex flex-col items-center bg-white p-6 rounded-xl border border-dashed border-indigo-300 shadow-sm" id="qr_block_{{ task.id }}">
+                            {% if task.saved_submission.image_url %}
+                                <!-- Фото уже загружено -->
+                                <div class="text-center w-full">
+                                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                    <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
+                                    <img src="{{ task.saved_submission.image_url.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
+                                    
+                                    {% if not task.saved_submission.is_correct and task.saved_submission.is_correct != False %}
+                                    <button type="button" onclick="verifyWithGemini({{ task.saved_submission.id }}, {{ task.id }})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_{{ task.id }}">
+                                        <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <!-- Ожидание загрузки -->
+                                <h4 class="font-bold text-indigo-900 mb-2 text-center">Загрузите решение с телефона</h4>
+                                <p class="text-xs text-gray-500 mb-4 text-center max-w-sm">Наведите камеру смартфона на этот QR-код, чтобы быстро сфотографировать тетрадь. Страница обновится автоматически.</p>
+                                
+                                <div class="bg-white p-2 rounded-xl shadow-sm border border-gray-100 inline-block mb-4 relative">
+                                    <img src="data:image/png;base64,{{ task.qr_code_base64 }}" alt="QR Code" class="w-40 h-40">
+                                    
+                                    <!-- Оверлей загрузки -->
+                                    <div id="qr_loading_{{ task.id }}" class="absolute inset-0 bg-white/80 flex items-center justify-center hidden rounded-xl backdrop-blur-sm">
+                                        <i class="fas fa-circle-notch fa-spin text-primary text-3xl"></i>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center text-xs text-indigo-600 font-medium animate-pulse">
+                                    <i class="fas fa-sync-alt fa-spin mr-2"></i> Ожидание загрузки фото...
+                                </div>
+                                
+                                <!-- Скрытый инпут для десктопа (запасной вариант) -->
+                                <div class="mt-4 text-center w-full">
+                                    <p class="text-xs text-gray-400 mb-2">Или загрузите файл с компьютера:</p>
+                                    <input type="file" id="desktop_file_{{ task.id }}" class="hidden" accept="image/*">
+                                    <button type="button" onclick="document.getElementById('desktop_file_{{ task.id }}').click()" class="text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-medium">Выбрать файл</button>
+                                </div>
+                                
+                                <!-- Скрипт поллинга (опроса сервера) -->
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', () => {
+                                        const submissionId = {{ task.saved_submission.id }};
+                                        const taskId = {{ task.id }};
+                                        const interval = setInterval(async () => {
+                                            try {
+                                                const res = await fetch(`/api/submission/${submissionId}/status/`);
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    if (data.has_image) {
+                                                        clearInterval(interval);
+                                                        // Обновляем UI
+                                                        const block = document.getElementById(`qr_block_${taskId}`);
+                                                        block.innerHTML = `
+                                                            <div class="text-center w-full animate-fade-in">
+                                                                <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                                                                    <i class="fas fa-check"></i>
+                                                                </div>
+                                                                <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
+                                                                <img src="${data.image_url}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
+                                                                <button type="button" onclick="verifyWithGemini(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}">
+                                                                    <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
+                                                                </button>
+                                                            </div>
+                                                        `;
+                                                    }
+                                                }
+                                            } catch(e) {}
+                                        }, 3000); // Раз в 3 секунды
+                                    });
+                                </script>
+                            {% endif %}
+                        </div>
+                        
+                        {% if task.exam_points == 1 %}
+                            <!-- Для тестовой части с запросом черновика: показываем инпут, но прячем кнопку "Проверить" пока нет фото -->
+                            <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4 mt-4">
+                                <div class="flex-1 max-w-xs mb-4 sm:mb-0">
+                                    <label class="block text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2">Ваш ответ:</label>
+                                    <input type="text" name="answer_{{ task.id }}" id="answer_{{ task.id }}" value="{{ task.saved_submission.user_answer|default:'' }}" class="w-full border-indigo-200 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary font-mono text-lg transition-colors answer-input" placeholder="Введите ответ" {% if task.saved_submission.is_correct %}readonly class="bg-green-50 border-green-300 text-green-900"{% endif %}>
+                                </div>
+                                <p class="text-xs text-gray-500 max-w-xs">Для этой задачи репетитор запросил черновик. Загрузите фото выше, а затем введите финальный ответ.</p>
+                            </div>
+                        {% endif %}
+                        
+                        {% else %}
+                        <!-- Стандартный блок для тестовой части без черновика -->
                         <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4">
                             <div class="flex-1 max-w-xs mb-4 sm:mb-0">
                                 <label class="block text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2">Ваш ответ:</label>
@@ -59,6 +151,7 @@
                                 <i class="fas fa-check mr-2"></i> Проверить
                             </button>
                         </div>
+                        {% endif %}
                         
                         <!-- Result and Solution Block -->
                         <div id="result_{{ task.id }}" class="mt-4 hidden rounded-lg p-4 border text-sm">
@@ -121,7 +214,62 @@
         solDiv.classList.toggle('hidden');
     }
 
-    async function checkTask(taskId) {
+    async function verifyWithGemini(submissionId, taskId) {
+        const btn = document.getElementById(`btn_verify_${taskId}`);
+        if(btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Проверка нейросетью...';
+        }
+
+        try {
+            const response = await fetch(`/api/submission/${submissionId}/verify/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            
+            const resultDiv = document.getElementById(`result_${taskId}`);
+            const title = resultDiv.querySelector('.result-title');
+            const correctText = resultDiv.querySelector('.correct-answer-text');
+            const solutionDiv = document.getElementById(`solution_${taskId}`);
+            
+            resultDiv.classList.remove('hidden', 'bg-green-50', 'border-green-200', 'bg-red-50', 'border-red-200');
+
+            if (data.is_correct || data.primary_score > 0) {
+                resultDiv.classList.add('bg-green-50', 'border-green-200');
+                title.className = 'flex items-center font-bold mb-2 text-green-700 result-title';
+                title.innerHTML = `<i class="fas fa-check-circle mr-2 text-lg"></i> Оценено: ${data.primary_score} баллов`;
+            } else {
+                resultDiv.classList.add('bg-red-50', 'border-red-200');
+                title.className = 'flex items-center font-bold mb-2 text-red-700 result-title';
+                title.innerHTML = `<i class="fas fa-times-circle mr-2 text-lg"></i> Оценено: ${data.primary_score} баллов`;
+            }
+
+            // Заменяем блок с правильным ответом на развернутый фидбек от ИИ
+            correctText.parentElement.innerHTML = `<strong>Вердикт ИИ:</strong><br><p class="mt-2 text-gray-700 bg-white p-3 rounded border border-gray-200">${data.feedback}</p>`;
+            
+            if (data.solution_html) {
+                solutionDiv.innerHTML = data.solution_html;
+                if (window.MathJax) {
+                    MathJax.typesetPromise([solutionDiv]);
+                }
+            } else {
+                solutionDiv.innerHTML = '<p class="text-gray-500 italic">Решение для этой задачи пока не добавлено в базу.</p>';
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert('Ошибка при проверке нейросетью');
+            if(btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить решение через ИИ';
+            }
+        }
+    }
         const input = document.getElementById(`answer_${taskId}`);
         const answer = input.value.trim();
         

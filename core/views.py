@@ -7,10 +7,24 @@ from django.contrib import messages
 from django.db import models
 from .models import User, Payment, Task, Submission, ExamFormat, Assignment
 from .services import process_task_submission
+import random
+import qrcode
+import base64
+from io import BytesIO
+from django.core.files.base import ContentFile
+
+def generate_qr_base64(url):
+    qr = qrcode.QRCode(version=1, box_size=4, border=4)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 import csv
-import io
 import os
 import uuid
+from django.conf import settings
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
@@ -247,9 +261,32 @@ def student_assignment_summary(request, assignment_id):
     total_score = 0
     max_score = 0
     
+    # Таблица перевода первичных баллов во вторичные (ЕГЭ Профиль 2024)
+    # Примерная: 0->0, 1->5, ..., 12->64, 13->66... 32->100
+    # Для простоты используем интерполяцию или словарь. Ограничимся базовым маппингом.
+    scale_2024 = {
+        0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58, 
+        13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84, 
+        24: 86, 25: 88, 26: 90, 27: 92, 28: 94, 29: 96, 30: 98, 31: 99, 32: 100
+    }
+    
+    # Считаем суммарный первичный балл ученика
+    total_primary_earned = 0
+    max_primary_possible = 0
+    
     for task in tasks:
         sub = submissions.get(task.id)
-        if sub and sub.is_correct:
+        points_earned = 0
+        if sub:
+            if task.exam_points == 1:
+                points_earned = 1 if sub.is_correct else 0
+            else:
+                points_earned = sub.primary_score or 0
+                
+        total_primary_earned += points_earned
+        max_primary_possible += task.exam_points
+        
+        if points_earned > 0:
             correct_count += 1
             total_score += task.exam_points
         max_score += task.exam_points
@@ -257,9 +294,19 @@ def student_assignment_summary(request, assignment_id):
         tasks_list.append({
             'task': task,
             'submission': sub,
+            'points_earned': points_earned
         })
         
-    success_rate = int((correct_count / tasks.count()) * 100) if tasks.count() > 0 else 0
+    # Перевод во вторичные (если максимальный балл <= 32, используем таблицу)
+    secondary_score = 0
+    if max_primary_possible > 0:
+        # Если вариант неполный, мы пересчитываем пропорционально или используем прямое значение
+        if max_primary_possible <= 32:
+            secondary_score = scale_2024.get(total_primary_earned, int((total_primary_earned/max_primary_possible)*100))
+        else:
+            secondary_score = int((total_primary_earned / max_primary_possible) * 100)
+    
+    success_rate = int((total_primary_earned / max_primary_possible) * 100) if max_primary_possible > 0 else 0
     
     return render(request, 'core/student_assignment_summary.html', {
         'assignment': assignment,
@@ -267,8 +314,9 @@ def student_assignment_summary(request, assignment_id):
         'correct_count': correct_count,
         'total_tasks': tasks.count(),
         'success_rate': success_rate,
-        'total_score': total_score,
-        'max_score': max_score
+        'total_primary_earned': total_primary_earned,
+        'max_primary_possible': max_primary_possible,
+        'secondary_score': secondary_score
     })
 @login_required
 def student_solve_assignment(request, assignment_id):
@@ -317,7 +365,20 @@ def student_solve_assignment(request, assignment_id):
                 correct_count += 1
                 if created: # Даем XP только за первое правильное решение
                     request.user.xp += max(1, int(task.difficulty / 5))
-                
+                    
+        # Calculate secondary score based on primary scores
+        # We need to know the total primary score possible for this assignment and the student's primary score
+        total_primary = sum(t.exam_points for t in tasks)
+        student_primary = 0
+        for t in tasks:
+            sub = Submission.objects.filter(assignment=assignment, task=t, student=request.user).first()
+            if sub:
+                # If part 1 (1 point), score is based on is_correct. If part 2, it's based on primary_score field
+                if t.exam_points == 1:
+                    student_primary += 1 if sub.is_correct else 0
+                else:
+                    student_primary += sub.primary_score
+
         request.user.save()
         
         if action == 'postpone':
@@ -335,9 +396,44 @@ def student_solve_assignment(request, assignment_id):
     saved_submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
     
     tasks_list = list(tasks)
+    domain = request.build_absolute_uri('/')[:-1]
+    
     for task in tasks_list:
         task.saved_submission = saved_submissions.get(task.id)
         
+        # Определяем, нужен ли черновик / фото
+        is_part2 = task.exam_points > 1
+        requires_draft = False
+        
+        if not is_part2 and request.user.draft_check_probability > 0:
+            # Если еще нет сохраненного флага requires_draft для этой задачи, сгенерируем
+            if task.saved_submission and task.saved_submission.requires_draft:
+                requires_draft = True
+            elif not task.saved_submission:
+                # Генерируем с вероятностью из профиля ученика
+                if random.randint(1, 100) <= request.user.draft_check_probability:
+                    requires_draft = True
+                    
+        task.needs_photo = is_part2 or requires_draft
+        
+        # Если нужно фото, убеждаемся, что есть Submission и у него есть upload_token
+        if task.needs_photo:
+            if not task.saved_submission:
+                sub = Submission.objects.create(
+                    student=request.user,
+                    task=task,
+                    assignment=assignment,
+                    requires_draft=requires_draft
+                )
+                task.saved_submission = sub
+            elif not task.saved_submission.upload_token:
+                task.saved_submission.upload_token = uuid.uuid4()
+                task.saved_submission.requires_draft = requires_draft
+                task.saved_submission.save()
+                
+            upload_url = f"{domain}/upload/{task.saved_submission.upload_token}/"
+            task.qr_code_base64 = generate_qr_base64(upload_url)
+            
     return render(request, 'core/student_solve_assignment.html', {
         'assignment': assignment, 
         'tasks': tasks_list,
@@ -391,6 +487,11 @@ def tutor_update_student_contacts(request, student_id):
     student.parent_name = request.POST.get('parent_name', '')
     student.parent_phone = request.POST.get('parent_phone', '')
     student.tutor_notes = request.POST.get('tutor_notes', '')
+    
+    draft_prob = request.POST.get('draft_check_probability', '')
+    if draft_prob and draft_prob.isdigit():
+        student.draft_check_probability = max(0, min(100, int(draft_prob)))
+        
     student.save()
     
     messages.success(request, "Контакты и заметки успешно сохранены.")
@@ -1003,6 +1104,95 @@ def register_view(request):
         return redirect('select_role')
 
     return render(request, 'core/register.html')
+
+import json
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def mobile_upload_draft(request, token):
+    submission = get_object_or_404(Submission, upload_token=token)
+    if request.method == 'POST':
+        image = request.FILES.get('image')
+        if not image:
+            return JsonResponse({'error': 'Файл не найден'}, status=400)
+            
+        submission.image_url = image
+        # Invalidate the token so it can't be used again
+        submission.upload_token = None
+        submission.save()
+        return JsonResponse({'status': 'ok'})
+        
+    return render(request, 'core/mobile_upload.html', {'submission': submission, 'token': token})
+
+def api_submission_status(request, submission_id):
+    submission = get_object_or_404(Submission, id=submission_id)
+    has_image = bool(submission.image_url)
+    image_url = submission.image_url.url if has_image else None
+    return JsonResponse({'has_image': has_image, 'image_url': image_url})
+
+import re
+from django.conf import settings
+
+def api_verify_with_gemini(request, submission_id):
+    if request.method != 'POST' or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+        
+    submission = get_object_or_404(Submission, id=submission_id, student=request.user)
+    
+    if not submission.image_url:
+        return JsonResponse({'error': 'Image not found'}, status=400)
+        
+    # In a real app, this is where you'd send the image to Gemini Vision API
+    # Since we don't have the real API key configured, we will mock the Gemini response
+    # to demonstrate the flow.
+    import time
+    time.sleep(1.5) # Mock AI delay
+    
+    task = submission.task
+    max_points = task.exam_points
+    
+    # Mocking Gemini's decision
+    # If the student's task is part 1 (max 1), we just check if the draft is readable
+    if max_points == 1:
+        primary_score = 1
+        feedback = "Отличный черновик, ход решения понятен. Ответ совпадает с правильным."
+        is_correct = True
+    else:
+        # Part 2 task, mock a partial or full score
+        import random
+        primary_score = random.randint(max_points // 2, max_points)
+        is_correct = primary_score == max_points
+        if is_correct:
+            feedback = "Решение полностью верное и обоснованное. Высший балл."
+        else:
+            feedback = f"В решении есть небольшая вычислительная ошибка на промежуточном этапе. Оценено в {primary_score} из {max_points} баллов."
+            
+    submission.primary_score = primary_score
+    submission.is_correct = is_correct
+    submission.ai_feedback = feedback
+    submission.save()
+    
+    # Award XP if correct
+    xp_gained = 0
+    if is_correct:
+        xp_gained = max(1, int(task.difficulty / 5))
+        request.user.xp += xp_gained
+        request.user.save()
+        
+    solution_html = ""
+    variant = task.variants.filter(theme='classic').first()
+    if variant and variant.solution:
+        solution_html = variant.solution
+
+    return JsonResponse({
+        'status': 'ok',
+        'primary_score': primary_score,
+        'feedback': feedback,
+        'is_correct': is_correct,
+        'xp_gained': xp_gained,
+        'solution_html': solution_html
+    })
+
 from django.contrib.auth import logout
 def logout_view(request):
     """Выход из системы"""

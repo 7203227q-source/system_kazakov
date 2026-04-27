@@ -1,3 +1,4 @@
+import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
@@ -30,6 +31,7 @@ class User(AbstractUser):
     xp = models.IntegerField(default=0, verbose_name="Опыт (XP)")
     level = models.IntegerField(default=1, verbose_name="Уровень")
     current_streak = models.IntegerField(default=0, verbose_name="Стрик (дней)")
+    draft_check_probability = models.IntegerField(default=0, verbose_name="Вероятность запроса черновика (%)")
     
     # Контакты, заполняемые репетитором
     parent_name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Имя родителя")
@@ -196,13 +198,19 @@ class Submission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, null=True, blank=True, related_name='submissions', verbose_name="Вариант (если решалось в рамках варианта)")
 
     is_correct = models.BooleanField(null=True, blank=True, verbose_name="Правильно ли решено")
-    user_answer = models.TextField(blank=True, null=True, verbose_name="Ответ ученика")
+    user_answer = models.TextField(blank=True, null=True, verbose_name="Текстовый ответ ученика")
     
-    image_url = models.URLField(blank=True, null=True, verbose_name="Ссылка на фото решения")
+    image_url = models.ImageField(upload_to='submissions/', blank=True, null=True, verbose_name="Фото решения/черновика")
+    
+    # Поля для QR-загрузки и проверки черновиков
+    upload_token = models.UUIDField(default=uuid.uuid4, null=True, blank=True, verbose_name="Токен для загрузки фото")
+    requires_draft = models.BooleanField(default=False, verbose_name="Был запрошен черновик")
+
     recognized_text = models.TextField(blank=True, null=True, verbose_name="Распознанный текст (ИИ)")
     
     ai_feedback = models.TextField(blank=True, null=True, verbose_name="Вердикт ИИ")
-    score = models.IntegerField(null=True, blank=True, verbose_name="Выставленный балл")
+    score = models.IntegerField(default=0, verbose_name="Начисленный балл")
+    primary_score = models.IntegerField(default=0, verbose_name="Первичный балл (развернутая часть)")
     
     tutor_comment = models.TextField(blank=True, null=True, verbose_name="Комментарий репетитора")
     

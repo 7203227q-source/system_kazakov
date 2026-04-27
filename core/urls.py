@@ -9,6 +9,11 @@ urlpatterns = [
     path('student/practice/<int:task_id>/submit/', views.student_practice_submit, name='student_practice_submit'),
     path('student/assignment/<int:assignment_id>/summary/', views.student_assignment_summary, name='student_assignment_summary'),
     path('student/history/', views.student_history, name='student_history'),
+    
+    # Загрузка через QR
+    path('upload/<uuid:token>/', views.mobile_upload_draft, name='mobile_upload_draft'),
+    path('api/submission/<int:submission_id>/status/', views.api_submission_status, name='api_submission_status'),
+    path('api/submission/<int:submission_id>/verify/', views.api_verify_with_gemini, name='api_verify_with_gemini'),
     path('student/assignment/<int:assignment_id>/', views.student_solve_assignment, name='student_solve_assignment'),
     path('student/assignment/<int:assignment_id>/check/<int:task_id>/', views.student_check_assignment_task, name='student_check_assignment_task'),
     path('student/update-theme/', views.update_theme_view, name='update_theme'),

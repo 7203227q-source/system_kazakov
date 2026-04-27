@@ -47,7 +47,11 @@
                 </div>
                 <div class="bg-indigo-50 rounded-xl px-6 py-4 border border-indigo-100 min-w-[120px]">
                     <p class="text-xs text-indigo-800 font-bold uppercase mb-1">Первичный балл</p>
-                    <p class="text-3xl font-black text-primary">{{ total_score }}<span class="text-lg text-indigo-300">/{{ max_score }}</span></p>
+                    <p class="text-3xl font-black text-primary">{{ total_primary_earned }}<span class="text-lg text-indigo-300">/{{ max_primary_possible }}</span></p>
+                </div>
+                <div class="bg-green-50 rounded-xl px-6 py-4 border border-green-100 min-w-[120px]">
+                    <p class="text-xs text-green-800 font-bold uppercase mb-1">Вторичный балл (ЕГЭ)</p>
+                    <p class="text-3xl font-black text-green-600">{{ secondary_score }}<span class="text-lg text-green-300">/100</span></p>
                 </div>
             </div>
         </div>

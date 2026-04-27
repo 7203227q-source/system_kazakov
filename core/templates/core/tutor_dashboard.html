@@ -258,6 +258,10 @@
                             <p class="text-sm text-gray-800 font-medium">{{ selected_student.parent_phone|default:"Не указан" }}</p>
                         </div>
                         <div class="sm:col-span-3 border-t border-gray-100 pt-4">
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Настройки проверок (Анти-чит)</p>
+                            <p class="text-sm text-gray-800 font-medium">Запрашивать черновик для тестовой части в {{ selected_student.draft_check_probability }}% случаев</p>
+                        </div>
+                        <div class="sm:col-span-3 border-t border-gray-100 pt-4">
                             <p class="text-xs text-gray-500 uppercase font-bold mb-1">Заметки репетитора</p>
                             <p class="text-sm text-gray-800 whitespace-pre-line">{{ selected_student.tutor_notes|default:"Нет заметок" }}</p>
                         </div>
@@ -279,7 +283,12 @@
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Телефон родителя</label>
                                 <input type="text" name="parent_phone" value="{{ selected_student.parent_phone|default:'' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary text-sm" placeholder="+7 (999) 000-00-00">
                             </div>
-                            <div class="sm:col-span-3">
+                            <div class="sm:col-span-3 border-t border-gray-100 pt-2">
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Частота запроса черновика в тестовой части (%)</label>
+                                <p class="text-xs text-gray-400 mb-2">0 - никогда не просить фото черновика. 100 - просить фото решения для каждой тестовой задачи.</p>
+                                <input type="number" name="draft_check_probability" min="0" max="100" value="{{ selected_student.draft_check_probability }}" class="w-full sm:w-1/3 border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary text-sm" placeholder="0">
+                            </div>
+                            <div class="sm:col-span-3 border-t border-gray-100 pt-2">
                                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Заметки репетитора (видит только репетитор)</label>
                                 <textarea name="tutor_notes" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary text-sm" placeholder="Дополнительная информация об ученике...">{{ selected_student.tutor_notes|default:'' }}</textarea>
                             </div>
