@@ -48,6 +48,9 @@
             <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg transition">
                 <i class="fas fa-database w-6"></i> База заданий
             </a>
+            <a href="{% url 'tutor_create_assignment' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <i class="fas fa-file-alt w-6"></i> Создать вариант
+            </a>
             <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
                 <i class="fas fa-robot w-6"></i> Проверка (ИИ)
             </a>
@@ -146,9 +149,14 @@
                             </button>
                         </div>
                         {% if task.get_solution_for_theme %}
-                        <div id="solution-{{ task.id }}" class="hidden mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-lg text-sm text-gray-800 prose max-w-none">
-                            <p class="font-bold text-indigo-900 mb-2">Решение:</p>
-                            {{ task.get_solution_for_theme|safe }}
+                        <div id="solution-{{ task.id }}" class="hidden mt-6 p-6 bg-indigo-50/50 border border-indigo-100 rounded-xl text-sm text-gray-800">
+                            <div class="flex items-center mb-4">
+                                <i class="fas fa-lightbulb text-yellow-500 mr-2 text-lg"></i>
+                                <span class="font-bold text-indigo-900 text-base">Подробное решение</span>
+                            </div>
+                            <div class="prose prose-sm max-w-none prose-indigo leading-relaxed space-y-4">
+                                {{ task.get_solution_for_theme|safe }}
+                            </div>
                         </div>
                         {% endif %}
                     </div>
