@@ -70,33 +70,41 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <!-- Forecast -->
                 <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 border-l-4 border-l-primary relative overflow-hidden">
-                    <div class="absolute top-0 right-0 bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-bl-lg flex items-center">
-                        <i class="fas fa-flag-checkered mr-1"></i> Цель: {{ selected_child.target_score|default:"Не указана" }}
-                    </div>
-                    
-                    <p class="text-sm text-gray-500 mb-1 mt-2">Прогноз ИИ на экзамен</p>
-                    <div class="flex items-end mb-1">
-                        <h3 class="text-3xl font-bold text-primary">85</h3>
-                        <span class="text-sm text-gray-400 ml-1 mb-1">/100 баллов</span>
-                    </div>
-                    
-                    <p class="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded border border-gray-100">
-                        <i class="fas fa-user-tie text-gray-400 mr-1"></i> Прогноз репетитора: <strong>80-88 баллов</strong>
-                    </p>
-                    
-                    <p class="text-sm text-green-600 flex items-center font-medium">
-                        <i class="fas fa-arrow-up mr-1"></i> Идет к цели
-                    </p>
+                    <p class="text-sm text-gray-500 mb-1 mt-2">Предметы и цели</p>
+                    {% if selected_child.subject_profiles.exists %}
+                        <div class="space-y-3 mt-3">
+                        {% for profile in selected_child.subject_profiles.all %}
+                            <div class="flex justify-between items-center bg-gray-50 p-2 rounded">
+                                <span class="font-bold text-gray-700 text-sm">{{ profile.subject.name }}</span>
+                                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">Цель: {{ profile.target_score }}</span>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-xs text-gray-500 mt-2">Предметы не выбраны</p>
+                    {% endif %}
                 </div>
 
                 <!-- Engagement -->
                 <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <p class="text-sm text-gray-500 mb-1">Вовлеченность (XP)</p>
-                    <div class="flex items-end mb-2">
-                        <h3 class="text-3xl font-bold text-gray-800">{{ selected_child.xp }}</h3>
-                        <span class="text-sm text-gray-400 ml-1 mb-1">опыта</span>
-                    </div>
-                    <p class="text-sm text-gray-500">Уровень {{ selected_child.level }}, стрик {{ selected_child.current_streak }} дней</p>
+                    <p class="text-sm text-gray-500 mb-4">Вовлеченность (XP)</p>
+                    {% if selected_child.subject_profiles.exists %}
+                        <div class="space-y-4">
+                        {% for profile in selected_child.subject_profiles.all %}
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-600">{{ profile.subject.name }}</span>
+                                    <span class="font-bold text-indigo-600">{{ profile.xp }} XP (Ур. {{ profile.level }})</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2">
+                                    <div class="bg-gradient-to-r from-primary to-indigo-500 h-2 rounded-full" style="width: {% widthratio profile.xp 100 100 %}%"></div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-gray-500">Нет данных</p>
+                    {% endif %}
                 </div>
 
                 <!-- Payment Block -->

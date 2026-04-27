@@ -62,6 +62,22 @@ class Subject(models.Model):
     def __str__(self):
         return self.name
 
+class StudentSubjectProfile(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='subject_profiles', verbose_name="Ученик")
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, verbose_name="Предмет")
+    target_score = models.IntegerField(default=80, verbose_name="Целевой балл")
+    xp = models.IntegerField(default=0, verbose_name="Опыт (XP)")
+    level = models.IntegerField(default=1, verbose_name="Уровень")
+    current_streak = models.IntegerField(default=0, verbose_name="Стрик (дней)")
+
+    class Meta:
+        unique_together = ('student', 'subject')
+        verbose_name = "Профиль ученика по предмету"
+        verbose_name_plural = "Профили учеников по предметам"
+
+    def __str__(self):
+        return f"{self.student.username} - {self.subject.name}"
+
 
 class ExamFormat(models.Model):
     """

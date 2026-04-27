@@ -5,7 +5,7 @@ from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse
 from django.contrib import messages
 from django.db import models
-from .models import User, Payment, Task, Submission, ExamFormat, Assignment
+from .models import User, Payment, Task, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject
 from .services import process_task_submission
 from .system_info import get_system_metrics, check_gemini_api, check_openai_api
 
@@ -199,25 +199,51 @@ def student_dashboard(request):
         return redirect('student_dashboard')
 
     recent_submissions = Submission.objects.filter(student=request.user).order_by('-created_at')[:5]
-    pending_assignments = Assignment.objects.filter(student=request.user, is_completed=False, is_draft=False).order_by('-created_at')
-
-    # Gamification calculations
-    current_level = (request.user.xp // 100) + 1
-    next_level_xp = current_level * 100
-    xp_to_next = next_level_xp - request.user.xp
-    progress_percent = int((request.user.xp % 100) / 100 * 100)
-
-    # Save level if it changed
-    if request.user.level != current_level:
-        request.user.level = current_level
-        request.user.save(update_fields=['level'])
     
+    # Handle subjects
+    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related('subject')
+    active_subject_id = request.GET.get('subject_id')
+    
+    if not active_subject_id and profiles.exists():
+        active_subject_id = profiles.first().subject_id
+    elif active_subject_id:
+        active_subject_id = int(active_subject_id)
+        
+    active_profile = next((p for p in profiles if p.subject_id == active_subject_id), None)
+    
+    # Filter assignments by subject
+    pending_assignments = Assignment.objects.filter(
+        student=request.user, 
+        is_completed=False, 
+        is_draft=False
+    )
+    
+    if active_subject_id:
+        pending_assignments = pending_assignments.filter(tasks__topic__subject_id=active_subject_id).distinct()
+        
+    pending_assignments = pending_assignments.order_by('-created_at')
+
+    # Gamification calculations for active profile
+    if active_profile:
+        current_level = active_profile.level
+        next_level_xp = current_level * 100
+        xp_to_next = next_level_xp - active_profile.xp
+        progress_percent = int((active_profile.xp % 100) / 100 * 100)
+    else:
+        current_level = 1
+        next_level_xp = 100
+        xp_to_next = 100
+        progress_percent = 0
+
     return render(request, 'core/student_dashboard.html', {
         'recent_submissions': recent_submissions,
         'pending_assignments': pending_assignments,
-        'next_level_xp': next_level_xp,
+        'profiles': profiles,
+        'active_profile': active_profile,
+        'active_subject_id': active_subject_id,
         'xp_to_next': xp_to_next,
         'progress_percent': progress_percent,
+        'next_level_xp': next_level_xp
     })
 
 from django.http import JsonResponse
@@ -261,11 +287,18 @@ def student_check_assignment_task(request, assignment_id, task_id):
         submission.save()
         
     # Если решили правильно, даем XP (только если еще не давали)
-    # Тут можно усложнить логику, чтобы XP не фармили, но для MVP:
     xp_gained = max(1, int(task.difficulty / 5))
     if is_correct and created:
-        request.user.xp += xp_gained
-        request.user.save()
+        profile, _ = StudentSubjectProfile.objects.get_or_create(
+            student=request.user, 
+            subject=task.topic.subject,
+            defaults={'target_score': 80, 'level': 1, 'xp': 0}
+        )
+        profile.xp += xp_gained
+        # Update level logic: 1 level per 100 XP
+        new_level = (profile.xp // 100) + 1
+        profile.level = new_level
+        profile.save()
         
     # Формируем HTML решения
     solution_html = ""
@@ -402,9 +435,14 @@ def student_solve_assignment(request, assignment_id):
             if is_correct:
                 correct_count += 1
                 if created: # Даем XP только за первое правильное решение
-                    request.user.xp += max(1, int(task.difficulty / 5))
-                    
-        # Calculate secondary score based on primary scores
+                    profile, _ = StudentSubjectProfile.objects.get_or_create(
+                        student=request.user,
+                        subject=task.topic.subject,
+                        defaults={'target_score': 80, 'level': 1, 'xp': 0}
+                    )
+                    profile.xp += max(1, int(task.difficulty / 5))
+                    profile.level = (profile.xp // 100) + 1
+                    profile.save()
         # We need to know the total primary score possible for this assignment and the student's primary score
         total_primary = sum(t.exam_points for t in tasks)
         student_primary = 0
@@ -545,7 +583,8 @@ def tutor_dashboard(request):
         request.user.invite_code = generate_invite_code()
         request.user.save(update_fields=['invite_code'])
 
-    students = request.user.students.all()
+    # Get students with their profiles
+    students = request.user.students.all().prefetch_related('subject_profiles', 'subject_profiles__subject')
     selected_student_id = request.GET.get('student_id')
     selected_student = None
     recent_payment = None
@@ -986,7 +1025,10 @@ def tutor_student_history(request, student_id):
 @login_required
 def parent_dashboard(request):
     """Дашборд Родителя"""
-    children = request.user.children.all()
+    if request.user.role != 'parent':
+        return redirect('login')
+        
+    children = request.user.children.all().prefetch_related('subject_profiles', 'subject_profiles__subject')
     selected_child_id = request.GET.get('child_id')
     selected_child = None
     
@@ -1080,18 +1122,34 @@ def role_selection_view(request):
                 phone = request.POST.get('phone', '').strip()
                 if not phone:
                     messages.error(request, "Для регистрации репетитором необходимо указать контактный телефон.")
-                    return render(request, 'core/select_role.html')
+                    subjects = Subject.objects.all()
+                    return render(request, 'core/select_role.html', {'subjects': subjects})
                 request.user.phone = phone
                 # Generate invite code and set trial start
                 request.user.invite_code = generate_invite_code()
                 request.user.role_assigned_at = timezone.now()
 
             if selected_role == 'student':
+                subject_id = request.POST.get('subject_id')
                 target_score_str = request.POST.get('target_score', '').strip()
-                if target_score_str and target_score_str.isdigit():
-                    request.user.target_score = int(target_score_str)
-                else:
-                    request.user.target_score = 80 # По умолчанию 80 баллов
+                
+                try:
+                    target_score = int(target_score_str)
+                    if target_score < 0 or target_score > 100:
+                        target_score = 80
+                except (ValueError, TypeError):
+                    target_score = 80
+                
+                if subject_id:
+                    try:
+                        subject = Subject.objects.get(id=subject_id)
+                        StudentSubjectProfile.objects.create(
+                            student=request.user,
+                            subject=subject,
+                            target_score=target_score
+                        )
+                    except Subject.DoesNotExist:
+                        pass
 
             request.user.role = selected_role
             request.user.save()
@@ -1104,7 +1162,8 @@ def role_selection_view(request):
             elif selected_role == 'parent':
                 return redirect('parent_dashboard')
                 
-    return render(request, 'core/select_role.html')
+    subjects = Subject.objects.all()
+    return render(request, 'core/select_role.html', {'subjects': subjects})
 
 def register_view(request):
     """
@@ -1210,12 +1269,18 @@ def api_verify_with_gemini(request, submission_id):
     submission.ai_feedback = feedback
     submission.save()
     
-    # Award XP if correct
+        # Award XP if correct
     xp_gained = 0
     if is_correct:
         xp_gained = max(1, int(task.difficulty / 5))
-        request.user.xp += xp_gained
-        request.user.save()
+        profile, _ = StudentSubjectProfile.objects.get_or_create(
+            student=request.user,
+            subject=task.topic.subject,
+            defaults={'target_score': 80, 'level': 1, 'xp': 0}
+        )
+        profile.xp += xp_gained
+        profile.level = (profile.xp // 100) + 1
+        profile.save()
         
     solution_html = ""
     variant = task.variants.filter(theme='classic').first()

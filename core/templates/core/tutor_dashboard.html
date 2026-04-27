@@ -76,14 +76,22 @@
                          <div class="flex justify-between items-start mb-2">
                              <div class="flex items-center">
                                  <img src="https://ui-avatars.com/api/?name={{ student.get_full_name|urlencode }}&background=E0E7FF&color=4F46E5" class="w-10 h-10 rounded-full mr-3">
-                                 <div>
+                                 <div class="overflow-hidden">
                                      <div class="flex items-center">
-                                         <h3 class="font-bold text-gray-800 text-sm">{{ student.get_full_name }}</h3>
+                                         <h3 class="font-bold text-gray-800 text-sm truncate">{{ student.get_full_name|default:student.username }}</h3>
                                          {% if student.is_idle %}
                                          <span title="Нет активных вариантов и заданий для повторения" class="ml-2 w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_0_2px_rgba(239,68,68,0.2)] shrink-0"></span>
                                          {% endif %}
                                      </div>
-                                     <p class="text-xs text-gray-500">Уровень {{ student.level }} • Цель: {{ student.target_score }}</p>
+                                     <p class="text-xs text-gray-500 truncate">
+                                         {% if student.subject_profiles.exists %}
+                                             {% for profile in student.subject_profiles.all %}
+                                                 {{ profile.subject.name }}{% if not forloop.last %}, {% endif %}
+                                             {% endfor %}
+                                         {% else %}
+                                             Нет предметов
+                                         {% endif %}
+                                     </p>
                                  </div>
                              </div>
                              <div class="text-right">
@@ -154,6 +162,28 @@
                             <i class="fas fa-star mr-2"></i> Дать +50 XP
                         </button>
                     </div>
+                </div>
+
+                <!-- Subject Profiles XP -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+                    <p class="text-sm font-medium text-gray-500 mb-4">Вовлеченность (XP)</p>
+                    {% if selected_student.subject_profiles.exists %}
+                        <div class="space-y-3">
+                        {% for profile in selected_student.subject_profiles.all %}
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-600">{{ profile.subject.name }}</span>
+                                    <span class="font-bold text-primary">{{ profile.xp }} XP (Ур. {{ profile.level }})</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2">
+                                    <div class="bg-gradient-to-r from-primary to-indigo-500 h-2 rounded-full" style="width: {% widthratio profile.xp 100 100 %}%"></div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-gray-500">Нет данных</p>
+                    {% endif %}
                 </div>
 
                 <!-- Problem Areas (AI Analysis) & Payments Row -->
