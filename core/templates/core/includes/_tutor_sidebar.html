@@ -1,9 +1,7 @@
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
-<style>.logo-font { font-family: "Montserrat", sans-serif; letter-spacing: -0.5px; }</style>
 <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0 h-full overflow-hidden">
     <div class="h-16 flex items-center px-6 border-b border-gray-200">
         <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
-        <span class="text-xl font-extrabold text-gray-800 logo-font">Система Казакова</span>
+        <span class="text-xl font-bold text-gray-800">Система Казакова</span>
     </div>
     <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto min-h-0">
         <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 {% if active_page == 'dashboard' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
@@ -28,21 +26,21 @@
             </a>
         </div>
     </nav>
-    <div class="p-4 border-t border-gray-200 bg-white">
-        <div class="flex items-center mb-3">
-            <img src="https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&background=FCE7F3&color=DB2777" alt="User" class="w-10 h-10 rounded-full">
-            <div class="ml-3">
-                <p class="text-sm font-medium text-gray-800 truncate w-32">{{ user.get_full_name|default:user.username }}</p>
-                <p class="text-xs text-gray-500">{{ user.get_role_display }}</p>
-            </div>
-        </div>
-        <div class="mt-4 border-t border-gray-100 pt-4">
+    <div class="p-4 border-t border-gray-200 bg-white shrink-0">
+        <div class="mb-4">
             <p class="text-xs text-gray-500 mb-1">Код для учеников:</p>
             <div class="flex items-center justify-between bg-gray-100 rounded-lg p-2 border border-gray-200">
                 <span class="font-mono text-sm font-bold text-primary tracking-wider" id="invite-code">{{ user.invite_code|default:"ПУСТО" }}</span>
                 <button onclick="copyInviteCode()" class="text-gray-500 hover:text-primary transition p-1" title="Скопировать">
                     <i class="fas fa-copy" id="copy-icon"></i>
                 </button>
+            </div>
+        </div>
+        <div class="flex items-center border-t border-gray-100 pt-4">
+            <img src="https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&background=FCE7F3&color=DB2777" alt="User" class="w-10 h-10 rounded-full">
+            <div class="ml-3">
+                <p class="text-sm font-medium text-gray-800 truncate w-32">{{ user.get_full_name|default:user.username }}</p>
+                <p class="text-xs text-gray-500">{{ user.get_role_display }}</p>
             </div>
         </div>
         <script>
