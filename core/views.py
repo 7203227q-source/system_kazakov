@@ -225,6 +225,12 @@ def update_theme_view(request):
 def tutor_dashboard(request):
     """Дашборд Репетитора"""
     # Предполагаем, что request.user.role == 'tutor'
+    
+    # Self-healing for older tutor accounts without an invite code
+    if request.user.role == 'tutor' and not request.user.invite_code:
+        request.user.invite_code = generate_invite_code()
+        request.user.save(update_fields=['invite_code'])
+
     students = request.user.students.all()
     selected_student_id = request.GET.get('student_id')
     selected_student = None
