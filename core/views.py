@@ -150,6 +150,65 @@ def student_dashboard(request):
         'pending_assignments': pending_assignments
     })
 
+from django.http import JsonResponse
+
+@login_required
+def student_check_assignment_task(request, assignment_id, task_id):
+    """AJAX проверка одной задачи в варианте"""
+    if request.user.role != 'student' or request.method != 'POST':
+        return JsonResponse({'error': 'Доступ запрещен'}, status=403)
+        
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
+    task = get_object_or_404(Task, id=task_id)
+    
+    if assignment.is_completed:
+        return JsonResponse({'error': 'Вариант уже завершен'}, status=400)
+        
+    user_answer = request.POST.get('answer', '').strip()
+    
+    # Нормализация
+    norm_user_answer = user_answer.lower().replace(',', '.')
+    norm_correct_answer = task.correct_answer.lower().replace(',', '.')
+    is_correct = (norm_user_answer == norm_correct_answer)
+    
+    # Ищем старое решение или создаем новое
+    submission, created = Submission.objects.get_or_create(
+        student=request.user,
+        task=task,
+        assignment=assignment,
+        defaults={
+            'user_answer': user_answer,
+            'is_correct': is_correct,
+            'score': task.exam_points if is_correct else 0
+        }
+    )
+    
+    # Если уже было создано, обновляем (разрешаем менять ответ до завершения варианта)
+    if not created:
+        submission.user_answer = user_answer
+        submission.is_correct = is_correct
+        submission.score = task.exam_points if is_correct else 0
+        submission.save()
+        
+    # Если решили правильно, даем XP (только если еще не давали)
+    # Тут можно усложнить логику, чтобы XP не фармили, но для MVP:
+    if is_correct and created:
+        request.user.xp += 10
+        request.user.save()
+        
+    # Формируем HTML решения
+    solution_html = ""
+    variant = task.variants.filter(theme='classic').first()
+    if variant and variant.solution:
+        solution_html = variant.solution
+        
+    return JsonResponse({
+        'is_correct': is_correct,
+        'correct_answer': task.correct_answer,
+        'solution_html': solution_html,
+        'xp_gained': 10 if is_correct and created else 0
+    })
+
 @login_required
 def student_solve_assignment(request, assignment_id):
     """Решение варианта (ДЗ) учеником"""
@@ -165,6 +224,8 @@ def student_solve_assignment(request, assignment_id):
     tasks = assignment.tasks.all()
     
     if request.method == 'POST':
+        action = request.POST.get('action', 'finish')
+        
         correct_count = 0
         for task in tasks:
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
@@ -174,27 +235,54 @@ def student_solve_assignment(request, assignment_id):
             norm_correct_answer = task.correct_answer.lower().replace(',', '.')
             is_correct = (norm_user_answer == norm_correct_answer)
             
-            # Сохраняем попытку
-            Submission.objects.create(
+            # Ищем старое решение или создаем новое (с привязкой к варианту)
+            sub, created = Submission.objects.get_or_create(
                 student=request.user,
                 task=task,
-                user_answer=user_answer,
-                is_correct=is_correct,
-                score=task.exam_points if is_correct else 0
+                assignment=assignment,
+                defaults={
+                    'user_answer': user_answer,
+                    'is_correct': is_correct,
+                    'score': task.exam_points if is_correct else 0
+                }
             )
+            
+            if not created:
+                # Если уже было, просто обновим (вдруг ученик поменял ответ при общем сабмите)
+                sub.user_answer = user_answer
+                sub.is_correct = is_correct
+                sub.score = task.exam_points if is_correct else 0
+                sub.save()
             
             if is_correct:
                 correct_count += 1
-                request.user.xp += 10
+                if created: # Даем XP только за первое правильное решение
+                    request.user.xp += 10
                 
         request.user.save()
+        
+        if action == 'postpone':
+            messages.success(request, "Ваши ответы сохранены! Вы сможете продолжить решение позже.")
+            return redirect('student_dashboard')
+            
+        # Иначе - Завершаем
         assignment.is_completed = True
         assignment.save()
         
         messages.success(request, f"Вариант завершен! Вы решили правильно {correct_count} из {tasks.count()} задач.")
         return redirect('student_dashboard')
 
-    return render(request, 'core/student_solve_assignment.html', {'assignment': assignment, 'tasks': tasks})
+    # GET: Загружаем сохраненные ответы ученика, чтобы подставить в поля
+    saved_submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
+    
+    tasks_list = list(tasks)
+    for task in tasks_list:
+        task.saved_submission = saved_submissions.get(task.id)
+        
+    return render(request, 'core/student_solve_assignment.html', {
+        'assignment': assignment, 
+        'tasks': tasks_list,
+    })
 
 @login_required
 def student_practice_submit(request, task_id):

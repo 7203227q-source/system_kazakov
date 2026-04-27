@@ -188,7 +188,8 @@ class Submission(models.Model):
     """
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='submissions')
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
-    
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, null=True, blank=True, related_name='submissions', verbose_name="Вариант (если решалось в рамках варианта)")
+
     is_correct = models.BooleanField(null=True, blank=True, verbose_name="Правильно ли решено")
     user_answer = models.TextField(blank=True, null=True, verbose_name="Ответ ученика")
     

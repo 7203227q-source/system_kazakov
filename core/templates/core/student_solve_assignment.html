@@ -21,23 +21,23 @@
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] overflow-y-auto">
-<div class="min-h-[100dvh] bg-gray-50 p-8 w-full">
+<div class="min-h-[100dvh] bg-gray-50 p-4 sm:p-8 w-full">
     <div class="max-w-4xl mx-auto">
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">{{ assignment.title }}</h1>
                 <p class="text-sm text-gray-500">От репетитора: {{ assignment.tutor.get_full_name|default:assignment.tutor.username }}</p>
             </div>
-            <a href="{% url 'student_dashboard' %}" class="text-gray-500 hover:text-gray-700 transition">
-                <i class="fas fa-arrow-left mr-2"></i> Вернуться
+            <a href="{% url 'student_dashboard' %}" class="text-gray-500 hover:text-gray-700 transition flex items-center">
+                <i class="fas fa-arrow-left mr-2"></i> <span class="hidden sm:inline">Вернуться</span>
             </a>
         </div>
 
-        <form method="POST" action="{% url 'student_solve_assignment' assignment.id %}">
+        <form method="POST" action="{% url 'student_solve_assignment' assignment.id %}" id="assignment-form">
             {% csrf_token %}
             <div class="space-y-6">
                 {% for task in tasks %}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden task-card" data-task-id="{{ task.id }}">
                     <div class="bg-gray-50 px-6 py-3 border-b border-gray-100 flex justify-between items-center">
                         <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Задача №{{ forloop.counter }}</span>
                         {% if task.task_type %}
@@ -46,28 +46,156 @@
                         </span>
                         {% endif %}
                     </div>
-                    <div class="p-6 prose max-w-none text-gray-800">
+                    <div class="p-6 prose max-w-none text-gray-800 task-content">
                         {{ task.get_content_for_theme|safe }}
                     </div>
-                    <div class="bg-indigo-50 border-t border-indigo-100 p-4">
-                        <div class="max-w-xs">
-                            <label class="block text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2">Ваш ответ:</label>
-                            <input type="text" name="answer_{{ task.id }}" class="w-full border-indigo-200 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary font-mono text-lg" required placeholder="Введите ответ">
+                    <div class="bg-indigo-50 border-t border-indigo-100 p-4 sm:p-6">
+                        <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4">
+                            <div class="flex-1 max-w-xs mb-4 sm:mb-0">
+                                <label class="block text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2">Ваш ответ:</label>
+                                <input type="text" name="answer_{{ task.id }}" id="answer_{{ task.id }}" value="{{ task.saved_submission.user_answer|default:'' }}" class="w-full border-indigo-200 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary font-mono text-lg transition-colors answer-input" placeholder="Введите ответ" {% if task.saved_submission.is_correct %}readonly class="bg-green-50 border-green-300 text-green-900"{% endif %}>
+                            </div>
+                            <button type="button" onclick="checkTask({{ task.id }})" class="bg-white border border-indigo-200 text-indigo-700 px-6 py-2 rounded-lg font-bold hover:bg-indigo-50 hover:border-indigo-300 transition shadow-sm check-btn" {% if task.saved_submission.is_correct %}disabled{% endif %}>
+                                <i class="fas fa-check mr-2"></i> Проверить
+                            </button>
                         </div>
+                        
+                        <!-- Result and Solution Block -->
+                        <div id="result_{{ task.id }}" class="mt-4 hidden rounded-lg p-4 border text-sm">
+                            <div class="flex items-center font-bold mb-2 result-title"></div>
+                            <p class="text-gray-700 mb-3">Правильный ответ: <span class="font-mono bg-white px-2 py-1 rounded border correct-answer-text"></span></p>
+                            
+                            <button type="button" onclick="toggleSolution({{ task.id }})" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center">
+                                <i class="fas fa-lightbulb mr-2"></i> Показать решение
+                            </button>
+                            
+                            <div id="solution_{{ task.id }}" class="hidden mt-4 pt-4 border-t border-gray-200 prose max-w-none text-gray-800">
+                                <!-- Solution HTML will be injected here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Restore visual state if already checked correctly -->
+                        {% if task.saved_submission.is_correct %}
+                        <div class="mt-4 rounded-lg p-4 border border-green-200 bg-green-50 text-sm">
+                            <div class="flex items-center font-bold mb-2 text-green-700"><i class="fas fa-check-circle mr-2 text-lg"></i> Верно!</div>
+                            <p class="text-gray-700 mb-3">Правильный ответ: <span class="font-mono bg-white px-2 py-1 rounded border">{{ task.correct_answer }}</span></p>
+                            <button type="button" onclick="toggleSolution({{ task.id }})" class="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center">
+                                <i class="fas fa-lightbulb mr-2"></i> Показать решение
+                            </button>
+                            <div id="solution_{{ task.id }}" class="hidden mt-4 pt-4 border-t border-green-200 prose max-w-none text-gray-800">
+                                {{ task.variants.first.solution|safe }}
+                            </div>
+                        </div>
+                        {% elif task.saved_submission and task.saved_submission.is_correct == False %}
+                        <!-- Visual state if checked and wrong previously -->
+                        <script>
+                            // Small trick to mark it red on load if it was wrong
+                            document.addEventListener('DOMContentLoaded', () => {
+                                const input = document.getElementById('answer_{{ task.id }}');
+                                if(input) {
+                                    input.classList.add('border-red-300', 'bg-red-50');
+                                }
+                            });
+                        </script>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
             </div>
 
-            <div class="mt-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
-                <p class="text-sm text-gray-500">Убедитесь, что заполнили все ответы перед отправкой.</p>
-                <button type="submit" class="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md">
-                    Завершить вариант
+            <div class="mt-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                <button type="submit" name="action" value="postpone" class="text-gray-600 border border-gray-300 bg-white px-6 py-3 rounded-lg font-bold hover:bg-gray-50 transition w-full sm:w-auto">
+                    <i class="fas fa-pause mr-2"></i> Отложить решение
+                </button>
+                <button type="submit" name="action" value="finish" class="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md w-full sm:w-auto flex items-center justify-center">
+                    <i class="fas fa-flag-checkered mr-2"></i> Завершить вариант
                 </button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+    function toggleSolution(taskId) {
+        const solDiv = document.getElementById(`solution_${taskId}`);
+        solDiv.classList.toggle('hidden');
+    }
+
+    async function checkTask(taskId) {
+        const input = document.getElementById(`answer_${taskId}`);
+        const answer = input.value.trim();
+        
+        if (!answer) {
+            alert("Введите ответ перед проверкой");
+            return;
+        }
+
+        const btn = document.querySelector(`.task-card[data-task-id="${taskId}"] .check-btn`);
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Проверка...';
+
+        const formData = new FormData();
+        formData.append('answer', answer);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        try {
+            const response = await fetch(`{% url 'student_solve_assignment' assignment.id %}check/${taskId}/`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                const resultDiv = document.getElementById(`result_${taskId}`);
+                const title = resultDiv.querySelector('.result-title');
+                const correctText = resultDiv.querySelector('.correct-answer-text');
+                const solutionDiv = document.getElementById(`solution_${taskId}`);
+                
+                resultDiv.classList.remove('hidden', 'bg-green-50', 'border-green-200', 'bg-red-50', 'border-red-200');
+                input.classList.remove('border-red-300', 'bg-red-50', 'border-green-300', 'bg-green-50');
+
+                if (data.is_correct) {
+                    resultDiv.classList.add('bg-green-50', 'border-green-200');
+                    title.className = 'flex items-center font-bold mb-2 text-green-700 result-title';
+                    title.innerHTML = '<i class="fas fa-check-circle mr-2 text-lg"></i> Верно!';
+                    
+                    input.classList.add('border-green-300', 'bg-green-50', 'text-green-900');
+                    // Optional: make readonly if correct
+                    // input.readOnly = true; 
+                    // btn.classList.add('hidden'); // hide check button
+                } else {
+                    resultDiv.classList.add('bg-red-50', 'border-red-200');
+                    title.className = 'flex items-center font-bold mb-2 text-red-700 result-title';
+                    title.innerHTML = '<i class="fas fa-times-circle mr-2 text-lg"></i> Ошибка';
+                    
+                    input.classList.add('border-red-300', 'bg-red-50');
+                }
+
+                correctText.textContent = data.correct_answer;
+                
+                if (data.solution_html) {
+                    solutionDiv.innerHTML = data.solution_html;
+                    // re-render mathjax if needed
+                    if (window.MathJax) {
+                        MathJax.typesetPromise([solutionDiv]);
+                    }
+                } else {
+                    solutionDiv.innerHTML = '<p class="text-gray-500 italic">Решение для этой задачи пока не добавлено в базу.</p>';
+                }
+
+            } else {
+                alert(data.error || 'Произошла ошибка при проверке');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Ошибка соединения с сервером');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check mr-2"></i> Проверить';
+        }
+    }
+</script>
 {% include "core/image_modal.html" %}
 </body>
 </html>
