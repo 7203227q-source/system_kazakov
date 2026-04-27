@@ -143,7 +143,7 @@ def student_dashboard(request):
         return redirect('student_dashboard')
 
     recent_submissions = Submission.objects.filter(student=request.user).order_by('-created_at')[:5]
-    pending_assignments = Assignment.objects.filter(student=request.user, is_completed=False).order_by('-created_at')
+    pending_assignments = Assignment.objects.filter(student=request.user, is_completed=False, is_draft=False).order_by('-created_at')
     
     return render(request, 'core/student_dashboard.html', {
         'recent_submissions': recent_submissions,
@@ -243,6 +243,19 @@ def tutor_dashboard(request):
     selected_student = None
     recent_payment = None
     recent_mistakes = []
+    
+    # Calculate idle status for all students
+    from django.utils import timezone
+    from .models import SpacedRepetition
+    today = timezone.now().date()
+    
+    for s in students:
+        # Check for active assignments
+        active_assignments_count = Assignment.objects.filter(student=s, is_draft=False, is_completed=False).count()
+        # Check for pending spaced repetition tasks
+        pending_srs_count = SpacedRepetition.objects.filter(student=s, next_review_date__lte=today).count()
+        
+        s.is_idle = (active_assignments_count == 0 and pending_srs_count == 0)
     
     if selected_student_id:
         selected_student = students.filter(id=selected_student_id).first()

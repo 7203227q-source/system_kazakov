@@ -77,7 +77,12 @@
                              <div class="flex items-center">
                                  <img src="https://ui-avatars.com/api/?name={{ student.get_full_name|urlencode }}&background=E0E7FF&color=4F46E5" class="w-10 h-10 rounded-full mr-3">
                                  <div>
-                                     <h3 class="font-bold text-gray-800 text-sm">{{ student.get_full_name }}</h3>
+                                     <div class="flex items-center">
+                                         <h3 class="font-bold text-gray-800 text-sm">{{ student.get_full_name }}</h3>
+                                         {% if student.is_idle %}
+                                         <span title="Нет активных вариантов и заданий для повторения" class="ml-2 w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_0_2px_rgba(239,68,68,0.2)] shrink-0"></span>
+                                         {% endif %}
+                                     </div>
                                      <p class="text-xs text-gray-500">Уровень {{ student.level }} • Цель: {{ student.target_score }}</p>
                                  </div>
                              </div>
@@ -89,6 +94,11 @@
                              <span class="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">Прогноз: 85</span>
                              <span class="text-xs text-gray-500"><i class="fas fa-fire text-orange-500"></i> {{ student.current_streak }} дней</span>
                          </div>
+                         {% if student.is_idle %}
+                         <div class="mt-3 text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100 flex items-center">
+                             <i class="fas fa-exclamation-triangle mr-1"></i> Нужны задания
+                         </div>
+                         {% endif %}
                      </a>
                      {% empty %}
                     <div class="p-4 text-center text-gray-500 text-sm">У вас пока нет учеников.</div>
