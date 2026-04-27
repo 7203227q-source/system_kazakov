@@ -80,7 +80,7 @@
                                 {% for subtype in group.subtypes %}
                                 <div class="p-4 flex items-center justify-between hover:bg-gray-50 transition subtype-row">
                                     <div class="flex-1 pr-4 flex items-center space-x-3">
-                                        <input type="checkbox" class="subtype-checkbox w-4 h-4 text-primary bg-white border-gray-300 rounded focus:ring-primary" checked onchange="updateMasterCheckbox(this)">
+                                        <input type="checkbox" class="subtype-checkbox w-4 h-4 text-primary bg-white border-gray-300 rounded focus:ring-primary" checked onchange="handleSubtypeCheckboxChange(this)">
                                         <div>
                                             <span class="text-sm text-gray-700 font-medium">{{ subtype.name }}</span>
                                             <span class="text-xs text-gray-400 ml-2 inline-block">(Доступно: {{ subtype.count }})</span>
@@ -118,13 +118,13 @@
     </main>
 </div>
 
-<script>
+    <script>
     document.addEventListener('DOMContentLoaded', () => {
         // Accordion toggle logic
         document.querySelectorAll('.group-header').forEach(header => {
             header.addEventListener('click', (e) => {
-                // Ignore clicks on checkboxes
-                if (e.target.tagName === 'INPUT') return;
+                // Ignore clicks on checkboxes or inputs
+                if (e.target.tagName === 'INPUT' || e.target.closest('.header-controls')) return;
                 
                 const list = header.nextElementSibling;
                 const chevron = header.querySelector('.group-chevron');
@@ -137,17 +137,52 @@
                 }
             });
         });
+        
+        // Sync subtype inputs to checkboxes
+        document.querySelectorAll('.task-counter').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const row = e.target.closest('.subtype-row');
+                if (!row) return;
+                const cb = row.querySelector('.subtype-checkbox');
+                if (!cb) return;
+                
+                // Only update checkbox state, don't trigger its change event
+                const val = parseInt(e.target.value) || 0;
+                cb.checked = val > 0;
+                updateMasterCheckbox(cb);
+            });
+        });
     });
 
     function toggleMasterCheckbox(masterCb) {
         const group = masterCb.closest('.type-group');
         const childCbs = group.querySelectorAll('.subtype-checkbox');
-        childCbs.forEach(cb => cb.checked = masterCb.checked);
+        
+        // Disable event listeners from firing multiple times by setting value directly
+        childCbs.forEach(cb => {
+            cb.checked = masterCb.checked;
+            const row = cb.closest('.subtype-row');
+            if (row) {
+                const input = row.querySelector('.task-counter');
+                if (input) {
+                    const max = parseInt(input.max) || 0;
+                    if (cb.checked && max > 0) {
+                        input.value = 1;
+                    } else {
+                        input.value = 0;
+                    }
+                }
+            }
+        });
     }
 
     function updateMasterCheckbox(childCb) {
         const group = childCb.closest('.type-group');
+        if (!group) return;
+        
         const masterCb = group.querySelector('.master-checkbox');
+        if (!masterCb) return;
+        
         const childCbs = Array.from(group.querySelectorAll('.subtype-checkbox'));
         
         const allChecked = childCbs.every(cb => cb.checked);
@@ -155,6 +190,27 @@
         
         masterCb.checked = allChecked;
         masterCb.indeterminate = someChecked && !allChecked;
+    }
+
+    // This function handles the checkbox change event triggered by the user clicking the checkbox
+    function handleSubtypeCheckboxChange(cb) {
+        const row = cb.closest('.subtype-row');
+        if (!row) return;
+        
+        const input = row.querySelector('.task-counter');
+        if (!input) return;
+        
+        const max = parseInt(input.max) || 0;
+        
+        if (cb.checked) {
+            if (max > 0 && (parseInt(input.value) || 0) === 0) {
+                input.value = 1;
+            }
+        } else {
+            input.value = 0;
+        }
+        
+        updateMasterCheckbox(cb);
     }
 
     function updateCount(idx, delta) {
@@ -165,6 +221,9 @@
         if (val < 0) val = 0;
         if (val > max) val = max;
         input.value = val;
+        
+        // Trigger input event to sync checkbox
+        input.dispatchEvent(new Event('input'));
     }
 
     function selectAllOne() {
