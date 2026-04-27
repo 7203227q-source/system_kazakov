@@ -54,10 +54,29 @@
                 </div>
             </div>
             {% if user.invite_code %}
-            <div class="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <p class="text-xs text-gray-500 mb-1">Код-приглашение для учеников:</p>
-                <p class="text-lg font-bold text-primary tracking-widest">{{ user.invite_code }}</p>
+            <div class="mt-4 border-t border-gray-100 pt-4">
+                <p class="text-xs text-gray-500 mb-1">Код для учеников:</p>
+                <div class="flex items-center justify-between bg-gray-100 rounded-lg p-2">
+                    <span class="font-mono text-sm font-bold text-gray-800 tracking-wider" id="invite-code">{{ user.invite_code }}</span>
+                    <button onclick="copyInviteCode()" class="text-gray-500 hover:text-primary transition" title="Скопировать">
+                        <i class="fas fa-copy" id="copy-icon"></i>
+                    </button>
+                </div>
             </div>
+            <script>
+            function copyInviteCode() {
+                const code = document.getElementById('invite-code').innerText;
+                navigator.clipboard.writeText(code).then(() => {
+                    const icon = document.getElementById('copy-icon');
+                    icon.classList.remove('fa-copy');
+                    icon.classList.add('fa-check', 'text-green-500');
+                    setTimeout(() => {
+                        icon.classList.remove('fa-check', 'text-green-500');
+                        icon.classList.add('fa-copy');
+                    }, 2000);
+                });
+            }
+            </script>
             {% endif %}
         </div>
     </aside>
