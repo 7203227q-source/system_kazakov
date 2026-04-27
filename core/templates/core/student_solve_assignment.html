@@ -158,7 +158,8 @@
                 if (data.is_correct) {
                     resultDiv.classList.add('bg-green-50', 'border-green-200');
                     title.className = 'flex items-center font-bold mb-2 text-green-700 result-title';
-                    title.innerHTML = '<i class="fas fa-check-circle mr-2 text-lg"></i> Верно!';
+                    let xpText = data.xp_gained > 0 ? ` <span class="ml-2 text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">+${data.xp_gained} XP</span>` : '';
+                    title.innerHTML = '<i class="fas fa-check-circle mr-2 text-lg"></i> Верно!' + xpText;
                     
                     input.classList.add('border-green-300', 'bg-green-50', 'text-green-900');
                     // Optional: make readonly if correct

@@ -108,17 +108,20 @@ def student_practice(request):
         
         # Обновляем алгоритм интервального повторения
         process_task_submission(request.user, task, grade)
-        
+
         # Даем XP за правильный ответ
+        xp_gained = 0
         if is_correct:
-            request.user.xp += 10
+            xp_gained = max(1, int(task.difficulty / 5))
+            request.user.xp += xp_gained
             request.user.save()
-            
+
         # Показываем результат (можно через messages, но тут для простоты сразу рендерим с ответом)
         return render(request, 'core/student_practice_result.html', {
             'task': task,
             'user_answer': user_answer,
-            'is_correct': is_correct
+            'is_correct': is_correct,
+            'xp_gained': xp_gained
         })
     
     # GET запрос: выбираем случайную задачу, которую еще не решали, или просто случайную
@@ -145,10 +148,24 @@ def student_dashboard(request):
 
     recent_submissions = Submission.objects.filter(student=request.user).order_by('-created_at')[:5]
     pending_assignments = Assignment.objects.filter(student=request.user, is_completed=False, is_draft=False).order_by('-created_at')
+
+    # Gamification calculations
+    current_level = (request.user.xp // 100) + 1
+    next_level_xp = current_level * 100
+    xp_to_next = next_level_xp - request.user.xp
+    progress_percent = int((request.user.xp % 100) / 100 * 100)
+
+    # Save level if it changed
+    if request.user.level != current_level:
+        request.user.level = current_level
+        request.user.save(update_fields=['level'])
     
     return render(request, 'core/student_dashboard.html', {
         'recent_submissions': recent_submissions,
-        'pending_assignments': pending_assignments
+        'pending_assignments': pending_assignments,
+        'next_level_xp': next_level_xp,
+        'xp_to_next': xp_to_next,
+        'progress_percent': progress_percent,
     })
 
 from django.http import JsonResponse
@@ -193,8 +210,9 @@ def student_check_assignment_task(request, assignment_id, task_id):
         
     # Если решили правильно, даем XP (только если еще не давали)
     # Тут можно усложнить логику, чтобы XP не фармили, но для MVP:
+    xp_gained = max(1, int(task.difficulty / 5))
     if is_correct and created:
-        request.user.xp += 10
+        request.user.xp += xp_gained
         request.user.save()
         
     # Формируем HTML решения
@@ -207,7 +225,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
         'is_correct': is_correct,
         'correct_answer': task.correct_answer,
         'solution_html': solution_html,
-        'xp_gained': 10 if is_correct and created else 0
+        'xp_gained': xp_gained if is_correct and created else 0
     })
 
 @login_required
@@ -298,7 +316,7 @@ def student_solve_assignment(request, assignment_id):
             if is_correct:
                 correct_count += 1
                 if created: # Даем XP только за первое правильное решение
-                    request.user.xp += 10
+                    request.user.xp += max(1, int(task.difficulty / 5))
                 
         request.user.save()
         
@@ -928,6 +946,13 @@ def role_selection_view(request):
                 # Generate invite code and set trial start
                 request.user.invite_code = generate_invite_code()
                 request.user.role_assigned_at = timezone.now()
+
+            if selected_role == 'student':
+                target_score_str = request.POST.get('target_score', '').strip()
+                if target_score_str and target_score_str.isdigit():
+                    request.user.target_score = int(target_score_str)
+                else:
+                    request.user.target_score = 80 # По умолчанию 80 баллов
 
             request.user.role = selected_role
             request.user.save()

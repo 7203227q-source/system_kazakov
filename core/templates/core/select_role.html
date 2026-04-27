@@ -41,7 +41,6 @@
                 <span class="block text-xl font-bold text-gray-800 mb-2">Я Ученик</span>
                 <span class="block text-sm text-gray-500">Хочу решать тренажеры, готовиться к экзаменам и видеть свой прогресс.</span>
                 <div class="absolute inset-0 border-2 border-primary rounded-2xl opacity-0 peer-checked:opacity-100 pointer-events-none transition"></div>
-                <!-- Checkmark (shows when selected via some custom CSS or JS, here we just use basic radio) -->
             </label>
 
             <!-- Репетитор -->
@@ -71,6 +70,13 @@
                 <input type="text" name="phone" id="tutor-phone" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary focus:border-primary text-lg" placeholder="+7 (999) 000-00-00">
             </div>
 
+            <!-- Поле для цели (только для ученика) -->
+            <div id="student-target-container" class="col-span-1 md:col-span-3 hidden mt-4 bg-green-50 border border-green-100 rounded-xl p-6 transition-all duration-300">
+                <label class="block text-sm font-bold text-gray-700 mb-2">Ваша цель на экзамене (баллы)</label>
+                <p class="text-xs text-gray-500 mb-3">На какой балл вы планируете сдать экзамен? Если не знаете, мы автоматически поставим 80 баллов.</p>
+                <input type="number" name="target_score" id="student-target" min="1" max="100" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary focus:border-primary text-lg" placeholder="Например: 85">
+            </div>
+
             <div class="col-span-1 md:col-span-3 mt-4">
                 <button type="submit" class="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-md text-lg font-bold text-white bg-primary hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition">
                     Продолжить
@@ -92,16 +98,24 @@
         const radios = document.querySelectorAll('input[name="role"]');
         const phoneContainer = document.getElementById('tutor-phone-container');
         const phoneInput = document.getElementById('tutor-phone');
+        const targetContainer = document.getElementById('student-target-container');
 
         radios.forEach(radio => {
             radio.addEventListener('change', (e) => {
                 if (e.target.value === 'tutor') {
                     phoneContainer.classList.remove('hidden');
                     phoneInput.required = true;
+                    targetContainer.classList.add('hidden');
+                } else if (e.target.value === 'student') {
+                    phoneContainer.classList.add('hidden');
+                    phoneInput.required = false;
+                    phoneInput.value = '';
+                    targetContainer.classList.remove('hidden');
                 } else {
                     phoneContainer.classList.add('hidden');
                     phoneInput.required = false;
-                    phoneInput.value = ''; // clear if they switch
+                    phoneInput.value = '';
+                    targetContainer.classList.add('hidden');
                 }
             });
         });
