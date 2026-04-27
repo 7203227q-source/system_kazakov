@@ -16,22 +16,36 @@
     {% include 'core/includes/_tutor_sidebar.html' with active_page='create_assignment' %}
 
     <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-8">
-        <div class="max-w-4xl mx-auto">
-            {% if messages %}
-            <div class="mb-6 space-y-2">
-                {% for message in messages %}
-                <div class="p-4 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
-                    {{ message }}
-                </div>
-                {% endfor %}
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0">
+            <div class="flex items-center space-x-4">
+                <button class="md:hidden text-gray-500 hover:text-gray-700 mr-2" onclick="toggleSidebar()">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
             </div>
-            {% endif %}
+            <div class="flex items-center space-x-3 md:space-x-4">
+                <a href="{% url 'logout' %}" class="text-red-500 hover:text-red-700 flex items-center font-medium transition" title="Выйти">
+                    <i class="fas fa-sign-out-alt text-xl md:mr-2"></i> <span class="hidden md:inline">Выйти</span>
+                </a>
+            </div>
+        </header>
 
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">Генератор вариантов</h1>
-            <p class="text-sm text-gray-500 mb-8">Соберите вариант из случайных задач по нужным типам.</p>
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
+            <div class="max-w-4xl mx-auto">
+                {% if messages %}
+                <div class="mb-6 space-y-2">
+                    {% for message in messages %}
+                    <div class="p-4 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
 
-            <form method="POST" action="{% url 'tutor_create_assignment' %}" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800 mb-2">Генератор вариантов</h1>
+                <p class="text-sm text-gray-500 mb-6 md:mb-8">Соберите вариант из случайных задач по нужным типам.</p>
+
+                <form method="POST" action="{% url 'tutor_create_assignment' %}" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {% csrf_token %}
                 
                 <div class="p-6 border-b border-gray-100 space-y-6">
@@ -142,7 +156,7 @@
     </main>
 </div>
 
-    <script>
+<script>
     document.addEventListener('DOMContentLoaded', () => {
         // Accordion toggle logic
         document.querySelectorAll('.group-header').forEach(header => {

@@ -25,14 +25,28 @@
     <!-- Sidebar -->
     {% include 'core/includes/_tutor_sidebar.html' with active_page='dashboard' %}
 
-    <main class="flex-1 flex flex-col h-[100dvh] overflow-y-auto p-8">
-        <div class="max-w-4xl mx-auto w-full">
+    <main class="flex-1 flex flex-col h-[100dvh] overflow-y-auto">
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0">
+            <div class="flex items-center space-x-4">
+                <button class="md:hidden text-gray-500 hover:text-gray-700 mr-2" onclick="toggleSidebar()">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+            </div>
+            <div class="flex items-center space-x-3 md:space-x-4">
+                <a href="{% url 'logout' %}" class="hidden md:flex text-red-500 hover:text-red-700 ml-2 md:ml-6 items-center font-medium transition" title="Выйти">
+                    <i class="fas fa-sign-out-alt text-xl md:mr-2"></i> <span class="hidden md:inline">Выйти</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="p-4 md:p-8 max-w-4xl mx-auto w-full">
             
             <div class="flex items-center mb-6">
-                <img src="https://ui-avatars.com/api/?name={{ student.get_full_name|urlencode }}&background=E0E7FF&color=4F46E5" class="w-12 h-12 rounded-full mr-4">
+                <img src="https://ui-avatars.com/api/?name={{ student.get_full_name|urlencode }}&background=E0E7FF&color=4F46E5" class="w-10 h-10 md:w-12 md:h-12 rounded-full mr-3 md:mr-4">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-800">Журнал решений: {{ student.get_full_name }}</h1>
-                    <p class="text-sm text-gray-500">История выполнения заданий в тренажере</p>
+                    <h1 class="text-xl md:text-2xl font-bold text-gray-800 leading-tight">Журнал решений: {{ student.get_full_name }}</h1>
+                    <p class="text-xs md:text-sm text-gray-500">История выполнения заданий в тренажере</p>
                 </div>
             </div>
 

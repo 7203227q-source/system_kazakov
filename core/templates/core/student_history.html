@@ -22,38 +22,33 @@
     </head>
 <body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] flex overflow-hidden">
 
-    <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        <div class="h-16 flex items-center px-6 border-b border-gray-200">
-            <i class="fas fa-graduation-cap text-primary text-2xl mr-2"></i>
-            <span class="text-xl font-bold text-gray-800">Система Казакова</span>
-        </div>
-        <nav class="flex-1 px-4 py-6 space-y-2">
-            <a href="{% url 'student_dashboard' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <i class="fas fa-home w-6"></i> Главная
-            </a>
-            <a href="{% url 'student_practice' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <i class="fas fa-dumbbell w-6"></i> Тренажер
-            </a>
-            <a href="{% url 'student_history' %}" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg transition">
-                <i class="fas fa-history w-6"></i> Журнал решений
-            </a>
-            <div class="mt-8 border-t border-gray-200 pt-4">
-                <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg transition">
-                    <i class="fas fa-sign-out-alt w-6"></i> Выйти
-                </a>
-            </div>
-        </nav>
-    </aside>
+    {% include 'core/includes/_student_sidebar.html' with active_page='history' %}
 
-    <main class="flex-1 flex flex-col h-[100dvh] overflow-y-auto p-8">
-        <div class="max-w-4xl mx-auto w-full">
+    <main class="flex-1 flex flex-col h-[100dvh] overflow-y-auto">
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0">
+            <div class="flex items-center space-x-2 md:space-x-4">
+                <button class="md:hidden text-gray-500 hover:text-gray-700 mr-2" onclick="toggleSidebar()">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+            </div>
+            <div class="flex items-center space-x-3 md:space-x-6">
+                <div class="hidden sm:flex items-center text-secondary font-bold">
+                    <i class="fas fa-fire mr-2"></i> {{ user.current_streak }} дней в ударе
+                </div>
+                <div class="flex items-center bg-yellow-100 px-2 md:px-3 py-1 rounded-full text-yellow-700 font-bold text-xs md:text-sm">
+                    <i class="fas fa-star mr-1"></i> Уровень {{ user.level|default:1 }} ({{ user.xp|default:0 }} XP)
+                </div>
+            </div>
+        </header>
+
+        <div class="p-4 md:p-8 max-w-4xl mx-auto w-full">
             
-            <h1 class="text-2xl font-bold text-gray-800 mb-6">Журнал учебных сессий</h1>
+            <h1 class="text-xl md:text-2xl font-bold text-gray-800 mb-6">Журнал учебных сессий</h1>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <!-- Filters -->
-                <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex gap-4">
+                <div class="bg-gray-50 px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex gap-2 md:gap-4 overflow-x-auto whitespace-nowrap scrollbar-hide">
                     <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-primary shadow-sm">Все задачи</button>
                     <button class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">Только ошибки</button>
                 </div>

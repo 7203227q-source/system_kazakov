@@ -22,13 +22,21 @@
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 h-[100dvh] flex overflow-hidden">
 
+    <!-- Mobile Overlay -->
+    <div id="mobile-sidebar-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
+
     <!-- Sidebar (Admin Theme) -->
-    <aside class="w-64 bg-admin text-white flex flex-col">
-        <div class="h-16 flex items-center px-6 border-b border-gray-700 bg-gray-900">
-            <i class="fas fa-shield-alt text-indigo-400 text-2xl mr-2"></i>
-            <span class="text-xl font-bold">Система Казакова <span class="text-xs text-gray-400 font-normal">Admin</span></span>
+    <aside id="admin-sidebar" class="w-64 bg-admin text-white flex flex-col shrink-0 h-full overflow-hidden fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+        <div class="h-16 flex items-center justify-between px-6 border-b border-gray-700 bg-gray-900">
+            <div class="flex items-center">
+                <i class="fas fa-shield-alt text-indigo-400 text-2xl mr-2"></i>
+                <span class="text-xl font-bold">Система <span class="text-xs text-gray-400 font-normal">Admin</span></span>
+            </div>
+            <button class="md:hidden text-gray-400 hover:text-white" onclick="toggleSidebar()">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
-        <nav class="flex-1 px-4 py-6 space-y-2">
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
             <a href="{% url 'admin_dashboard' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-users-cog w-6 text-gray-400"></i> Пользователи
             </a>
@@ -47,17 +55,22 @@
     <!-- Main Content -->
     <main class="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-gray-50">
         <!-- Header -->
-        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
-            <h1 class="text-xl font-bold text-gray-800">Мониторинг Системы</h1>
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-10">
+            <div class="flex items-center">
+                <button class="md:hidden text-gray-500 hover:text-gray-700 mr-4" onclick="toggleSidebar()">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">Мониторинг Системы</h1>
+            </div>
             <div class="flex items-center space-x-4">
-                <a href="{% url 'logout' %}" class="text-red-500 hover:text-red-700 flex items-center font-medium transition">
-                    <i class="fas fa-sign-out-alt mr-2"></i> Выйти
+                <a href="{% url 'logout' %}" class="text-red-500 hover:text-red-700 flex items-center font-medium transition" title="Выйти">
+                    <i class="fas fa-sign-out-alt md:mr-2 text-xl md:text-base"></i> <span class="hidden md:inline">Выйти</span>
                 </a>
             </div>
         </header>
 
         <!-- Dashboard Content -->
-        <div class="flex-1 overflow-y-auto p-8">
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
             <div class="max-w-7xl mx-auto space-y-8">
                 
                 <!-- API Integrations -->
@@ -197,5 +210,19 @@
         </div>
     </main>
 
+<script>
+function toggleSidebar() {
+    const sidebar = document.getElementById('admin-sidebar');
+    const overlay = document.getElementById('mobile-sidebar-overlay');
+    
+    if (sidebar.classList.contains('-translate-x-full')) {
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+    }
+}
+</script>
 </body>
 </html>
