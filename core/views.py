@@ -9,6 +9,18 @@ from .models import User, Payment, Task, Submission, ExamFormat, Assignment
 from .services import process_task_submission
 from .system_info import get_system_metrics, check_gemini_api, check_openai_api
 
+from django.core.management import call_command
+from django.http import HttpResponse
+
+def run_migrations(request):
+    try:
+        import io
+        out = io.StringIO()
+        call_command('migrate', stdout=out)
+        return HttpResponse(f"Migrations applied successfully!<br><pre>{out.getvalue()}</pre><br><a href='/platform-admin/'>Go back</a>")
+    except Exception as e:
+        return HttpResponse(f"Error applying migrations: {e}")
+
 @login_required
 def admin_system_status(request):
     """Страница мониторинга системы и API ключей для Администратора"""
