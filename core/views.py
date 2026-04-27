@@ -6,6 +6,8 @@ from django.http import HttpResponse
 from django.contrib import messages
 from django.db import models
 from .models import User, Payment, Task, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject
+import time
+from .analytics import record_task_log
 from .services import process_task_submission
 from .system_info import get_system_metrics, check_gemini_api, check_openai_api
 
@@ -404,6 +406,13 @@ def student_solve_assignment(request, assignment_id):
     if request.method == 'POST':
         action = request.POST.get('action', 'finish')
         
+        # Calculate time spent per task
+        start_time = request.session.get(f'assignment_{assignment.id}_start')
+        time_spent_per_task = 0
+        if start_time:
+            total_time = int(time.time() - start_time)
+            time_spent_per_task = total_time // max(1, tasks.count())
+        
         correct_count = 0
         for task in tasks:
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
@@ -443,6 +452,10 @@ def student_solve_assignment(request, assignment_id):
                     profile.xp += max(1, int(task.difficulty / 5))
                     profile.level = (profile.xp // 100) + 1
                     profile.save()
+            
+            # Если завершаем, записываем лог в аналитику
+            if action == 'finish':
+                record_task_log(request.user, task, sub, assignment, time_spent_per_task)
         # We need to know the total primary score possible for this assignment and the student's primary score
         total_primary = sum(t.exam_points for t in tasks)
         student_primary = 0
@@ -465,10 +478,16 @@ def student_solve_assignment(request, assignment_id):
         assignment.is_completed = True
         assignment.save()
         
+        # Clear session start time
+        if f'assignment_{assignment.id}_start' in request.session:
+            del request.session[f'assignment_{assignment.id}_start']
+        
         messages.success(request, f"Вариант завершен! Вы решили правильно {correct_count} из {tasks.count()} задач.")
         return redirect('student_assignment_summary', assignment_id=assignment.id)
 
-    # GET: Загружаем сохраненные ответы ученика, чтобы подставить в поля
+    # GET: Устанавливаем время начала
+    if f'assignment_{assignment.id}_start' not in request.session:
+        request.session[f'assignment_{assignment.id}_start'] = time.time()
     saved_submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
     
     tasks_list = list(tasks)
