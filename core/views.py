@@ -557,10 +557,49 @@ def parent_dashboard(request):
     }
     return render(request, 'core/parent_dashboard.html', context)
 
+from django.db.models import Count, Q
+
 @login_required
 def admin_dashboard(request):
     """Дашборд Администратора"""
-    return render(request, 'core/admin_dashboard.html')
+    if request.user.role != 'admin':
+        return redirect('login')
+        
+    role_filter = request.GET.get('role', '')
+    search_query = request.GET.get('q', '')
+    
+    # Base queryset, exclude superuser if we only want regular users
+    users = User.objects.all().prefetch_related('students', 'tutors', 'parents', 'children')
+    
+    if role_filter:
+        users = users.filter(role=role_filter)
+        
+    if search_query:
+        users = users.filter(
+            Q(first_name__icontains=search_query) | 
+            Q(last_name__icontains=search_query) | 
+            Q(email__icontains=search_query) |
+            Q(username__icontains=search_query)
+        )
+        
+    users = users.order_by('-date_joined')
+    
+    total_count = User.objects.count()
+    student_count = User.objects.filter(role='student').count()
+    tutor_count = User.objects.filter(role='tutor').count()
+    parent_count = User.objects.filter(role='parent').count()
+    
+    context = {
+        'users': users,
+        'total_count': total_count,
+        'student_count': student_count,
+        'tutor_count': tutor_count,
+        'parent_count': parent_count,
+        'current_role': role_filter,
+        'search_query': search_query,
+    }
+    
+    return render(request, 'core/admin_dashboard.html', context)
 
 import random
 import string

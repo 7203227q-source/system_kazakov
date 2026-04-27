@@ -92,7 +92,7 @@
                         </div>
                         <div>
                             <p class="text-xs text-gray-500 uppercase font-bold">Всего</p>
-                            <h3 class="text-xl font-bold text-gray-800">1,245</h3>
+                            <h3 class="text-xl font-bold text-gray-800">{{ total_count }}</h3>
                         </div>
                     </div>
                     <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex items-center">
@@ -101,7 +101,7 @@
                         </div>
                         <div>
                             <p class="text-xs text-gray-500 uppercase font-bold">Ученики</p>
-                            <h3 class="text-xl font-bold text-gray-800">850</h3>
+                            <h3 class="text-xl font-bold text-gray-800">{{ student_count }}</h3>
                         </div>
                     </div>
                     <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex items-center">
@@ -110,7 +110,7 @@
                         </div>
                         <div>
                             <p class="text-xs text-gray-500 uppercase font-bold">Репетиторы</p>
-                            <h3 class="text-xl font-bold text-gray-800">42</h3>
+                            <h3 class="text-xl font-bold text-gray-800">{{ tutor_count }}</h3>
                         </div>
                     </div>
                     <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex items-center">
@@ -119,7 +119,7 @@
                         </div>
                         <div>
                             <p class="text-xs text-gray-500 uppercase font-bold">Родители</p>
-                            <h3 class="text-xl font-bold text-gray-800">353</h3>
+                            <h3 class="text-xl font-bold text-gray-800">{{ parent_count }}</h3>
                         </div>
                     </div>
                 </div>
@@ -127,21 +127,24 @@
                 <!-- Tabs & Filters -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center p-2">
                     <div class="flex space-x-1 mb-4 sm:mb-0">
-                        <button class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-800">Все</button>
-                        <button class="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50">Репетиторы</button>
-                        <button class="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50">Ученики</button>
-                        <button class="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50">Родители</button>
+                        <a href="{% url 'admin_dashboard' %}" class="px-4 py-2 text-sm font-medium rounded-lg {% if not current_role %}bg-gray-100 text-gray-800{% else %}text-gray-600 hover:bg-gray-50{% endif %}">Все</a>
+                        <a href="{% url 'admin_dashboard' %}?role=tutor" class="px-4 py-2 text-sm font-medium rounded-lg {% if current_role == 'tutor' %}bg-gray-100 text-gray-800{% else %}text-gray-600 hover:bg-gray-50{% endif %}">Репетиторы</a>
+                        <a href="{% url 'admin_dashboard' %}?role=student" class="px-4 py-2 text-sm font-medium rounded-lg {% if current_role == 'student' %}bg-gray-100 text-gray-800{% else %}text-gray-600 hover:bg-gray-50{% endif %}">Ученики</a>
+                        <a href="{% url 'admin_dashboard' %}?role=parent" class="px-4 py-2 text-sm font-medium rounded-lg {% if current_role == 'parent' %}bg-gray-100 text-gray-800{% else %}text-gray-600 hover:bg-gray-50{% endif %}">Родители</a>
                     </div>
-                    
-                    <div class="flex items-center space-x-3 w-full sm:w-auto">
+
+                    <form method="GET" action="{% url 'admin_dashboard' %}" class="flex items-center space-x-3 w-full sm:w-auto">
+                        {% if current_role %}
+                        <input type="hidden" name="role" value="{{ current_role }}">
+                        {% endif %}
                         <div class="relative flex-1 sm:w-64">
                             <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            <input type="text" placeholder="Поиск по ФИО, email, телефону..." class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none transition">
+                            <input type="text" name="q" value="{{ search_query }}" placeholder="Поиск по ФИО, email..." class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none transition">
                         </div>
-                        <button class="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50" title="Фильтры">
-                            <i class="fas fa-filter"></i>
+                        <button type="submit" class="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 bg-white" title="Поиск">
+                            <i class="fas fa-search"></i>
                         </button>
-                    </div>
+                    </form>
                 </div>
 
                 <!-- Users Table -->
@@ -159,123 +162,72 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100 text-sm">
-                                <!-- Tutor Row -->
+                                {% for u in users %}
                                 <tr class="hover:bg-gray-50 transition">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center">
-                                            <img src="https://ui-avatars.com/api/?name=Мария+С.&background=FCE7F3&color=DB2777" class="w-8 h-8 rounded-full mr-3">
+                                            <img src="https://ui-avatars.com/api/?name={{ u.get_full_name|default:u.username|urlencode }}&background=E0E7FF&color=4F46E5" class="w-8 h-8 rounded-full mr-3">
                                             <div>
-                                                <p class="font-bold text-gray-800">Мария Сергеевна</p>
-                                                <p class="text-xs text-gray-500">m.sergeevna@mail.ru • +7 900 111-22-33</p>
+                                                <p class="font-bold text-gray-800">{{ u.get_full_name|default:u.username }}</p>
+                                                <p class="text-xs text-gray-500">{{ u.email }}</p>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
+                                        {% if u.role == 'tutor' %}
                                         <span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">Репетитор</span>
-                                        <p class="text-xs text-gray-500 mt-1">Математика</p>
+                                        {% elif u.role == 'student' %}
+                                        <span class="bg-indigo-100 text-primary px-2 py-1 rounded text-xs font-bold">Ученик</span>
+                                        {% elif u.role == 'parent' %}
+                                        <span class="bg-orange-100 text-orange-600 px-2 py-1 rounded text-xs font-bold">Родитель</span>
+                                        {% else %}
+                                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-bold">{{ u.get_role_display }}</span>
+                                        {% endif %}
                                     </td>
                                     <td class="px-6 py-4 text-gray-600">
-                                        <div class="flex -space-x-2 overflow-hidden mb-1">
-                                            <img class="inline-block h-6 w-6 rounded-full ring-2 ring-white" src="https://ui-avatars.com/api/?name=Иван+И&background=E0E7FF" alt=""/>
-                                            <img class="inline-block h-6 w-6 rounded-full ring-2 ring-white" src="https://ui-avatars.com/api/?name=Анна+С&background=FEF3C7" alt=""/>
-                                            <img class="inline-block h-6 w-6 rounded-full ring-2 ring-white" src="https://ui-avatars.com/api/?name=Егор+П&background=D1FAE5" alt=""/>
-                                            <div class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 ring-2 ring-white text-xs font-medium text-gray-500">+9</div>
-                                        </div>
-                                        <span class="text-xs">12 учеников</span>
+                                        {% if u.role == 'tutor' %}
+                                            <span class="text-xs">{{ u.students.count }} учеников</span>
+                                        {% elif u.role == 'student' %}
+                                            <p class="text-xs">Реп: 
+                                                {% for t in u.tutors.all %}
+                                                    <span class="text-primary">{{ t.get_full_name|default:t.username }}</span>{% if not forloop.last %}, {% endif %}
+                                                {% empty %}
+                                                    <span class="text-gray-400">Нет</span>
+                                                {% endfor %}
+                                            </p>
+                                            <p class="text-xs mt-1">Род: 
+                                                {% for p in u.parents.all %}
+                                                    <span class="text-primary">{{ p.get_full_name|default:p.username }}</span>{% if not forloop.last %}, {% endif %}
+                                                {% empty %}
+                                                    <span class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Нет</span>
+                                                {% endfor %}
+                                            </p>
+                                        {% elif u.role == 'parent' %}
+                                            <p class="text-xs">Дети: 
+                                                {% for c in u.children.all %}
+                                                    <span class="text-primary">{{ c.get_full_name|default:c.username }}</span>{% if not forloop.last %}, {% endif %}
+                                                {% empty %}
+                                                    <span class="text-gray-400">Нет</span>
+                                                {% endfor %}
+                                            </p>
+                                        {% else %}
+                                            <span class="text-gray-500 text-xs">-</span>
+                                        {% endif %}
                                     </td>
                                     <td class="px-6 py-4">
                                         <span class="text-green-600 font-medium flex items-center"><i class="fas fa-check-circle mr-1"></i> Активен</span>
                                     </td>
-                                    <td class="px-6 py-4 text-gray-500">Сегодня, 10:45</td>
+                                    <td class="px-6 py-4 text-gray-500">{{ u.last_login|date:"d M Y, H:i"|default:"Никогда" }}</td>
                                     <td class="px-6 py-4 text-right space-x-2">
                                         <button class="text-gray-400 hover:text-primary transition" title="Редактировать"><i class="fas fa-edit"></i></button>
                                         <button class="text-gray-400 hover:text-red-500 transition" title="Заблокировать"><i class="fas fa-ban"></i></button>
                                     </td>
                                 </tr>
-
-                                <!-- Student Row -->
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center">
-                                            <img src="https://ui-avatars.com/api/?name=Иван+Иванов&background=E0E7FF&color=4F46E5" class="w-8 h-8 rounded-full mr-3">
-                                            <div>
-                                                <p class="font-bold text-gray-800">Иван Иванов</p>
-                                                <p class="text-xs text-gray-500">ivan.i@mail.ru</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="bg-indigo-100 text-primary px-2 py-1 rounded text-xs font-bold">Ученик</span>
-                                        <p class="text-xs text-gray-500 mt-1">11 класс</p>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-600">
-                                        <p class="text-xs">Реп: <a href="#" class="text-primary hover:underline">Мария С.</a></p>
-                                        <p class="text-xs">Род: <a href="#" class="text-primary hover:underline">Елена И.</a></p>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="text-green-600 font-medium text-xs border border-green-200 bg-green-50 px-2 py-0.5 rounded">Оплачено до 15.03</span>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-500">Сегодня, 14:20</td>
-                                    <td class="px-6 py-4 text-right space-x-2">
-                                        <button class="text-gray-400 hover:text-primary transition" title="Редактировать"><i class="fas fa-edit"></i></button>
-                                        <button class="text-gray-400 hover:text-red-500 transition" title="Заблокировать"><i class="fas fa-ban"></i></button>
-                                    </td>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">Пользователи не найдены.</td>
                                 </tr>
-
-                                <!-- Parent Row -->
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center">
-                                            <img src="https://ui-avatars.com/api/?name=Елена+Иванова&background=F3F4F6&color=4B5563" class="w-8 h-8 rounded-full mr-3">
-                                            <div>
-                                                <p class="font-bold text-gray-800">Елена Иванова</p>
-                                                <p class="text-xs text-gray-500">elena.i@mail.ru • +7 999 123-45-67</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="bg-orange-100 text-orange-600 px-2 py-1 rounded text-xs font-bold">Родитель</span>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-600">
-                                        <p class="text-xs">Ребенок: <a href="#" class="text-primary hover:underline">Иван И.</a></p>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="text-gray-500 text-xs">-</span>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-500">Вчера, 19:00</td>
-                                    <td class="px-6 py-4 text-right space-x-2">
-                                        <button class="text-gray-400 hover:text-primary transition" title="Редактировать"><i class="fas fa-edit"></i></button>
-                                        <button class="text-gray-400 hover:text-red-500 transition" title="Заблокировать"><i class="fas fa-ban"></i></button>
-                                    </td>
-                                </tr>
-                                
-                                <!-- Overdue Student Row -->
-                                <tr class="hover:bg-gray-50 transition bg-red-50/30">
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center">
-                                            <img src="https://ui-avatars.com/api/?name=Анна+Смирнова&background=FEF3C7&color=DB2777" class="w-8 h-8 rounded-full mr-3">
-                                            <div>
-                                                <p class="font-bold text-gray-800">Анна Смирнова</p>
-                                                <p class="text-xs text-gray-500">anna.s@mail.ru</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="bg-indigo-100 text-primary px-2 py-1 rounded text-xs font-bold">Ученик</span>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-600">
-                                        <p class="text-xs">Реп: <a href="#" class="text-primary hover:underline">Мария С.</a></p>
-                                        <p class="text-xs text-red-500"><i class="fas fa-exclamation-triangle"></i> Нет родителя</p>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="text-red-600 font-medium text-xs border border-red-200 bg-red-50 px-2 py-0.5 rounded">Долг: 2 500 ₽</span>
-                                    </td>
-                                    <td class="px-6 py-4 text-gray-500">3 дня назад</td>
-                                    <td class="px-6 py-4 text-right space-x-2">
-                                        <button class="text-gray-400 hover:text-primary transition" title="Отправить напоминание об оплате"><i class="fas fa-bell"></i></button>
-                                        <button class="text-gray-400 hover:text-primary transition" title="Редактировать"><i class="fas fa-edit"></i></button>
-                                    </td>
-                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
