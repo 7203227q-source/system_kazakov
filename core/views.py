@@ -276,16 +276,53 @@ def tutor_create_assignment(request):
 
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
-        title = request.POST.get('title', 'Новый вариант')
+        
+        # Генерация дефолтного названия
+        import datetime
+        default_title = f"Вариант {datetime.datetime.now().strftime('%d%m%y%H%M')}"
+        title = request.POST.get('title', '').strip()
+        if not title:
+            title = default_title
         
         if not student_id:
             messages.error(request, "Выберите ученика")
+            # Preserve POST data for the form to reuse
+            request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
             
         student = get_object_or_404(User, id=student_id, role='student')
         
         # Collect tasks
         selected_tasks = []
+        
+        # We need to find which subtypes of this type are checked
+        allowed_subtypes_by_type = {}
+        for key, value in request.POST.items():
+            if key.startswith('subtype_checked_') and value == 'on':
+                idx = key.replace('subtype_checked_', '')
+                subtype_tag = request.POST.get(f'subtype_name_{idx}', '')
+                t_type_id = request.POST.get(f'subtype_type_{idx}')
+                if t_type_id:
+                    allowed_subtypes_by_type.setdefault(int(t_type_id), []).append(subtype_tag)
+
+        # Handle Type-level counts
+        task_types = TaskType.objects.all()
+        for t_type in task_types:
+            type_count_str = request.POST.get(f'type_count_{t_type.id}', '0')
+            if type_count_str.isdigit() and int(type_count_str) > 0:
+                count = int(type_count_str)
+                allowed_subtypes = allowed_subtypes_by_type.get(t_type.id, [])
+                
+                # If the user selected some count for the type, but unchecked all subtypes, 
+                # we shouldn't pick any tasks for this type.
+                if not allowed_subtypes:
+                    continue
+                    
+                tasks_qs = Task.objects.filter(task_type=t_type, subtype_tag__in=allowed_subtypes)
+                tasks_of_type = list(tasks_qs.order_by('?')[:count])
+                selected_tasks.extend(tasks_of_type)
+        
+        # Handle Subtype-level counts
         for key, value in request.POST.items():
             if key.startswith('subtype_count_') and value.isdigit() and int(value) > 0:
                 count = int(value)
@@ -302,7 +339,12 @@ def tutor_create_assignment(request):
                 
         if not selected_tasks:
             messages.error(request, "Выберите хотя бы одно задание для варианта")
+            request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
+            
+        # Clear saved form if success
+        if 'saved_assignment_form' in request.session:
+            del request.session['saved_assignment_form']
             
         assignment = Assignment.objects.create(
             tutor=request.user,
@@ -337,9 +379,39 @@ def tutor_create_assignment(request):
                 'total_count': sum(s['count'] for s in subtypes)
             })
 
+    # Retrieve saved form data if exists
+    saved_form = request.session.pop('saved_assignment_form', {})
+    saved_type_counts = {}
+    saved_subtype_counts = {}
+    saved_subtype_checked = {}
+    
+    if saved_form:
+        for key, val_list in saved_form.items():
+            if key.startswith('type_count_'):
+                t_id = key.replace('type_count_', '')
+                if t_id.isdigit():
+                    saved_type_counts[int(t_id)] = val_list[0]
+            elif key.startswith('subtype_count_'):
+                s_idx = key.replace('subtype_count_', '')
+                saved_subtype_counts[s_idx] = val_list[0]
+            elif key.startswith('subtype_checked_'):
+                s_idx = key.replace('subtype_checked_', '')
+                saved_subtype_checked[s_idx] = val_list[0] == 'on'
+                
+    # Add saved info to grouped_data
+    for group in grouped_data:
+        t_id = group['type'].id
+        group['saved_count'] = saved_type_counts.get(t_id, 0)
+        for subtype in group['subtypes']:
+            s_idx = str(subtype['idx'])
+            subtype['saved_count'] = saved_subtype_counts.get(s_idx, 0)
+            # Default to True if no saved form, else use what's saved
+            subtype['saved_checked'] = saved_subtype_checked.get(s_idx, False) if saved_form else True
+
     return render(request, 'core/tutor_create_assignment.html', {
         'students': students,
-        'grouped_data': grouped_data
+        'grouped_data': grouped_data,
+        'saved_form': saved_form
     })
 
 @login_required
