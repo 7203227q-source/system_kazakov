@@ -817,7 +817,11 @@ def tutor_publish_assignment(request, assignment_id):
     """Публикация варианта для ученика"""
     if request.method == 'POST' and request.user.role == 'tutor':
         assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
+        
+        is_verified = request.POST.get('is_verified') == 'on'
+        
         assignment.is_draft = False
+        assignment.is_verified = is_verified
         assignment.save()
         messages.success(request, f"Вариант '{assignment.title}' успешно опубликован для {assignment.student.get_full_name() or assignment.student.username}!")
     return redirect('tutor_dashboard')

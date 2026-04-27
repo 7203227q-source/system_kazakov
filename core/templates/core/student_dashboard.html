@@ -282,11 +282,23 @@
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         {% for assignment in pending_assignments %}
                         <div class="p-5 border-b border-gray-100 flex items-center hover:bg-gray-50 transition">
-                            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xl shrink-0">
+                            <div class="w-12 h-12 {% if assignment.is_verified %}bg-red-100 text-red-600{% else %}bg-indigo-100 text-indigo-600{% endif %} rounded-full flex items-center justify-center text-xl shrink-0 relative">
                                 <i class="fas fa-file-alt"></i>
+                                {% if assignment.is_verified %}
+                                <div class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] border-2 border-white shadow-sm" title="Контрольная работа">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                {% endif %}
                             </div>
                             <div class="ml-4 flex-1">
-                                <h4 class="font-bold text-gray-800">{{ assignment.title }}</h4>
+                                <div class="flex items-center space-x-2">
+                                    <h4 class="font-bold text-gray-800">{{ assignment.title }}</h4>
+                                    {% if assignment.is_verified %}
+                                    <span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-red-200">
+                                        Контрольная
+                                    </span>
+                                    {% endif %}
+                                </div>
                                 <p class="text-sm text-gray-500">От репетитора: {{ assignment.tutor.get_full_name|default:assignment.tutor.username }} • Задач: {{ assignment.tasks.count }}</p>
                             </div>
                             <div class="text-right ml-4">

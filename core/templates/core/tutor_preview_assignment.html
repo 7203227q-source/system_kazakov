@@ -28,16 +28,23 @@
                 <h1 class="text-2xl font-bold text-gray-800">Предпросмотр: {{ assignment.title }}</h1>
                 <p class="text-sm text-gray-500">Ученик: {{ assignment.student.get_full_name|default:assignment.student.username }}</p>
             </div>
-            <div class="flex space-x-4">
+            <div class="flex space-x-4 items-center">
+                <form method="POST" action="{% url 'tutor_publish_assignment' assignment.id %}" class="flex items-center space-x-4">
+                    {% csrf_token %}
+                    <label class="flex items-center space-x-2 cursor-pointer group bg-white border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 transition shadow-sm">
+                        <input type="checkbox" name="is_verified" class="form-checkbox h-4 w-4 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer">
+                        <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900 flex items-center">
+                            <i class="fas fa-shield-alt text-indigo-500 mr-2"></i>
+                            Это Контрольная (Verified)
+                        </span>
+                    </label>
+                    <button type="submit" class="bg-primary text-white font-medium px-6 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm flex items-center">
+                        <i class="fas fa-paper-plane mr-2"></i> Опубликовать
+                    </button>
+                </form>
                 <a href="{% url 'tutor_create_assignment' %}" class="text-gray-500 hover:text-gray-700 font-medium px-4 py-2 border border-gray-300 rounded-lg bg-white transition">
                     Отмена
                 </a>
-                <form method="POST" action="{% url 'tutor_publish_assignment' assignment.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="bg-primary text-white font-medium px-6 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm">
-                        Опубликовать ученику
-                    </button>
-                </form>
             </div>
         </div>
 
