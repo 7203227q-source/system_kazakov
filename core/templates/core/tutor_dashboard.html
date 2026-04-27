@@ -232,6 +232,83 @@
                     </div>
                 </div>
 
+                <!-- Contacts and Notes -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider flex items-center">
+                            <i class="fas fa-address-book text-indigo-500 mr-2"></i> Контакты и заметки
+                        </h3>
+                        <button type="button" onclick="toggleContactsEdit()" id="btn-edit-contacts" class="text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-md font-bold transition flex items-center">
+                            <i class="fas fa-edit mr-1"></i> Редактировать
+                        </button>
+                    </div>
+
+                    <!-- Display View -->
+                    <div id="contacts-display" class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div>
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Телефон ученика</p>
+                            <p class="text-sm text-gray-800 font-medium">{{ selected_student.phone|default:"Не указан" }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Имя родителя</p>
+                            <p class="text-sm text-gray-800 font-medium">{{ selected_student.parent_name|default:"Не указано" }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Телефон родителя</p>
+                            <p class="text-sm text-gray-800 font-medium">{{ selected_student.parent_phone|default:"Не указан" }}</p>
+                        </div>
+                        <div class="sm:col-span-3 border-t border-gray-100 pt-4">
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Заметки репетитора</p>
+                            <p class="text-sm text-gray-800 whitespace-pre-line">{{ selected_student.tutor_notes|default:"Нет заметок" }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Edit Form -->
+                    <form id="contacts-form" method="POST" action="{% url 'tutor_update_student_contacts' selected_student.id %}" class="hidden">
+                        {% csrf_token %}
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Телефон ученика</label>
+                                <input type="text" name="phone" value="{{ selected_student.phone|default:'' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary text-sm" placeholder="+7 (999) 000-00-00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Имя родителя</label>
+                                <input type="text" name="parent_name" value="{{ selected_student.parent_name|default:'' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary text-sm" placeholder="Имя Отчество">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Телефон родителя</label>
+                                <input type="text" name="parent_phone" value="{{ selected_student.parent_phone|default:'' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary text-sm" placeholder="+7 (999) 000-00-00">
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Заметки репетитора (видит только репетитор)</label>
+                                <textarea name="tutor_notes" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary text-sm" placeholder="Дополнительная информация об ученике...">{{ selected_student.tutor_notes|default:'' }}</textarea>
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-2 border-t border-gray-100 pt-4">
+                            <button type="button" onclick="toggleContactsEdit()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">Отмена</button>
+                            <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <script>
+                    function toggleContactsEdit() {
+                        const display = document.getElementById('contacts-display');
+                        const form = document.getElementById('contacts-form');
+                        const btn = document.getElementById('btn-edit-contacts');
+                        
+                        if (form.classList.contains('hidden')) {
+                            display.classList.add('hidden');
+                            form.classList.remove('hidden');
+                            btn.classList.add('hidden');
+                        } else {
+                            display.classList.remove('hidden');
+                            form.classList.add('hidden');
+                            btn.classList.remove('hidden');
+                        }
+                    }
+                </script>
+
                 <!-- Actions Tabs -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="flex border-b border-gray-200 bg-gray-50">

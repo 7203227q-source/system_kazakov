@@ -6,6 +6,7 @@ class CustomUserAdmin(UserAdmin):
     model = User
     fieldsets = UserAdmin.fieldsets + (
         ('Роли и профиль', {'fields': ('role', 'phone', 'target_score', 'xp', 'level', 'current_streak')}),
+        ('Контакты (от репетитора)', {'fields': ('parent_name', 'parent_phone', 'tutor_notes')}),
         ('Связи', {'fields': ('tutors', 'parents')}),
     )
     list_display = ['username', 'email', 'first_name', 'last_name', 'role']

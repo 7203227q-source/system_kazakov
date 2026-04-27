@@ -31,6 +31,11 @@ class User(AbstractUser):
     level = models.IntegerField(default=1, verbose_name="Уровень")
     current_streak = models.IntegerField(default=0, verbose_name="Стрик (дней)")
     
+    # Контакты, заполняемые репетитором
+    parent_name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Имя родителя")
+    parent_phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон родителя")
+    tutor_notes = models.TextField(blank=True, null=True, verbose_name="Заметки репетитора")
+    
     # Связи (кто кого обучает/контролирует)
     tutors = models.ManyToManyField('self', symmetrical=False, related_name='students', blank=True, limit_choices_to={'role': 'tutor'})
     parents = models.ManyToManyField('self', symmetrical=False, related_name='children', blank=True, limit_choices_to={'role': 'parent'})

@@ -219,7 +219,7 @@
                                     </td>
                                     <td class="px-6 py-4 text-gray-500">{{ u.last_login|date:"d M Y, H:i"|default:"Никогда" }}</td>
                                     <td class="px-6 py-4 text-right space-x-2">
-                                        <button class="text-gray-400 hover:text-primary transition" title="Редактировать"><i class="fas fa-edit"></i></button>
+                                        <a href="{% url 'admin:core_user_change' u.id %}" target="_blank" class="text-gray-400 hover:text-primary transition inline-block" title="Редактировать в админке"><i class="fas fa-edit"></i></a>
                                         <button class="text-gray-400 hover:text-red-500 transition" title="Заблокировать"><i class="fas fa-ban"></i></button>
                                     </td>
                                 </tr>

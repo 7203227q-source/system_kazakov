@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse
@@ -355,6 +356,27 @@ def update_theme_view(request):
             request.user.save()
             messages.success(request, f"Тема изменена на: {dict(User.THEME_CHOICES)[theme]}")
     return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+@login_required
+def tutor_update_student_contacts(request, student_id):
+    if request.user.role not in ['tutor', 'admin'] or request.method != 'POST':
+        return redirect('tutor_dashboard')
+        
+    student = get_object_or_404(User, id=student_id, role='student')
+    
+    # Optional security: make sure the tutor actually teaches this student
+    if request.user.role == 'tutor' and not request.user.students.filter(id=student.id).exists():
+        messages.error(request, "Ученик не найден в вашем списке.")
+        return redirect('tutor_dashboard')
+        
+    student.phone = request.POST.get('phone', '')
+    student.parent_name = request.POST.get('parent_name', '')
+    student.parent_phone = request.POST.get('parent_phone', '')
+    student.tutor_notes = request.POST.get('tutor_notes', '')
+    student.save()
+    
+    messages.success(request, "Контакты и заметки успешно сохранены.")
+    return redirect(f"{reverse('tutor_dashboard')}?student_id={student.id}")
 
 @login_required
 def tutor_dashboard(request):
