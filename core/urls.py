@@ -31,6 +31,7 @@ urlpatterns = [
 
     path('parent/', views.parent_dashboard, name='parent_dashboard'),
     path('platform-admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('platform-admin/system/', views.admin_system_status, name='admin_system'),
     
     path('select-role/', views.role_selection_view, name='select_role'),
     path('logout/', views.logout_view, name='logout'),

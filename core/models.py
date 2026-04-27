@@ -218,13 +218,22 @@ class Submission(models.Model):
 
 
 class Payment(models.Model):
-    parent = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_made', limit_choices_to={'role': 'parent'})
-    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_received', limit_choices_to={'role': 'tutor'})
-    student = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'student'})
-    
+    parent = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_made', limit_choices_to={'role': 'parent'}, verbose_name="Родитель")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_received', limit_choices_to={'role': 'student'}, verbose_name="Ученик")
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments_collected', limit_choices_to={'role': 'tutor'}, verbose_name="Репетитор")
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Сумма")
-    lessons_credited = models.IntegerField(verbose_name="Оплачено занятий")
-    status = models.CharField(max_length=20, choices=(('pending', 'Ожидает'), ('paid', 'Оплачено'), ('failed', 'Ошибка')), default='pending')
-    
+    lessons_credited = models.IntegerField(default=1, verbose_name="Количество занятий")
     created_at = models.DateTimeField(auto_now_add=True)
-    paid_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=[('pending', 'В обработке'), ('completed', 'Оплачено')], default='pending', verbose_name="Статус")
+
+    def __str__(self):
+        return f"Payment {self.amount} by {self.parent.username} for {self.student.username}"
+
+class SystemConfig(models.Model):
+    """
+    Dummy model to provide a link to the System Status page in Django Admin.
+    """
+    class Meta:
+        managed = False
+        verbose_name = "Система и API"
+        verbose_name_plural = "Система и API"

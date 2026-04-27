@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Subject, Topic, Task, SpacedRepetition, Submission, Payment
+from .models import User, Subject, Topic, Task, SpacedRepetition, Submission, Payment, SystemConfig
+from django.shortcuts import redirect
+from django.urls import reverse
 
 class CustomUserAdmin(UserAdmin):
     model = User
@@ -33,6 +35,17 @@ class SubmissionAdmin(admin.ModelAdmin):
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ('parent', 'student', 'tutor', 'amount', 'lessons_credited', 'status')
     list_filter = ('status', 'created_at')
+
+@admin.register(SystemConfig)
+class SystemConfigAdmin(admin.ModelAdmin):
+    def changelist_view(self, request, extra_context=None):
+        return redirect('admin_system')
+        
+    def has_add_permission(self, request):
+        return False
+        
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Subject)

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система и Интеграции - Система Казакова</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                        admin: '#1F2937'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 h-[100dvh] flex overflow-hidden">
+
+    <!-- Sidebar (Admin Theme) -->
+    <aside class="w-64 bg-admin text-white flex flex-col">
+        <div class="h-16 flex items-center px-6 border-b border-gray-700 bg-gray-900">
+            <i class="fas fa-shield-alt text-indigo-400 text-2xl mr-2"></i>
+            <span class="text-xl font-bold">Система Казакова <span class="text-xs text-gray-400 font-normal">Admin</span></span>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="{% url 'admin_dashboard' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-users-cog w-6 text-gray-400"></i> Пользователи
+            </a>
+            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-database w-6 text-gray-400"></i> База заданий
+            </a>
+            <a href="#" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-credit-card w-6 text-gray-400"></i> Биллинг и Платежи
+            </a>
+            <a href="{% url 'admin_system' %}" class="flex items-center px-4 py-3 bg-gray-800 text-white rounded-lg">
+                <i class="fas fa-server w-6 text-indigo-400"></i> Система и Интеграции
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-gray-50">
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
+            <h1 class="text-xl font-bold text-gray-800">Мониторинг Системы</h1>
+            <div class="flex items-center space-x-4">
+                <a href="{% url 'logout' %}" class="text-red-500 hover:text-red-700 flex items-center font-medium transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Выйти
+                </a>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <div class="flex-1 overflow-y-auto p-8">
+            <div class="max-w-7xl mx-auto space-y-8">
+                
+                <!-- API Integrations -->
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-plug text-primary mr-2"></i> Внешние API-ключи
+                    </h2>
+                    <p class="text-sm text-gray-500 mb-4">В целях безопасности все ключи хранятся исключительно в переменных окружения сервера (ENV). Здесь отображается только их статус.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Gemini API Card -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
+                            <div class="absolute top-0 right-0 p-4">
+                                {% if gemini.status == 'ok' %}
+                                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-check-circle mr-1"></i> Активен</span>
+                                {% elif gemini.status == 'missing' %}
+                                    <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">Не задан</span>
+                                {% else %}
+                                    <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-exclamation-triangle mr-1"></i> Ошибка</span>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex items-center mb-4">
+                                <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-2xl mr-4">
+                                    <i class="fas fa-brain"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-lg">Google Gemini Vision</h3>
+                                    <p class="text-xs text-gray-500 font-mono">GEMINI_API_KEY</p>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-lg p-3 text-sm border border-gray-100 mb-4">
+                                <p class="text-gray-700">Используется для ИИ-проверки фото решений и черновиков.</p>
+                                <p class="mt-2 text-xs font-medium {% if gemini.status == 'ok' %}text-green-600{% elif gemini.status == 'missing' %}text-gray-500{% else %}text-red-600{% endif %}">
+                                    Статус: {{ gemini.message }}
+                                </p>
+                            </div>
+                            
+                            <a href="{% url 'admin_system' %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
+                                <i class="fas fa-sync-alt mr-1"></i> Проверить соединение
+                            </a>
+                        </div>
+
+                        <!-- OpenAI API Card -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
+                            <div class="absolute top-0 right-0 p-4">
+                                {% if openai.status == 'ok' %}
+                                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-check-circle mr-1"></i> Активен</span>
+                                {% elif openai.status == 'missing' %}
+                                    <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">Не задан</span>
+                                {% else %}
+                                    <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-exclamation-triangle mr-1"></i> Ошибка</span>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex items-center mb-4">
+                                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-2xl mr-4">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-lg">OpenAI / GPT-4</h3>
+                                    <p class="text-xs text-gray-500 font-mono">OPENAI_API_KEY</p>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-lg p-3 text-sm border border-gray-100 mb-4">
+                                <p class="text-gray-700">Используется для авто-генерации вариантов и уникализации задач.</p>
+                                <p class="mt-2 text-xs font-medium {% if openai.status == 'ok' %}text-green-600{% elif openai.status == 'missing' %}text-gray-500{% else %}text-red-600{% endif %}">
+                                    Статус: {{ openai.message }}
+                                </p>
+                            </div>
+                            
+                            <a href="{% url 'admin_system' %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
+                                <i class="fas fa-sync-alt mr-1"></i> Проверить соединение
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Storage & Limits -->
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-hdd text-gray-600 mr-2"></i> Хранилище и Лимиты
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">База Данных (SQL)</p>
+                            <p class="text-3xl font-black text-gray-800">{{ metrics.db_size_fmt }}</p>
+                            <p class="text-xs text-gray-400 mt-2">Тексты задач, пользователи, логи</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 border-l-4 border-l-primary">
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Медиа файлы</p>
+                            <p class="text-3xl font-black text-gray-800">{{ metrics.media_size_fmt }}</p>
+                            <p class="text-xs text-gray-400 mt-2">Фото решений, картинки из задач</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 bg-gray-50">
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">Суммарный объем</p>
+                            <p class="text-3xl font-black text-primary">{{ metrics.total_size_fmt }}</p>
+                            <p class="text-xs text-gray-400 mt-2">Общее потребление диска</p>
+                        </div>
+                    </div>
+
+                    <!-- Breakdown table -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500">
+                                    <th class="px-6 py-3 font-bold">Директория / Ресурс</th>
+                                    <th class="px-6 py-3 font-bold">Описание</th>
+                                    <th class="px-6 py-3 font-bold text-right">Размер</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-sm">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 font-mono text-gray-700">media/submissions/</td>
+                                    <td class="px-6 py-4 text-gray-500">Загруженные фото решений от учеников (через QR)</td>
+                                    <td class="px-6 py-4 font-bold text-right text-gray-800">{{ metrics.submissions_size_fmt }}</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 font-mono text-gray-700">media/tasks/</td>
+                                    <td class="px-6 py-4 text-gray-500">Изображения и графики из условий задач (парсинг ФИПИ)</td>
+                                    <td class="px-6 py-4 font-bold text-right text-gray-800">{{ metrics.tasks_size_fmt }}</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 font-mono text-gray-700">db.sqlite3 / Postgres</td>
+                                    <td class="px-6 py-4 text-gray-500">Основная база данных</td>
+                                    <td class="px-6 py-4 font-bold text-right text-gray-800">{{ metrics.db_size_fmt }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

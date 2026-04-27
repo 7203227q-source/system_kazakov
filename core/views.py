@@ -7,6 +7,28 @@ from django.contrib import messages
 from django.db import models
 from .models import User, Payment, Task, Submission, ExamFormat, Assignment
 from .services import process_task_submission
+from .system_info import get_system_metrics, check_gemini_api, check_openai_api
+
+@login_required
+def admin_system_status(request):
+    """Страница мониторинга системы и API ключей для Администратора"""
+    if request.user.role != 'admin':
+        return redirect('login')
+        
+    metrics = get_system_metrics()
+    
+    # Check APIs only if explicitly requested or on load (could be slow, but ok for admin)
+    gemini_status = check_gemini_api()
+    openai_status = check_openai_api()
+    
+    context = {
+        'metrics': metrics,
+        'gemini': gemini_status,
+        'openai': openai_status,
+    }
+    
+    return render(request, 'core/admin_system.html', context)
+
 import random
 import qrcode
 import base64
