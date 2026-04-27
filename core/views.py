@@ -1140,22 +1140,21 @@ def role_selection_view(request):
                 except (ValueError, TypeError):
                     target_score = 80
                 
+                # Assign role first
+                request.user.role = selected_role
+                request.user.save()
+                
                 if subject_id:
                     try:
                         subject = Subject.objects.get(id=subject_id)
-                        StudentSubjectProfile.objects.create(
+                        StudentSubjectProfile.objects.get_or_create(
                             student=request.user,
                             subject=subject,
-                            target_score=target_score
+                            defaults={'target_score': target_score}
                         )
                     except Subject.DoesNotExist:
                         pass
-
-            request.user.role = selected_role
-            request.user.save()
-
-            # Редирект после сохранения
-            if selected_role == 'student':
+                
                 return redirect('student_dashboard')
             elif selected_role == 'tutor':
                 return redirect('tutor_dashboard')
