@@ -7,21 +7,23 @@ from django.test import Client
 from core.models import User
 
 client = Client()
-# Get the first admin user
-user = User.objects.filter(role='admin').first()
-if not user:
-    user = User.objects.first()
+user = User.objects.create(username='test_select_role_99991234', role='unassigned')
 
-if user:
+try:
     client.force_login(user)
-    try:
-        response = client.get('/')
-        print("Status:", response.status_code)
-        if response.status_code == 500:
-            print("ERROR DUMP:")
-            print(response.content.decode('utf-8'))
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-else:
-    print("No user found")
+    # first post creates profile
+    response = client.post('/select-role/', {'role': 'student', 'subject_id': 1, 'target_score': 80})
+    print("Status POST 1:", response.status_code)
+    
+    # reset role to simulate back button
+    user.role = 'unassigned'
+    user.save()
+    
+    # second post should not fail now
+    response = client.post('/select-role/', {'role': 'student', 'subject_id': 1, 'target_score': 80})
+    print("Status POST 2:", response.status_code)
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+finally:
+    user.delete()

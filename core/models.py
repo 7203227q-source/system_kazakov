@@ -69,6 +69,12 @@ class StudentSubjectProfile(models.Model):
     xp = models.IntegerField(default=0, verbose_name="Опыт (XP)")
     level = models.IntegerField(default=1, verbose_name="Уровень")
     current_streak = models.IntegerField(default=0, verbose_name="Стрик (дней)")
+    
+    # Analytics Calibration Fields
+    avg_model_error = models.FloatField(default=0.0, verbose_name="Средняя ошибка модели прогноза")
+    trust_factor = models.FloatField(default=0.6, verbose_name="Индекс доверия (0.0 - 1.0)")
+    last_verified_date = models.DateField(null=True, blank=True, verbose_name="Дата последней верификации")
+    learning_velocity = models.FloatField(default=1.0, verbose_name="Коэффициент обучаемости (Темп)")
 
     class Meta:
         unique_together = ('student', 'subject')
@@ -201,6 +207,7 @@ class Assignment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_completed = models.BooleanField(default=False, verbose_name="Завершено")
     is_draft = models.BooleanField(default=False, verbose_name="Черновик (на стадии сборки)")
+    is_verified = models.BooleanField(default=False, verbose_name="Контрольная работа (Verified Mode)")
 
     def __str__(self):
         return f"{self.title} для {self.student.username}"
@@ -221,16 +228,52 @@ class Submission(models.Model):
     # Поля для QR-загрузки и проверки черновиков
     upload_token = models.UUIDField(default=uuid.uuid4, null=True, blank=True, verbose_name="Токен для загрузки фото")
     requires_draft = models.BooleanField(default=False, verbose_name="Был запрошен черновик")
-
-    recognized_text = models.TextField(blank=True, null=True, verbose_name="Распознанный текст (ИИ)")
-    
-    ai_feedback = models.TextField(blank=True, null=True, verbose_name="Вердикт ИИ")
-    score = models.IntegerField(default=0, verbose_name="Начисленный балл")
-    primary_score = models.IntegerField(default=0, verbose_name="Первичный балл (развернутая часть)")
-    
-    tutor_comment = models.TextField(blank=True, null=True, verbose_name="Комментарий репетитора")
     
     created_at = models.DateTimeField(auto_now_add=True)
+    score = models.IntegerField(null=True, blank=True, verbose_name="Итоговый балл за решение (для 2 части)")
+    primary_score = models.IntegerField(null=True, blank=True, verbose_name="Первичный балл (0-4)")
+
+    def __str__(self):
+        return f"Submission {self.id} by {self.student.username}"
+
+    recognized_text = models.TextField(blank=True, null=True, verbose_name="Распознанный текст (ИИ)")
+    ai_feedback = models.TextField(blank=True, null=True, verbose_name="Вердикт ИИ")
+    
+    tutor_comment = models.TextField(blank=True, null=True, verbose_name="Комментарий репетитора")
+
+class DailySnapshot(models.Model):
+    """Ежедневный срез аналитики ученика по предмету"""
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_snapshots')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+    date = models.DateField(default=timezone.now)
+    
+    current_mastery = models.FloatField(default=0.0, verbose_name="Текущее мастерство (0-100)")
+    predicted_exam_score = models.FloatField(default=0.0, verbose_name="Прогноз балла на ЕГЭ")
+    gap_between_solo_and_verified = models.FloatField(default=0.0, verbose_name="Разрыв между Solo и Verified")
+    rolling_forecast_error = models.FloatField(default=0.0, verbose_name="Скользящая ошибка прогноза")
+
+    class Meta:
+        unique_together = ('student', 'subject', 'date')
+        verbose_name = "Ежедневный срез аналитики"
+        verbose_name_plural = "Ежедневные срезы аналитики"
+
+class TaskLog(models.Model):
+    """Детальный лог решения каждой задачи для аналитики"""
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_logs')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    submission = models.ForeignKey(Submission, on_delete=models.SET_NULL, null=True, blank=True, related_name='task_logs')
+    assignment = models.ForeignKey(Assignment, on_delete=models.SET_NULL, null=True, blank=True, related_name='task_logs')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    time_spent = models.IntegerField(default=0, verbose_name="Потрачено времени (секунд)")
+    score = models.FloatField(default=0.0, verbose_name="Полученный балл")
+    
+    is_verified = models.BooleanField(default=False, verbose_name="Была ли это контрольная (Verified)")
+    verifier_role = models.CharField(max_length=20, blank=True, null=True, verbose_name="Кто верифицировал (tutor/parent)")
+    is_anomaly = models.BooleanField(default=False, verbose_name="Аномалия (слишком быстро/списывание)")
+
+    def __str__(self):
+        return f"Log: {self.student.username} -> Task {self.task.id} (Score: {self.score})"
 
 
 class Payment(models.Model):
