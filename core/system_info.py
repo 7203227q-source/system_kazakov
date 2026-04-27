@@ -2,7 +2,6 @@ import os
 import math
 from django.conf import settings
 from django.db import connection
-import requests
 
 def format_size(size_bytes):
     if size_bytes == 0:
@@ -61,35 +60,43 @@ def get_system_metrics():
     }
 
 def check_gemini_api():
+    import urllib.request
+    import urllib.error
+    
     api_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     if not api_key:
         return {'status': 'missing', 'message': 'Ключ не найден в ENV (GEMINI_API_KEY или GOOGLE_API_KEY)'}
-        
+
     # Quick check
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            return {'status': 'ok', 'message': 'Подключено успешно. Ключ действителен.'}
-        elif response.status_code == 403:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                return {'status': 'ok', 'message': 'Подключено успешно. Ключ действителен.'}
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
             return {'status': 'error', 'message': 'Ошибка 403: Неверный ключ.'}
         else:
-            return {'status': 'error', 'message': f'Ошибка {response.status_code}: {response.text[:50]}'}
+            return {'status': 'error', 'message': f'Ошибка {e.code}: {e.reason}'}
     except Exception as e:
         return {'status': 'error', 'message': f'Ошибка соединения: {str(e)}'}
 
 def check_openai_api():
+    import urllib.request
+    import urllib.error
+    
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
         return {'status': 'missing', 'message': 'Ключ не найден в ENV (OPENAI_API_KEY)'}
-    
+
     try:
         url = "https://api.openai.com/v1/models"
-        headers = {"Authorization": f"Bearer {api_key}"}
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200:
-            return {'status': 'ok', 'message': 'Подключено успешно. Ключ действителен.'}
-        else:
-            return {'status': 'error', 'message': f'Ошибка {response.status_code}'}
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                return {'status': 'ok', 'message': 'Подключено успешно. Ключ действителен.'}
+    except urllib.error.HTTPError as e:
+        return {'status': 'error', 'message': f'Ошибка {e.code}: {e.reason}'}
     except Exception as e:
         return {'status': 'error', 'message': f'Ошибка соединения: {str(e)}'}
