@@ -1,9 +1,27 @@
-{% extends "core/base.html" %}
-
-{% block title %}Решение варианта | ExamPrep{% endblock %}
-
-{% block content %}
-<div class="min-h-screen bg-gray-50 p-8">
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Решение варианта | ExamPrep</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["$", "$"], ["\\(", "\\)"]],
+                displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+                processEscapes: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 h-screen overflow-y-auto">
+<div class="min-h-screen bg-gray-50 p-8 w-full">
     <div class="max-w-4xl mx-auto">
         <div class="flex justify-between items-center mb-8">
             <div>
@@ -50,4 +68,5 @@
         </form>
     </div>
 </div>
-{% endblock %}
+</body>
+</html>
