@@ -24,33 +24,30 @@
 
     <!-- Sidebar -->
     {% if user.role == 'admin' %}
-    {% include 'core/includes/_tutor_sidebar.html' with active_page='tasks' %}
-    {% else %}
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        <div class="h-16 flex items-center px-6 border-b border-gray-200">
-            <i class="fas fa-chalkboard-teacher text-primary text-2xl mr-2"></i>
-            <span class="text-xl font-bold text-gray-800">Система Казакова</span>
+    <aside class="w-64 bg-gray-900 text-white flex flex-col shrink-0 h-[100dvh] overflow-hidden">
+        <div class="h-16 flex items-center px-6 border-b border-gray-700 bg-gray-900 shrink-0">
+            <i class="fas fa-shield-alt text-indigo-400 text-2xl mr-2"></i>
+            <span class="text-xl font-bold">Система Казакова <span class="text-xs text-gray-400 font-normal">Admin</span></span>
         </div>
-        <nav class="flex-1 px-4 py-6 space-y-2">
-            <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <i class="fas fa-users w-6"></i> Мои ученики
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="{% url 'admin_dashboard' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-users-cog w-6 text-gray-400"></i> Пользователи
             </a>
-            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 bg-primary text-white rounded-lg transition">
-                <i class="fas fa-database w-6"></i> База заданий
+            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 bg-gray-800 text-white rounded-lg">
+                <i class="fas fa-database w-6 text-indigo-400"></i> База заданий
             </a>
-            <a href="{% url 'tutor_create_assignment' %}" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <i class="fas fa-file-alt w-6"></i> Создать вариант
+            <a href="{% url 'import_tasks' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-upload w-6 text-gray-400"></i> Импорт заданий
             </a>
-            <a href="#" class="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <i class="fas fa-robot w-6"></i> Проверка (ИИ)
-            </a>
-            <div class="mt-8 border-t border-gray-200 pt-4">
-                <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg transition">
+            <div class="mt-8 border-t border-gray-700 pt-4">
+                <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-red-400 hover:bg-gray-800 hover:text-red-300 rounded-lg transition">
                     <i class="fas fa-sign-out-alt w-6"></i> Выйти
                 </a>
             </div>
         </nav>
     </aside>
+    {% else %}
+    {% include 'core/includes/_tutor_sidebar.html' with active_page='tasks' %}
     {% endif %}
 
     <main class="flex-1 flex flex-col h-[100dvh] overflow-y-auto">
