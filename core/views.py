@@ -273,7 +273,6 @@ def tutor_create_assignment(request):
         return redirect('login')
 
     students = request.user.students.all()
-    task_types = TaskType.objects.all().order_by('number')
 
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
@@ -287,16 +286,19 @@ def tutor_create_assignment(request):
         
         # Collect tasks
         selected_tasks = []
-        for t_type in task_types:
-            count_str = request.POST.get(f'type_{t_type.id}', '0')
-            try:
-                count = int(count_str)
-                if count > 0:
-                    # Get random tasks of this type
-                    tasks_of_type = list(Task.objects.filter(task_type=t_type).order_by('?')[:count])
-                    selected_tasks.extend(tasks_of_type)
-            except ValueError:
-                pass
+        for key, value in request.POST.items():
+            if key.startswith('subtype_count_') and value.isdigit() and int(value) > 0:
+                count = int(value)
+                idx = key.replace('subtype_count_', '')
+                subtype_tag = request.POST.get(f'subtype_name_{idx}', '')
+                t_type_id = request.POST.get(f'subtype_type_{idx}')
+                
+                if t_type_id:
+                    tasks_of_subtype = list(Task.objects.filter(
+                        task_type_id=t_type_id, 
+                        subtype_tag=subtype_tag
+                    ).order_by('?')[:count])
+                    selected_tasks.extend(tasks_of_subtype)
                 
         if not selected_tasks:
             messages.error(request, "Выберите хотя бы одно задание для варианта")
@@ -312,9 +314,32 @@ def tutor_create_assignment(request):
         
         return redirect('tutor_preview_assignment', assignment_id=assignment.id)
 
+    # Формируем структуру: Типы -> Подтипы с их количеством
+    grouped_data = []
+    task_types = TaskType.objects.all().order_by('number')
+    idx = 0
+    for t_type in task_types:
+        subtypes = Task.objects.filter(task_type=t_type).values('subtype_tag').annotate(count=models.Count('id')).order_by('subtype_tag')
+        if subtypes:
+            subtype_list = []
+            for s in subtypes:
+                idx += 1
+                subtype_list.append({
+                    'idx': idx,
+                    'name': s['subtype_tag'] or 'Без темы',
+                    'original_name': s['subtype_tag'],
+                    'count': s['count'],
+                    'type_id': t_type.id
+                })
+            grouped_data.append({
+                'type': t_type,
+                'subtypes': subtype_list,
+                'total_count': sum(s['count'] for s in subtypes)
+            })
+
     return render(request, 'core/tutor_create_assignment.html', {
         'students': students,
-        'task_types': task_types
+        'grouped_data': grouped_data
     })
 
 @login_required
@@ -343,8 +368,13 @@ def tutor_preview_assignment(request, assignment_id):
             success_rates[t_type.id] = None
             
     tasks = list(tasks_qs)
+    
+    # Расчет количества всех задач по подтипам
+    subtype_counts = dict(Task.objects.values_list('subtype_tag').annotate(c=models.Count('id')))
+
     for task in tasks:
         task.student_success_rate = success_rates.get(task.task_type_id)
+        task.subtype_count = subtype_counts.get(task.subtype_tag, 0)
         
     return render(request, 'core/tutor_preview_assignment.html', {
         'assignment': assignment,
@@ -449,8 +479,14 @@ def tutor_task_bank(request):
         subtypes_query = subtypes_query.filter(task_type__id=type_filter)
     subtypes = subtypes_query.values('subtype_tag').annotate(task_count=models.Count('id')).order_by('subtype_tag')
 
+    # Add subtype counts directly to the displayed tasks
+    subtype_counts = dict(Task.objects.values_list('subtype_tag').annotate(c=models.Count('id')))
+    tasks_list = list(tasks)
+    for task in tasks_list:
+        task.subtype_count = subtype_counts.get(task.subtype_tag, 0)
+
     return render(request, 'core/tutor_task_bank.html', {
-        'tasks': tasks,
+        'tasks': tasks_list,
         'search_query': search_query,
         'task_types': task_types,
         'type_filter': type_filter,
