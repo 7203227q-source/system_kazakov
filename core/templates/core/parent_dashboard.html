@@ -168,29 +168,8 @@
                             <span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">Идет по плану</span>
                         </div>
                         
-                        <!-- Simple visual representation of the chart -->
-                        <div class="relative h-48 w-full bg-gray-50 rounded-lg border border-gray-100 p-4">
-                            <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-                                <!-- Target Line -->
-                                <line x1="0" y1="20" x2="100" y2="20" stroke="#E5E7EB" stroke-width="1" stroke-dasharray="2,2" />
-                                <text x="2" y="18" fill="#9CA3AF" font-size="4">Цель: 90</text>
-                                
-                                <!-- Progress curve -->
-                                <path d="M 0,80 L 20,70 L 40,60 L 60,45 L 80,32" fill="none" stroke="#4F46E5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                
-                                <!-- Forecast curve -->
-                                <path d="M 80,32 L 100,15" fill="none" stroke="#10B981" stroke-width="2" stroke-dasharray="4,4" stroke-linecap="round" stroke-linejoin="round"/>
-                                
-                                <!-- Current Point -->
-                                <circle cx="80" cy="32" r="2.5" fill="white" stroke="#4F46E5" stroke-width="1.5" />
-                                <text x="75" y="28" fill="#4F46E5" font-size="4" font-weight="bold">68 б.</text>
-                            </svg>
-                            <div class="absolute bottom-2 left-4 right-4 flex justify-between text-xs text-gray-400">
-                                <span>Сентябрь</span>
-                                <span>Новый год</span>
-                                <span class="font-bold text-gray-600">Сейчас</span>
-                                <span>Экзамен</span>
-                            </div>
+                        <div class="relative h-64 w-full bg-white rounded-lg p-4">
+                            <canvas id="parentProgressChart"></canvas>
                         </div>
                     </div>
 
@@ -287,6 +266,77 @@
         </div>
     </main>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartDataRaw = '{{ chart_data|escapejs }}';
+    if (!chartDataRaw || chartDataRaw === '""' || chartDataRaw === 'null' || chartDataRaw === 'None') return;
+    
+    const data = JSON.parse(chartDataRaw);
+    if (!data.dates || data.dates.length === 0) return;
+
+    const ctx = document.getElementById('parentProgressChart').getContext('2d');
+    
+    let predictions = data.predictions;
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.dates,
+            datasets: [
+                {
+                    label: 'Фактический балл',
+                    data: data.mastery,
+                    borderColor: '#4F46E5',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#4F46E5',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Прогноз ИИ',
+                    data: predictions,
+                    borderColor: '#10B981',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#10B981',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    fill: false,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    align: 'end',
+                    labels: { usePointStyle: true, boxWidth: 8 }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    grid: { color: '#f3f4f6', drawBorder: false },
+                },
+                x: {
+                    grid: { display: false, drawBorder: false },
+                    ticks: { maxRotation: 45, minRotation: 0 }
+                }
+            }
+        }
+    });
+});
+</script>
 {% include "core/image_modal.html" %}
 </body>
 </html>

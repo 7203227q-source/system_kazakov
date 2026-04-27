@@ -239,6 +239,25 @@ def student_dashboard(request):
         xp_to_next = 100
         progress_percent = 0
 
+    # Prepare chart data (last 30 snapshots)
+    chart_dates = []
+    chart_mastery = []
+    chart_predictions = []
+    
+    if active_profile:
+        snapshots = DailySnapshot.objects.filter(student=request.user, subject=active_profile.subject).order_by('date')[:30]
+        for s in snapshots:
+            chart_dates.append(s.date.strftime('%d %b'))
+            chart_mastery.append(s.current_mastery)
+            chart_predictions.append(s.predicted_exam_score)
+            
+    import json
+    chart_data = json.dumps({
+        'dates': chart_dates,
+        'mastery': chart_mastery,
+        'predictions': chart_predictions
+    })
+
     return render(request, 'core/student_dashboard.html', {
         'recent_submissions': recent_submissions,
         'pending_assignments': pending_assignments,
@@ -248,7 +267,8 @@ def student_dashboard(request):
         'active_subject_id': active_subject_id,
         'xp_to_next': xp_to_next,
         'progress_percent': progress_percent,
-        'next_level_xp': next_level_xp
+        'next_level_xp': next_level_xp,
+        'chart_data': chart_data
     })
 
 from django.http import JsonResponse
@@ -1073,13 +1093,34 @@ def parent_dashboard(request):
         selected_child = children.first()
         
     payment = None
+    chart_data = None
     if selected_child:
         payment = Payment.objects.filter(parent=request.user, student=selected_child).order_by('-created_at').first()
+        
+        # Prepare chart data for the first profile (or default Math)
+        active_profile = selected_child.subject_profiles.first()
+        if active_profile:
+            chart_dates = []
+            chart_mastery = []
+            chart_predictions = []
+            snapshots = DailySnapshot.objects.filter(student=selected_child, subject=active_profile.subject).order_by('date')[:30]
+            for s in snapshots:
+                chart_dates.append(s.date.strftime('%d %b'))
+                chart_mastery.append(s.current_mastery)
+                chart_predictions.append(s.predicted_exam_score)
+                
+            import json
+            chart_data = json.dumps({
+                'dates': chart_dates,
+                'mastery': chart_mastery,
+                'predictions': chart_predictions
+            })
         
     context = {
         'children': children,
         'selected_child': selected_child,
         'payment': payment,
+        'chart_data': chart_data,
     }
     return render(request, 'core/parent_dashboard.html', context)
 
