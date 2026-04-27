@@ -76,7 +76,10 @@
                         {% for profile in selected_child.subject_profiles.all %}
                             <div class="flex justify-between items-center bg-gray-50 p-2 rounded">
                                 <span class="font-bold text-gray-700 text-sm">{{ profile.subject.name }}</span>
-                                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">Цель: {{ profile.target_score }}</span>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold" title="Текущий прогноз ИИ">Прогноз: {{ profile.latest_snapshot.predicted_exam_score|default:"-" }}</span>
+                                    <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-bold" title="Целевой балл">Цель: {{ profile.target_score }}</span>
+                                </div>
                             </div>
                         {% endfor %}
                         </div>
@@ -87,17 +90,17 @@
 
                 <!-- Engagement -->
                 <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <p class="text-sm text-gray-500 mb-4">Вовлеченность (XP)</p>
+                    <p class="text-sm text-gray-500 mb-4">Текущее мастерство (Аналитика)</p>
                     {% if selected_child.subject_profiles.exists %}
                         <div class="space-y-4">
                         {% for profile in selected_child.subject_profiles.all %}
                             <div>
                                 <div class="flex justify-between text-xs mb-1">
                                     <span class="text-gray-600">{{ profile.subject.name }}</span>
-                                    <span class="font-bold text-indigo-600">{{ profile.xp }} XP (Ур. {{ profile.level }})</span>
+                                    <span class="font-bold text-indigo-600">{{ profile.latest_snapshot.current_mastery|default:"0.0" }}% (Ур. {{ profile.level }})</span>
                                 </div>
                                 <div class="w-full bg-gray-100 rounded-full h-2">
-                                    <div class="bg-gradient-to-r from-primary to-indigo-500 h-2 rounded-full" style="width: {% widthratio profile.xp 100 100 %}%"></div>
+                                    <div class="bg-gradient-to-r from-primary to-indigo-500 h-2 rounded-full" style="width: {{ profile.latest_snapshot.current_mastery|default:0 }}%"></div>
                                 </div>
                             </div>
                         {% endfor %}

@@ -143,12 +143,8 @@
                         <div>
                             <div class="flex items-center">
                                 <h2 class="text-2xl font-bold text-gray-800">{{ selected_student.get_full_name }}</h2>
-                                <span class="ml-3 bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded border border-yellow-200">Цель: {{ selected_student.target_score|default:"Не указана" }}</span>
                             </div>
                             <p class="text-sm text-gray-500 mt-1">Телефон: {{ selected_student.phone|default:"Не указан" }}</p>
-                            <p class="text-xs text-gray-400 mt-1 flex items-center">
-                                Моя оценка: <span class="ml-1 px-1.5 py-0.5 bg-white border border-gray-200 rounded font-medium cursor-pointer hover:bg-gray-50" title="Нажмите, чтобы изменить">80 - 88 баллов <i class="fas fa-pen ml-1 text-gray-300"></i></span>
-                            </p>
                         </div>
                     </div>
                     <div class="flex space-x-2">
@@ -164,19 +160,26 @@
                     </div>
                 </div>
 
-                <!-- Subject Profiles XP -->
+                <!-- Прогноз и Аналитика -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                    <p class="text-sm font-medium text-gray-500 mb-4">Вовлеченность (XP)</p>
+                    <p class="text-sm font-medium text-gray-500 mb-4">Прогноз и Аналитика</p>
                     {% if selected_student.subject_profiles.exists %}
-                        <div class="space-y-3">
+                        <div class="space-y-4">
                         {% for profile in selected_student.subject_profiles.all %}
-                            <div>
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span class="text-gray-600">{{ profile.subject.name }}</span>
-                                    <span class="font-bold text-primary">{{ profile.xp }} XP (Ур. {{ profile.level }})</span>
+                            <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="font-bold text-gray-700 text-sm">{{ profile.subject.name }}</span>
+                                    <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">Прогноз: {{ profile.latest_snapshot.predicted_exam_score|default:"-" }}</span>
                                 </div>
-                                <div class="w-full bg-gray-100 rounded-full h-2">
-                                    <div class="bg-gradient-to-r from-primary to-indigo-500 h-2 rounded-full" style="width: {% widthratio profile.xp 100 100 %}%"></div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-xs text-gray-500">Мастерство:</span>
+                                    <span class="text-xs font-bold text-gray-800">{{ profile.latest_snapshot.current_mastery|default:"0.0" }}%</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-gray-500">Индекс доверия (Trust):</span>
+                                    <span class="text-xs font-bold {% if profile.trust_factor >= 0.8 %}text-green-600{% elif profile.trust_factor >= 0.5 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                        {{ profile.trust_factor }}
+                                    </span>
                                 </div>
                             </div>
                         {% endfor %}

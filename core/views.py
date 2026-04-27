@@ -5,7 +5,7 @@ from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse
 from django.contrib import messages
 from django.db import models
-from .models import User, Payment, Task, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject
+from .models import User, Payment, Task, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot
 import time
 from .analytics import record_task_log
 from .services import process_task_submission
@@ -226,11 +226,13 @@ def student_dashboard(request):
     pending_assignments = pending_assignments.order_by('-created_at')
 
     # Gamification calculations for active profile
+    latest_snapshot = None
     if active_profile:
         current_level = active_profile.level
         next_level_xp = current_level * 100
         xp_to_next = next_level_xp - active_profile.xp
         progress_percent = int((active_profile.xp % 100) / 100 * 100)
+        latest_snapshot = DailySnapshot.objects.filter(student=request.user, subject=active_profile.subject).order_by('-date').first()
     else:
         current_level = 1
         next_level_xp = 100
@@ -242,6 +244,7 @@ def student_dashboard(request):
         'pending_assignments': pending_assignments,
         'profiles': profiles,
         'active_profile': active_profile,
+        'latest_snapshot': latest_snapshot,
         'active_subject_id': active_subject_id,
         'xp_to_next': xp_to_next,
         'progress_percent': progress_percent,
@@ -615,6 +618,10 @@ def tutor_dashboard(request):
     today = timezone.now().date()
     
     for s in students:
+        # Fetch latest snapshot for each profile
+        for profile in s.subject_profiles.all():
+            profile.latest_snapshot = DailySnapshot.objects.filter(student=s, subject=profile.subject).order_by('-date').first()
+            
         # Check for active assignments
         active_assignments_count = Assignment.objects.filter(student=s, is_draft=False, is_completed=False).count()
         # Check for pending spaced repetition tasks
@@ -1052,6 +1059,11 @@ def parent_dashboard(request):
         return redirect('login')
         
     children = request.user.children.all().prefetch_related('subject_profiles', 'subject_profiles__subject')
+    
+    for child in children:
+        for profile in child.subject_profiles.all():
+            profile.latest_snapshot = DailySnapshot.objects.filter(student=child, subject=profile.subject).order_by('-date').first()
+            
     selected_child_id = request.GET.get('child_id')
     selected_child = None
     
