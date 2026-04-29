@@ -80,13 +80,12 @@
                     </h2>
                     <p class="text-sm text-gray-500 mb-4">В целях безопасности все ключи хранятся исключительно в переменных окружения сервера (ENV). Здесь отображается только их статус.</p>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Gemini API Card -->
+                    <div class="grid grid-cols-1 gap-6">
                         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
                             <div class="absolute top-0 right-0 p-4">
-                                {% if gemini.status == 'ok' %}
+                                {% if openrouter.status == 'ok' %}
                                     <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-check-circle mr-1"></i> Активен</span>
-                                {% elif gemini.status == 'missing' %}
+                                {% elif openrouter.status == 'missing' %}
                                     <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">Не задан</span>
                                 {% else %}
                                     <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-exclamation-triangle mr-1"></i> Ошибка</span>
@@ -95,60 +94,199 @@
                             
                             <div class="flex items-center mb-4">
                                 <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-2xl mr-4">
-                                    <i class="fas fa-brain"></i>
+                                    <i class="fas fa-network-wired"></i>
                                 </div>
                                 <div>
-                                    <h3 class="font-bold text-gray-800 text-lg">Google Gemini Vision</h3>
-                                    <p class="text-xs text-gray-500 font-mono">GEMINI_API_KEY</p>
+                                    <h3 class="font-bold text-gray-800 text-lg">OpenRouter</h3>
+                                    <p class="text-xs text-gray-500 font-mono">OPENROUTER_API_KEY</p>
                                 </div>
                             </div>
                             
                             <div class="bg-gray-50 rounded-lg p-3 text-sm border border-gray-100 mb-4">
-                                <p class="text-gray-700">Используется для ИИ-проверки фото решений и черновиков.</p>
-                                <p class="mt-2 text-xs font-medium {% if gemini.status == 'ok' %}text-green-600{% elif gemini.status == 'missing' %}text-gray-500{% else %}text-red-600{% endif %}">
-                                    Статус: {{ gemini.message }}
+                                <p class="text-gray-700">Единая точка доступа к нейросетям для проверки, анализа, генерации и регенерации.</p>
+                                <p class="mt-2 text-xs font-medium {% if openrouter.status == 'ok' %}text-green-600{% elif openrouter.status == 'missing' %}text-gray-500{% else %}text-red-600{% endif %}">
+                                    Статус: {{ openrouter.message }}
                                 </p>
                             </div>
                             
-                            <a href="{% url 'admin_system' %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
-                                <i class="fas fa-sync-alt mr-1"></i> Проверить соединение
-                            </a>
-                        </div>
-
-                        <!-- OpenAI API Card -->
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-                            <div class="absolute top-0 right-0 p-4">
-                                {% if openai.status == 'ok' %}
-                                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-check-circle mr-1"></i> Активен</span>
-                                {% elif openai.status == 'missing' %}
-                                    <span class="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">Не задан</span>
-                                {% else %}
-                                    <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-exclamation-triangle mr-1"></i> Ошибка</span>
-                                {% endif %}
+                            <div class="flex flex-wrap gap-3">
+                                <a href="{% url 'admin_system' %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
+                                    <i class="fas fa-sync-alt mr-1"></i> Проверить соединение
+                                </a>
+                                <form method="POST" action="{% url 'admin_system' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="sync_openrouter_models">
+                                    <button type="submit" class="text-gray-700 hover:text-gray-900 text-sm font-medium transition">
+                                        <i class="fas fa-download mr-1"></i> Обновить список моделей
+                                    </button>
+                                </form>
                             </div>
-                            
-                            <div class="flex items-center mb-4">
-                                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-2xl mr-4">
-                                    <i class="fas fa-robot"></i>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800 text-lg">OpenAI / GPT-4</h3>
-                                    <p class="text-xs text-gray-500 font-mono">OPENAI_API_KEY</p>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-gray-50 rounded-lg p-3 text-sm border border-gray-100 mb-4">
-                                <p class="text-gray-700">Используется для авто-генерации вариантов и уникализации задач.</p>
-                                <p class="mt-2 text-xs font-medium {% if openai.status == 'ok' %}text-green-600{% elif openai.status == 'missing' %}text-gray-500{% else %}text-red-600{% endif %}">
-                                    Статус: {{ openai.message }}
-                                </p>
-                            </div>
-                            
-                            <a href="{% url 'admin_system' %}" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
-                                <i class="fas fa-sync-alt mr-1"></i> Проверить соединение
-                            </a>
                         </div>
                     </div>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-star text-yellow-500 mr-2"></i> Избранные модели
+                    </h2>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <form method="POST" action="{% url 'admin_system' %}" class="flex flex-col md:flex-row gap-3 items-start md:items-end">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle_openrouter_featured">
+                            <div class="w-full md:w-2/3">
+                                <label class="block text-xs font-bold text-gray-500 mb-2">Модель</label>
+                                <select name="model_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <optgroup label="⭐ Избранные">
+                                        {% for m in featured_models %}
+                                        <option value="{{ m.id }}">{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    <optgroup label="Все остальные">
+                                        {% for m in other_models %}
+                                        <option value="{{ m.id }}">{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <button type="submit" class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-black transition">
+                                Переключить ⭐
+                            </button>
+                        </form>
+
+                        {% if featured_models %}
+                        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {% for m in featured_models %}
+                            <div class="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3">
+                                <div class="min-w-0">
+                                    <div class="font-bold text-gray-800 truncate">{{ m.label|default:m.code }}</div>
+                                    <div class="text-xs text-gray-500 font-mono truncate">{{ m.code }}</div>
+                                </div>
+                                <form method="POST" action="{% url 'admin_system' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="toggle_openrouter_featured">
+                                    <input type="hidden" name="model_id" value="{{ m.id }}">
+                                    <button type="submit" class="text-gray-600 hover:text-gray-900 text-sm font-bold">
+                                        Убрать ⭐
+                                    </button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-sliders-h text-primary mr-2"></i> Выбор моделей по предметам
+                    </h2>
+
+                    <form method="POST" action="{% url 'admin_system' %}" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_subject_ai_configs">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500">
+                                        <th class="px-4 py-3 font-bold">Предмет</th>
+                                        <th class="px-4 py-3 font-bold">Анализ фото</th>
+                                        <th class="px-4 py-3 font-bold">Проверка решения</th>
+                                        <th class="px-4 py-3 font-bold">Генерация изображения</th>
+                                        <th class="px-4 py-3 font-bold">Регенерация (текст)</th>
+                                        <th class="px-4 py-3 font-bold">Регенерация (картинка)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-sm">
+                                    {% for row in subject_rows %}
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-3 font-bold text-gray-800 whitespace-nowrap">{{ row.subject.name }}</td>
+                                        <td class="px-4 py-3">
+                                            <select name="subject_{{ row.subject.id }}_photo_analysis_model" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                <option value="">—</option>
+                                                <optgroup label="⭐ Избранные">
+                                                    {% for m in featured_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.photo_analysis_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                <optgroup label="Все остальные">
+                                                    {% for m in other_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.photo_analysis_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                            </select>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <select name="subject_{{ row.subject.id }}_solution_check_model" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                <option value="">—</option>
+                                                <optgroup label="⭐ Избранные">
+                                                    {% for m in featured_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.solution_check_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                <optgroup label="Все остальные">
+                                                    {% for m in other_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.solution_check_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                            </select>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <select name="subject_{{ row.subject.id }}_image_generate_model" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                <option value="">—</option>
+                                                <optgroup label="⭐ Избранные">
+                                                    {% for m in featured_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.image_generate_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                <optgroup label="Все остальные">
+                                                    {% for m in other_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.image_generate_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                            </select>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <select name="subject_{{ row.subject.id }}_task_regen_text_model" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                <option value="">—</option>
+                                                <optgroup label="⭐ Избранные">
+                                                    {% for m in featured_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.task_regen_text_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                <optgroup label="Все остальные">
+                                                    {% for m in other_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.task_regen_text_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                            </select>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <select name="subject_{{ row.subject.id }}_task_regen_image_model" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                <option value="">—</option>
+                                                <optgroup label="⭐ Избранные">
+                                                    {% for m in featured_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.task_regen_image_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                <optgroup label="Все остальные">
+                                                    {% for m in other_models %}
+                                                    <option value="{{ m.id }}" {% if row.config and row.config.task_regen_image_model_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition">
+                                Сохранить настройки
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 <!-- Storage & Limits -->

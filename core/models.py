@@ -291,6 +291,28 @@ class TaskGenerationLog(models.Model):
     error_message = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class OpenRouterModel(models.Model):
+    code = models.CharField(max_length=200, unique=True)
+    label = models.CharField(max_length=255, blank=True, null=True)
+    capabilities = models.CharField(max_length=50, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.label or self.code
+
+class SubjectAIConfig(models.Model):
+    subject = models.OneToOneField(Subject, on_delete=models.CASCADE, related_name='ai_config')
+    photo_analysis_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    solution_check_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    image_generate_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    task_regen_text_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    task_regen_image_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+
+    def __str__(self):
+        return f"AI config: {self.subject.name}"
+
 class Message(models.Model):
     """Модель сообщения для внутреннего чата"""
     sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)

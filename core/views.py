@@ -10,7 +10,7 @@ import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
 from .services import process_task_submission
-from .system_info import get_system_metrics, check_gemini_api, check_openai_api
+from .system_info import get_system_metrics, check_openrouter_api
 
 from django.core.management import call_command
 from django.http import HttpResponse
@@ -29,17 +29,71 @@ def admin_system_status(request):
     """Страница мониторинга системы и API ключей для Администратора"""
     if request.user.role != 'admin':
         return redirect('login')
+
+    from .models import OpenRouterModel, Subject, SubjectAIConfig
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        if action == 'sync_openrouter_models':
+            try:
+                from .openrouter_models import sync_openrouter_models
+                created, updated, deactivated = sync_openrouter_models()
+                messages.success(request, f"Модели обновлены. Новых: {created}, обновлено: {updated}, деактивировано: {deactivated}.")
+            except Exception as e:
+                messages.error(request, f"Ошибка обновления моделей: {e}")
+            return redirect('admin_system')
+
+        if action == 'toggle_openrouter_featured':
+            try:
+                model_id = int(request.POST.get('model_id'))
+                m = OpenRouterModel.objects.get(id=model_id)
+                m.is_featured = not m.is_featured
+                m.save(update_fields=['is_featured'])
+            except Exception:
+                pass
+            return redirect('admin_system')
+
+        if action == 'save_subject_ai_configs':
+            for subject in Subject.objects.all():
+                cfg, _ = SubjectAIConfig.objects.get_or_create(subject=subject)
+
+                def get_fk(field):
+                    raw = request.POST.get(f"subject_{subject.id}_{field}", "")
+                    if not raw:
+                        return None
+                    try:
+                        return OpenRouterModel.objects.get(id=int(raw))
+                    except Exception:
+                        return None
+
+                cfg.photo_analysis_model = get_fk("photo_analysis_model")
+                cfg.solution_check_model = get_fk("solution_check_model")
+                cfg.image_generate_model = get_fk("image_generate_model")
+                cfg.task_regen_text_model = get_fk("task_regen_text_model")
+                cfg.task_regen_image_model = get_fk("task_regen_image_model")
+                cfg.save()
+
+            messages.success(request, "Настройки моделей по предметам сохранены.")
+            return redirect('admin_system')
         
     metrics = get_system_metrics()
-    
-    # Check APIs only if explicitly requested or on load (could be slow, but ok for admin)
-    gemini_status = check_gemini_api()
-    openai_status = check_openai_api()
-    
+
+    openrouter_status = check_openrouter_api()
+
+    subjects = Subject.objects.all().order_by('name')
+    configs = {c.subject_id: c for c in SubjectAIConfig.objects.select_related('subject')}
+    subject_rows = [{'subject': s, 'config': configs.get(s.id)} for s in subjects]
+    featured_models = OpenRouterModel.objects.filter(is_featured=True).order_by('label', 'code')
+    other_models = OpenRouterModel.objects.filter(is_featured=False).order_by('label', 'code')
+
     context = {
         'metrics': metrics,
-        'gemini': gemini_status,
-        'openai': openai_status,
+        'openrouter': openrouter_status,
+        'subjects': subjects,
+        'configs': configs,
+        'subject_rows': subject_rows,
+        'featured_models': featured_models,
+        'other_models': other_models,
     }
     
     return render(request, 'core/admin_system.html', context)
@@ -913,10 +967,19 @@ def admin_task_regen_preview(request, task_id):
         payload = {}
 
     mode = payload.get('mode', 'full')
-    model = payload.get('model', '')
+    model = (payload.get('model') or '').strip()
     prompt_template = payload.get('prompt_template')
 
     try:
+        if not model:
+            from .models import SubjectAIConfig
+            cfg = SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id).select_related('task_regen_text_model').first()
+            if cfg and cfg.task_regen_text_model:
+                model = cfg.task_regen_text_model.code
+
+        if not model:
+            raise ValueError("Не выбрана модель OpenRouter для регенерации текста (настройки по предмету).")
+
         from .openrouter_client import generate_task_regeneration
         result = generate_task_regeneration(task=task, mode=mode, model=model, prompt_template=prompt_template)
         TaskGenerationLog.objects.create(
@@ -983,10 +1046,21 @@ def admin_task_regen_apply(request, task_id):
 
     from .openrouter_client import generate_task_regeneration
 
+    mode = payload.get('mode', 'full')
+    model = (payload.get('model') or '').strip()
+    if not model:
+        from .models import SubjectAIConfig
+        cfg = SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id).select_related('task_regen_text_model').first()
+        if cfg and cfg.task_regen_text_model:
+            model = cfg.task_regen_text_model.code
+
+    if not model:
+        return JsonResponse({'error': 'Не выбрана модель OpenRouter для регенерации текста (настройки по предмету).'}, status=400)
+
     result = generate_task_regeneration(
         task=task,
-        mode=payload.get('mode', 'full'),
-        model=payload.get('model', ''),
+        mode=mode,
+        model=model,
         prompt_template=payload.get('prompt_template'),
     )
 
@@ -1005,8 +1079,8 @@ def admin_task_regen_apply(request, task_id):
         task=task,
         user=request.user,
         provider='openrouter',
-        model=payload.get('model', ''),
-        mode=payload.get('mode', 'full'),
+        model=model,
+        mode=mode,
         prompt_template=payload.get('prompt_template'),
         response_raw=json.dumps(result, ensure_ascii=False),
         result_content_html=result.get('content_html'),
@@ -1463,7 +1537,7 @@ def api_submission_status(request, submission_id):
 import re
 from django.conf import settings
 
-def api_verify_with_gemini(request, submission_id):
+def api_verify_with_ai(request, submission_id):
     if request.method != 'POST' or not request.user.is_authenticated:
         return JsonResponse({'error': 'Unauthorized'}, status=403)
         
@@ -1471,31 +1545,106 @@ def api_verify_with_gemini(request, submission_id):
     
     if not submission.image_url:
         return JsonResponse({'error': 'Image not found'}, status=400)
-        
-    # In a real app, this is where you'd send the image to Gemini Vision API
-    # Since we don't have the real API key configured, we will mock the Gemini response
-    # to demonstrate the flow.
-    import time
-    time.sleep(1.5) # Mock AI delay
-    
+
     task = submission.task
     max_points = task.exam_points
-    
-    # Mocking Gemini's decision
-    # If the student's task is part 1 (max 1), we just check if the draft is readable
-    if max_points == 1:
-        primary_score = 1
-        feedback = "Отличный черновик, ход решения понятен. Ответ совпадает с правильным."
-        is_correct = True
-    else:
-        # Part 2 task, mock a partial or full score
-        import random
-        primary_score = random.randint(max_points // 2, max_points)
-        is_correct = primary_score == max_points
-        if is_correct:
-            feedback = "Решение полностью верное и обоснованное. Высший балл."
+
+    model = ""
+    try:
+        from .models import SubjectAIConfig
+        cfg = SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id).select_related('photo_analysis_model').first()
+        if cfg and cfg.photo_analysis_model:
+            model = cfg.photo_analysis_model.code
+    except Exception:
+        model = ""
+
+    used_openrouter = False
+    feedback = ""
+    is_correct = False
+    primary_score = 0
+
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if api_key and model:
+        try:
+            import base64
+            import mimetypes
+            import json as pyjson
+
+            file_path = submission.image_url.path
+            mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
+            with open(file_path, "rb") as f:
+                img_b64 = base64.b64encode(f.read()).decode("utf-8")
+            data_url = f"data:{mime};base64,{img_b64}"
+
+            referer = os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru"
+            title = os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system"
+
+            prompt = (
+                "Оцени решение по фото как эксперт экзамена.\n"
+                f"Максимум баллов: {max_points}.\n"
+                "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
+            )
+
+            res = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": referer,
+                    "X-Title": title,
+                },
+                json={
+                    "model": model,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": data_url}},
+                            ],
+                        },
+                    ],
+                },
+                timeout=90,
+            )
+
+            if res.status_code != 200:
+                raise ValueError(res.text[:500])
+
+            data = res.json()
+            content = data["choices"][0]["message"]["content"]
+            try:
+                parsed = pyjson.loads(content)
+            except Exception:
+                match = re.search(r"\{[\s\S]*\}", str(content))
+                if not match:
+                    raise ValueError("No JSON found")
+                parsed = pyjson.loads(match.group(0))
+
+            primary_score = int(parsed.get("primary_score") or 0)
+            is_correct = bool(parsed.get("is_correct"))
+            feedback = str(parsed.get("feedback") or "")
+            used_openrouter = True
+        except Exception:
+            used_openrouter = False
+
+    if not used_openrouter:
+        import time
+        time.sleep(1.0)
+        if max_points == 1:
+            primary_score = 1
+            feedback = "Отличный черновик, ход решения понятен. Ответ совпадает с правильным."
+            is_correct = True
         else:
-            feedback = f"В решении есть небольшая вычислительная ошибка на промежуточном этапе. Оценено в {primary_score} из {max_points} баллов."
+            import random
+            primary_score = random.randint(max_points // 2, max_points)
+            is_correct = primary_score == max_points
+            if is_correct:
+                feedback = "Решение полностью верное и обоснованное. Высший балл."
+            else:
+                feedback = f"В решении есть небольшая вычислительная ошибка на промежуточном этапе. Оценено в {primary_score} из {max_points} баллов."
             
     submission.primary_score = primary_score
     submission.is_correct = is_correct
@@ -1526,7 +1675,8 @@ def api_verify_with_gemini(request, submission_id):
         'feedback': feedback,
         'is_correct': is_correct,
         'xp_gained': xp_gained,
-        'solution_html': solution_html
+        'solution_html': solution_html,
+        'model': model
     })
 
 from django.contrib.auth import logout
