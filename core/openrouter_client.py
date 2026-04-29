@@ -2,6 +2,7 @@ import os
 import requests
 
 from .services_openrouter import parse_openrouter_json
+from .http_headers import sanitize_header_value
 
 
 def generate_task_regeneration(*, task, mode, model, prompt_template=None):
@@ -9,8 +10,8 @@ def generate_task_regeneration(*, task, mode, model, prompt_template=None):
     if not api_key:
         raise ValueError("OPENROUTER_API_KEY is not set")
 
-    referer = os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru"
-    title = os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system"
+    referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
+    title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
 
     prompt = (prompt_template or "").strip()
     if not prompt:

@@ -1576,8 +1576,9 @@ def api_verify_with_ai(request, submission_id):
                 img_b64 = base64.b64encode(f.read()).decode("utf-8")
             data_url = f"data:{mime};base64,{img_b64}"
 
-            referer = os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru"
-            title = os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system"
+            from .http_headers import sanitize_header_value
+            referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
+            title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
 
             prompt = (
                 "Оцени решение по фото как эксперт экзамена.\n"

@@ -28,8 +28,8 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
-test_*.py
-debug_*.py
+/test_*.py
+/debug_*.py
 
 # IDE / OS
 .idea/

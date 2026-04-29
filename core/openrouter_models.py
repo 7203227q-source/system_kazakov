@@ -3,6 +3,7 @@ import os
 import requests
 
 from .models import OpenRouterModel
+from .http_headers import sanitize_header_value
 
 
 def _get_openrouter_headers():
@@ -10,8 +11,8 @@ def _get_openrouter_headers():
     if not api_key:
         raise ValueError("OPENROUTER_API_KEY is not set")
 
-    referer = os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru"
-    title = os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system"
+    referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
+    title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
 
     return {
         "Authorization": f"Bearer {api_key}",
@@ -107,4 +108,3 @@ def sync_openrouter_models():
         deactivated += 1
 
     return created, updated, deactivated
-
