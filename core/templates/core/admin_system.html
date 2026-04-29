@@ -211,10 +211,31 @@
     </main>
 
 <script>
+function syncSidebarLayout() {
+    const sidebar = document.getElementById('admin-sidebar');
+    const overlay = document.getElementById('mobile-sidebar-overlay');
+    if (!sidebar || !overlay) return;
+
+    if (window.matchMedia('(min-width: 768px)').matches) {
+        overlay.classList.add('hidden');
+        sidebar.classList.remove('-translate-x-full');
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+    }
+}
+
 function toggleSidebar() {
     const sidebar = document.getElementById('admin-sidebar');
     const overlay = document.getElementById('mobile-sidebar-overlay');
-    
+    if (!sidebar || !overlay) return;
+
+    if (window.matchMedia('(min-width: 768px)').matches) {
+        overlay.classList.add('hidden');
+        sidebar.classList.remove('-translate-x-full');
+        return;
+    }
+
     if (sidebar.classList.contains('-translate-x-full')) {
         sidebar.classList.remove('-translate-x-full');
         overlay.classList.remove('hidden');
@@ -223,6 +244,9 @@ function toggleSidebar() {
         overlay.classList.add('hidden');
     }
 }
+
+document.addEventListener('DOMContentLoaded', syncSidebarLayout);
+window.addEventListener('resize', syncSidebarLayout);
 </script>
 </body>
 </html>

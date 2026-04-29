@@ -2,11 +2,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.contrib import messages
 from django.db import models
-from .models import User, Payment, Task, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot
 import time
+import json
 from .analytics import record_task_log, get_adaptive_task_for_student
 from .services import process_task_submission
 from .system_info import get_system_metrics, check_gemini_api, check_openai_api
@@ -896,6 +897,127 @@ def tutor_regenerate_task(request, assignment_id, task_id):
     return redirect('tutor_dashboard')
 
 @login_required
+def admin_task_regen_preview(request, task_id):
+    if request.user.role != 'admin':
+        return HttpResponseForbidden()
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    task = get_object_or_404(Task, id=task_id)
+
+    payload = {}
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        payload = {}
+
+    mode = payload.get('mode', 'full')
+    model = payload.get('model', '')
+    prompt_template = payload.get('prompt_template')
+
+    try:
+        from .openrouter_client import generate_task_regeneration
+        result = generate_task_regeneration(task=task, mode=mode, model=model, prompt_template=prompt_template)
+        TaskGenerationLog.objects.create(
+            task=task,
+            user=request.user,
+            provider='openrouter',
+            model=model,
+            mode=mode,
+            prompt_template=prompt_template,
+            response_raw=json.dumps(result, ensure_ascii=False),
+            result_content_html=result.get('content_html'),
+            result_solution_html=result.get('solution_html'),
+            result_correct_answer=result.get('correct_answer'),
+            status='success',
+        )
+
+        preview = {
+            'task_id': task.id,
+            'mode': mode,
+            'model': model,
+            'content_html': result.get('content_html') or '',
+            'solution_html': result.get('solution_html') or '',
+            'correct_answer': result.get('correct_answer') or '',
+        }
+        return JsonResponse({'preview': preview})
+    except Exception as e:
+        TaskGenerationLog.objects.create(
+            task=task,
+            user=request.user,
+            provider='openrouter',
+            model=model,
+            mode=mode,
+            prompt_template=prompt_template,
+            status='error',
+            error_message=str(e),
+        )
+
+        preview = {
+            'task_id': task.id,
+            'mode': mode,
+            'model': model,
+            'content_html': task.get_content_for_theme('classic'),
+            'solution_html': task.get_solution_for_theme('classic'),
+            'correct_answer': task.correct_answer,
+            'error': str(e),
+        }
+        return JsonResponse({'preview': preview})
+
+@login_required
+def admin_task_regen_apply(request, task_id):
+    if request.user.role != 'admin':
+        return HttpResponseForbidden()
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    task = get_object_or_404(Task, id=task_id)
+
+    payload = {}
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        payload = {}
+
+    from .openrouter_client import generate_task_regeneration
+
+    result = generate_task_regeneration(
+        task=task,
+        mode=payload.get('mode', 'full'),
+        model=payload.get('model', ''),
+        prompt_template=payload.get('prompt_template'),
+    )
+
+    variant, _ = TaskVariant.objects.get_or_create(task=task, theme='classic', defaults={'content': '', 'solution': ''})
+    if result.get('content_html') is not None:
+        variant.content = result.get('content_html') or ''
+    if result.get('solution_html') is not None:
+        variant.solution = result.get('solution_html') or ''
+    variant.save()
+
+    if result.get('correct_answer') is not None:
+        task.correct_answer = result.get('correct_answer') or ''
+        task.save(update_fields=['correct_answer'])
+
+    TaskGenerationLog.objects.create(
+        task=task,
+        user=request.user,
+        provider='openrouter',
+        model=payload.get('model', ''),
+        mode=payload.get('mode', 'full'),
+        prompt_template=payload.get('prompt_template'),
+        response_raw=json.dumps(result, ensure_ascii=False),
+        result_content_html=result.get('content_html'),
+        result_solution_html=result.get('solution_html'),
+        result_correct_answer=result.get('correct_answer'),
+        status='success',
+    )
+
+    return JsonResponse({'status': 'ok'})
+
+@login_required
 def tutor_bulk_uniqualize(request):
     """
     Массовая уникализация задач через ИИ (NanoBanana/OpenAI API).
@@ -944,8 +1066,16 @@ def tutor_task_bank(request):
     tasks = Task.objects.select_related('topic', 'task_type', 'task_type__exam_format').all()
 
     search_query = request.GET.get('q', '')
+    subject_filter = request.GET.get('subject', '')
+    exam_format_filter = request.GET.get('exam_format', '')
     type_filter = request.GET.get('type', '')
     subtype_filter = request.GET.get('subtype', '')
+
+    if request.user.role == 'admin':
+        if subject_filter:
+            tasks = tasks.filter(task_type__exam_format__subject_id=subject_filter)
+        if exam_format_filter:
+            tasks = tasks.filter(task_type__exam_format_id=exam_format_filter)
 
     if search_query:
         tasks = tasks.filter(subtype_tag__icontains=search_query) | tasks.filter(fipi_id__icontains=search_query)
@@ -956,10 +1086,21 @@ def tutor_task_bank(request):
     if subtype_filter:
         tasks = tasks.filter(subtype_tag=subtype_filter)
 
-    task_types = TaskType.objects.annotate(task_count=models.Count('tasks')).order_by('number')
+    task_types_qs = TaskType.objects.all()
+    if request.user.role == 'admin':
+        if subject_filter:
+            task_types_qs = task_types_qs.filter(exam_format__subject_id=subject_filter)
+        if exam_format_filter:
+            task_types_qs = task_types_qs.filter(exam_format_id=exam_format_filter)
+    task_types = task_types_qs.annotate(task_count=models.Count('tasks')).order_by('number')
     
     # Get unique subtype_tags for the selected type, or all if no type selected
     subtypes_query = Task.objects.exclude(subtype_tag__isnull=True).exclude(subtype_tag__exact='')
+    if request.user.role == 'admin':
+        if subject_filter:
+            subtypes_query = subtypes_query.filter(task_type__exam_format__subject_id=subject_filter)
+        if exam_format_filter:
+            subtypes_query = subtypes_query.filter(task_type__exam_format_id=exam_format_filter)
     if type_filter:
         subtypes_query = subtypes_query.filter(task_type__id=type_filter)
     subtypes = subtypes_query.values('subtype_tag').annotate(task_count=models.Count('id')).order_by('subtype_tag')
@@ -970,9 +1111,22 @@ def tutor_task_bank(request):
     for task in tasks_list:
         task.subtype_count = subtype_counts.get(task.subtype_tag, 0)
 
+    subjects = []
+    exam_formats = []
+    if request.user.role == 'admin':
+        subjects = Subject.objects.all().order_by('name')
+        exam_formats_qs = ExamFormat.objects.filter(is_active=True).order_by('subject__name', '-year', 'name')
+        if subject_filter:
+            exam_formats_qs = exam_formats_qs.filter(subject_id=subject_filter)
+        exam_formats = exam_formats_qs
+
     return render(request, 'core/tutor_task_bank.html', {
         'tasks': tasks_list,
         'search_query': search_query,
+        'subjects': subjects,
+        'exam_formats': exam_formats,
+        'subject_filter': subject_filter,
+        'exam_format_filter': exam_format_filter,
         'task_types': task_types,
         'type_filter': type_filter,
         'subtypes': subtypes,

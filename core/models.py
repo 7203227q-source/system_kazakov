@@ -275,6 +275,22 @@ class TaskLog(models.Model):
     def __str__(self):
         return f"Log: {self.student.username} -> Task {self.task.id} (Score: {self.score})"
 
+class TaskGenerationLog(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='generation_logs')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_generation_logs')
+    provider = models.CharField(max_length=50, default='openrouter')
+    model = models.CharField(max_length=200, blank=True, null=True)
+    mode = models.CharField(max_length=50, default='full')
+    prompt_template = models.TextField(blank=True, null=True)
+    prompt_rendered = models.TextField(blank=True, null=True)
+    response_raw = models.TextField(blank=True, null=True)
+    result_content_html = models.TextField(blank=True, null=True)
+    result_solution_html = models.TextField(blank=True, null=True)
+    result_correct_answer = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, default='success')
+    error_message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
 class Message(models.Model):
     """Модель сообщения для внутреннего чата"""
     sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)
