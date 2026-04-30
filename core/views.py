@@ -1563,9 +1563,11 @@ def api_verify_with_ai(request, submission_id):
     is_correct = False
     primary_score = 0
 
-    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
     if api_key and model:
         try:
+            from .http_headers import require_ascii
+            require_ascii(api_key, "OPENROUTER_API_KEY")
             import base64
             import mimetypes
             import json as pyjson
