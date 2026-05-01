@@ -16,6 +16,14 @@ class NormalizeTaskHtmlTests(SimpleTestCase):
         self.assertIn("AC = 5, cos ACB = 0,8.", out)
         self.assertNotIn("<br", out)
 
+    def test_collapses_single_br_after_comma_at_top_level(self):
+        from core.task_html import normalize_task_html
+
+        html = "В треугольнике ABC AB = BC, AC = 5,<br>cos ACB = 0,8."
+        out = normalize_task_html(html)
+        self.assertIn("AC = 5, cos ACB = 0,8.", out)
+        self.assertNotIn("<br", out)
+
     def test_collapses_many_br_into_spaces_in_plain_paragraph(self):
         from core.task_html import normalize_task_html
 
