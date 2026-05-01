@@ -5,6 +5,7 @@ from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.contrib import messages
 from django.db import models
+from django.core.paginator import Paginator
 from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot
 import time
 import json
@@ -1137,7 +1138,7 @@ def tutor_task_bank(request):
         request.user.invite_code = generate_invite_code()
         request.user.save(update_fields=['invite_code'])
 
-    tasks = Task.objects.select_related('topic', 'task_type', 'task_type__exam_format').all()
+    tasks = Task.objects.select_related('topic', 'task_type', 'task_type__exam_format').all().order_by('id')
 
     search_query = request.GET.get('q', '')
     subject_filter = request.GET.get('subject', '')
@@ -1160,6 +1161,13 @@ def tutor_task_bank(request):
     if subtype_filter:
         tasks = tasks.filter(subtype_tag=subtype_filter)
 
+    base_query = request.GET.copy()
+    base_query.pop('page', None)
+    base_query_prefix = f"&{base_query.urlencode()}" if base_query else ""
+
+    paginator = Paginator(tasks, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
     task_types_qs = TaskType.objects.all()
     if request.user.role == 'admin':
         if subject_filter:
@@ -1181,7 +1189,7 @@ def tutor_task_bank(request):
 
     # Add subtype counts directly to the displayed tasks
     subtype_counts = dict(Task.objects.values_list('subtype_tag').annotate(c=models.Count('id')))
-    tasks_list = list(tasks)
+    tasks_list = list(page_obj.object_list)
     for task in tasks_list:
         task.subtype_count = subtype_counts.get(task.subtype_tag, 0)
 
@@ -1196,6 +1204,8 @@ def tutor_task_bank(request):
 
     return render(request, 'core/tutor_task_bank.html', {
         'tasks': tasks_list,
+        'page_obj': page_obj,
+        'base_query_prefix': base_query_prefix,
         'search_query': search_query,
         'subjects': subjects,
         'exam_formats': exam_formats,
