@@ -1,6 +1,7 @@
 import csv
 import io
 from .models import Task, TaskVariant, TaskType, Topic, ExamFormat
+from .task_html import normalize_task_html
 from .utils import download_and_replace_images
 
 def import_tasks_from_csv(file_obj, exam_format_id):
@@ -58,6 +59,8 @@ def import_tasks_from_csv(file_obj, exam_format_id):
         # Process images and HTML content
         processed_content = download_and_replace_images(content, fipi_id, theme)
         processed_solution = download_and_replace_images(solution, fipi_id, theme)
+        processed_content = normalize_task_html(processed_content)
+        processed_solution = normalize_task_html(processed_solution)
 
         # Update or create variant
         TaskVariant.objects.update_or_create(
