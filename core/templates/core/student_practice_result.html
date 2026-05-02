@@ -14,7 +14,11 @@
             tex: {
                 inlineMath: [["$", "$"], ["\\(", "\\)"]],
                 displayMath: [["$$", "$$"], ["\\[", "\\]"]],
-                processEscapes: true
+                processEscapes: true,
+                packages: { "[+]": ["ams"] },
+                macros: {
+                    frac: ["\\dfrac{#1}{#2}", 2]
+                }
             },
             chtml: {
                 scale: 1.32
