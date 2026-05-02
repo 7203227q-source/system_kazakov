@@ -26,6 +26,10 @@
         };
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root { --tex-scale: 1; }
+        mjx-container { font-size: calc(var(--tex-scale, 1) * 1em); }
+    </style>
     </head>
 <body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] flex overflow-hidden">
 
@@ -134,6 +138,14 @@
                         </a>
                         {% endif %}
                     </form>
+                </div>
+            </div>
+
+            <div class="mt-4 mb-6 bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="font-bold text-gray-800">Масштаб формул</div>
+                <div class="flex items-center gap-3">
+                    <input id="tex-scale-range" type="range" min="90" max="180" step="5" value="100" class="w-56">
+                    <span id="tex-scale-value" class="font-mono font-bold text-indigo-700 w-14 text-right">100%</span>
                 </div>
             </div>
 
@@ -348,6 +360,42 @@
     </div>
 
     <script>
+        (function () {
+            const RANGE_ID = "tex-scale-range";
+            const VALUE_ID = "tex-scale-value";
+            const STORAGE_KEY = "texScalePercent";
+
+            function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
+
+            function applyPercent(pct) {
+                document.documentElement.style.setProperty("--tex-scale", String(pct / 100));
+            }
+
+            function setValueText(el, pct) {
+                el.textContent = `${pct}%`;
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                const range = document.getElementById(RANGE_ID);
+                const value = document.getElementById(VALUE_ID);
+                if (!range || !value) return;
+
+                const saved = parseInt(localStorage.getItem(STORAGE_KEY) || "100", 10);
+                const pct = clamp(Number.isFinite(saved) ? saved : 100, 90, 180);
+
+                range.value = String(pct);
+                setValueText(value, pct);
+                applyPercent(pct);
+
+                range.addEventListener("input", () => {
+                    const next = clamp(parseInt(range.value, 10), 90, 180);
+                    setValueText(value, next);
+                    applyPercent(next);
+                    localStorage.setItem(STORAGE_KEY, String(next));
+                });
+            });
+        })();
+
         function updateBulkActionBar() {
             const checkboxes = document.querySelectorAll('.task-checkbox');
             const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
