@@ -6,6 +6,7 @@ from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.contrib import messages
 from django.db import models
 from django.core.paginator import Paginator
+from django.views.decorators.http import require_POST
 from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot
 import time
 import json
@@ -1245,6 +1246,61 @@ def import_tasks_view(request):
 
     formats = ExamFormat.objects.filter(is_active=True)
     return render(request, 'core/import_tasks.html', {'formats': formats})
+
+@login_required
+@require_POST
+def tutor_task_purge(request):
+    if request.user.role != 'admin':
+        return HttpResponseForbidden("Forbidden")
+
+    action = (request.POST.get("action") or "").strip()
+    confirm = (request.POST.get("confirm") or "").strip()
+
+    exam_format_id = (request.POST.get("exam_format_id") or "").strip()
+    type_number_raw = (request.POST.get("type_number") or "").strip()
+
+    def redirect_back():
+        return redirect("tutor_task_bank")
+
+    if action == "purge_all":
+        if confirm != "DELETE ALL":
+            messages.error(request, "Подтверждение неверное. Введите: DELETE ALL")
+            return redirect_back()
+        deleted_count, _ = Task.objects.all().delete()
+        messages.success(request, f"Очистка выполнена. Удалено объектов: {deleted_count}.")
+        return redirect_back()
+
+    if action == "purge_exam_format":
+        if confirm != "DELETE":
+            messages.error(request, "Подтверждение неверное. Введите: DELETE")
+            return redirect_back()
+        if not exam_format_id:
+            messages.error(request, "Не выбран формат экзамена.")
+            return redirect_back()
+        qs = Task.objects.filter(task_type__exam_format_id=exam_format_id)
+        deleted_count, _ = qs.delete()
+        messages.success(request, f"Удаление по формату выполнено. Удалено объектов: {deleted_count}.")
+        return redirect_back()
+
+    if action == "purge_exam_format_type":
+        if confirm != "DELETE":
+            messages.error(request, "Подтверждение неверное. Введите: DELETE")
+            return redirect_back()
+        if not exam_format_id:
+            messages.error(request, "Не выбран формат экзамена.")
+            return redirect_back()
+        try:
+            type_number = int(type_number_raw)
+        except Exception:
+            messages.error(request, "Некорректный номер типа.")
+            return redirect_back()
+        qs = Task.objects.filter(task_type__exam_format_id=exam_format_id, task_type__number=type_number)
+        deleted_count, _ = qs.delete()
+        messages.success(request, f"Удаление по формату+типу выполнено. Удалено объектов: {deleted_count}.")
+        return redirect_back()
+
+    messages.error(request, "Неизвестное действие.")
+    return redirect_back()
 
 from django.utils.timezone import localtime
 
