@@ -4,6 +4,16 @@
     <img id="modal-image" src="" alt="Увеличенное изображение" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl transform scale-95 transition-transform duration-300 cursor-default bg-white p-2">
 </div>
 
+<style>
+    .prose img.tex {
+        display: inline-block;
+        margin: 0;
+        vertical-align: middle;
+        max-height: 1.1em;
+        width: auto;
+    }
+</style>
+
 <script>
     function openImageModal(src) {
         const modal = document.getElementById('image-modal');
@@ -32,7 +42,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         // Find all images inside prose (task content/solutions)
-        const images = document.querySelectorAll('.prose img');
+        const images = document.querySelectorAll('.prose img:not(.tex)');
         images.forEach(img => {
             // Only attach to images that are likely content (not tiny icons)
             img.classList.add('cursor-zoom-in', 'hover:opacity-80', 'transition-opacity', 'rounded');
