@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -59,6 +60,58 @@ def fetch_task_page_html(base_url: str, task_id: str) -> str:
     return res.text
 
 
+def is_view_many_url(value: str) -> bool:
+    raw = (value or "").strip()
+    if not raw:
+        return False
+    return "a=view_many" in raw and "/test" in raw
+
+
+def base_url_from_any_url(value: str) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        p = urlparse(raw)
+        if p.scheme and p.netloc:
+            return f"{p.scheme}://{p.netloc}"
+    except Exception:
+        return None
+    return None
+
+
+def fetch_view_many_ids(list_url: str, limit: int = 300) -> list[str]:
+    headers = {"User-Agent": "Mozilla/5.0"}
+    res = requests.get(list_url, headers=headers, timeout=30)
+    res.raise_for_status()
+    html = res.text
+
+    ids: list[str] = []
+    for m in re.finditer(r"(?:problem\?id=)(\d+)", html):
+        tid = m.group(1)
+        if tid not in ids:
+            ids.append(tid)
+        if len(ids) >= limit:
+            break
+
+    if ids:
+        return ids
+
+    soup = BeautifulSoup(html, "html.parser")
+    for a in soup.find_all("a"):
+        href = a.get("href") or ""
+        m = re.search(r"[?&]id=(\d+)", href)
+        if not m:
+            continue
+        tid = m.group(1)
+        if tid not in ids:
+            ids.append(tid)
+        if len(ids) >= limit:
+            break
+
+    return ids
+
+
 def parse_task_page(html: str) -> tuple[str, str, str]:
     soup = BeautifulSoup(html or "", "html.parser")
 
@@ -114,6 +167,7 @@ def import_tasks_from_sdamgia_ids(
         "requested": len(raw_ids),
         "processed": 0,
         "recognized": 0,
+        "expanded": 0,
         "imported": 0,
         "updated": 0,
         "skipped_existing": 0,
@@ -126,20 +180,47 @@ def import_tasks_from_sdamgia_ids(
 
     ids: list[str] = []
     max_items = max(1, min(25, int(limit)))
+
+    candidates: list[str] = []
     for raw in raw_ids[:25]:
+        if is_view_many_url(raw):
+            list_base = base_url_from_any_url(raw)
+            if list_base:
+                base_url = list_base
+                stats["base_url"] = base_url
+            try:
+                list_ids = fetch_view_many_ids(raw, limit=500)
+                stats["expanded"] += len(list_ids)
+                report_items.append({"task_id": "view_many", "status": "ok", "detail": f"expanded {len(list_ids)} ids"})
+                for tid in list_ids:
+                    if tid not in candidates:
+                        candidates.append(tid)
+            except Exception as e:
+                stats["errors"] += 1
+                report_items.append({"task_id": "view_many", "status": "error", "detail": str(e)[:200]})
+            continue
+
         task_id = extract_task_id(raw)
         if not task_id:
             stats["skipped_invalid"] += 1
             report_items.append({"task_id": raw[:80], "status": "skipped", "detail": "invalid id"})
             continue
-        if task_id not in ids:
-            ids.append(task_id)
-        if len(ids) >= max_items:
+        raw_base = base_url_from_any_url(raw)
+        if raw_base:
+            base_url = raw_base
+            stats["base_url"] = base_url
+        if task_id not in candidates:
+            candidates.append(task_id)
+
+    if skip_existing:
+        candidates = [tid for tid in candidates if not Task.objects.filter(fipi_id=tid).exists()]
+
+    stats["recognized"] = len(candidates)
+
+    for task_id in candidates:
+        if stats["imported"] + stats["updated"] >= max_items:
             break
 
-    stats["recognized"] = len(ids)
-
-    for task_id in ids:
         stats["processed"] += 1
         item = {"task_id": task_id, "status": "", "detail": ""}
 
