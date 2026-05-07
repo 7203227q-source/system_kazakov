@@ -85,7 +85,7 @@
                         <div class="font-bold text-gray-800">Параметры импорта</div>
                         <div class="text-sm text-gray-500 mt-1">Можно вставить ID/ссылки на задачи или ссылку на список (/test?a=view_many...). Максимум 25 задач за запуск.</div>
                     </div>
-                    <form method="POST" class="p-6 space-y-5">
+                    <form method="POST" id="reshuege-import-form" class="p-6 space-y-5">
                         {% csrf_token %}
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
@@ -132,9 +132,19 @@
                         </div>
 
                         <div class="pt-2">
-                            <button type="submit" class="w-full md:w-auto bg-primary text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center">
+                            <button id="reshuege-import-submit" type="submit" class="w-full md:w-auto bg-primary text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center">
                                 <i class="fas fa-cloud-download-alt mr-2"></i> Импортировать
                             </button>
+                        </div>
+
+                        <div id="reshuege-progress-wrap" class="hidden">
+                            <div class="flex items-center justify-between text-sm text-gray-700">
+                                <div id="reshuege-progress-text">Скачано 0 из 0</div>
+                                <div id="reshuege-progress-subtext" class="text-gray-500"></div>
+                            </div>
+                            <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                <div id="reshuege-progress-bar" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -212,6 +222,93 @@
             sidebar.classList.toggle('-translate-x-full');
             overlay.classList.toggle('hidden');
         }
+
+        function setProgress(saved, target, checked, totalCandidates) {
+            const text = document.getElementById('reshuege-progress-text');
+            const sub = document.getElementById('reshuege-progress-subtext');
+            const bar = document.getElementById('reshuege-progress-bar');
+            if (!text || !sub || !bar) return;
+            text.textContent = `Скачано ${saved} из ${target}`;
+            sub.textContent = totalCandidates ? `Проверено: ${checked} / ${totalCandidates}` : `Проверено: ${checked}`;
+            const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
+            bar.style.width = `${pct}%`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('reshuege-import-form');
+            const submitBtn = document.getElementById('reshuege-import-submit');
+            const wrap = document.getElementById('reshuege-progress-wrap');
+            if (!form || !submitBtn || !wrap) return;
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const csrf = form.querySelector('[name=csrfmiddlewaretoken]')?.value;
+                if (!csrf) return;
+
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-60');
+                wrap.classList.remove('hidden');
+
+                const formData = new FormData(form);
+                setProgress(0, 0, 0, 0);
+
+                try {
+                    const startRes = await fetch("{% url 'admin_reshuege_import_start' %}", {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrf },
+                        body: formData
+                    });
+
+                    const start = await startRes.json();
+                    if (!startRes.ok || start.error) {
+                        alert(start.error || 'Ошибка старта импорта');
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('opacity-60');
+                        return;
+                    }
+
+                    const target = start.target || 25;
+                    const candidates = start.candidates || [];
+                    const baseUrl = start.base_url || '';
+
+                    let saved = 0;
+                    let checked = 0;
+                    setProgress(saved, target, checked, candidates.length);
+
+                    for (const taskId of candidates) {
+                        if (saved >= target) break;
+                        checked += 1;
+
+                        const stepData = new FormData();
+                        stepData.set('exam_format', String(formData.get('exam_format') || ''));
+                        stepData.set('type_number', String(formData.get('type_number') || ''));
+                        stepData.set('task_id', String(taskId));
+                        stepData.set('base_url', String(baseUrl));
+                        if (formData.get('skip_existing')) stepData.set('skip_existing', 'on');
+                        if (formData.get('skip_no_answer')) stepData.set('skip_no_answer', 'on');
+                        if (formData.get('skip_prototype')) stepData.set('skip_prototype', 'on');
+                        if (formData.get('skip_no_solution')) stepData.set('skip_no_solution', 'on');
+
+                        const stepRes = await fetch("{% url 'admin_reshuege_import_step' %}", {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrf },
+                            body: stepData
+                        });
+
+                        const step = await stepRes.json();
+                        if (step && step.status === 'ok') saved += 1;
+
+                        setProgress(saved, target, checked, candidates.length);
+                    }
+
+                    window.location.reload();
+                } catch (err) {
+                    alert('Ошибка импорта');
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-60');
+                }
+            });
+        });
     </script>
 
 {% include "core/image_modal.html" %}

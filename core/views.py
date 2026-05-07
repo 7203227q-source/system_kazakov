@@ -192,6 +192,99 @@ def admin_reshuege_import(request):
         'form': form,
     })
 
+
+@login_required
+@require_POST
+def admin_reshuege_import_start(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
+    type_number_raw = (request.POST.get('type_number') or '').strip()
+    ids_raw = (request.POST.get('task_ids') or '').strip()
+    limit_raw = (request.POST.get('limit') or '25').strip()
+
+    skip_existing = request.POST.get('skip_existing') == 'on'
+
+    if not exam_format_id_raw or not type_number_raw or not ids_raw:
+        return JsonResponse({'error': 'Missing required fields'}, status=400)
+
+    try:
+        exam_format_id = int(exam_format_id_raw)
+        type_number = int(type_number_raw)
+        limit = int(limit_raw) if limit_raw.isdigit() else 25
+        limit = max(1, min(25, limit))
+
+        raw_lines = [line.strip() for line in ids_raw.splitlines() if line.strip()]
+
+        from .services_reshuege import prepare_candidate_ids
+
+        exam_format = ExamFormat.objects.select_related("subject").get(id=exam_format_id)
+        prep = prepare_candidate_ids(
+            exam_format=exam_format,
+            raw_lines=raw_lines,
+            limit=limit,
+            skip_existing=skip_existing,
+            expanded_limit=500,
+        )
+
+        return JsonResponse({
+            'exam_format_id': exam_format_id,
+            'type_number': type_number,
+            'base_url': prep['base_url'],
+            'target': prep['target'],
+            'candidates': prep['candidates'],
+            'stats': prep['stats'],
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)[:200]}, status=400)
+
+
+@login_required
+@require_POST
+def admin_reshuege_import_step(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
+    type_number_raw = (request.POST.get('type_number') or '').strip()
+    task_id_raw = (request.POST.get('task_id') or '').strip()
+    base_url = (request.POST.get('base_url') or '').strip()
+
+    skip_no_answer = request.POST.get('skip_no_answer') == 'on'
+    skip_prototype = request.POST.get('skip_prototype') == 'on'
+    skip_no_solution = request.POST.get('skip_no_solution') == 'on'
+    skip_existing = request.POST.get('skip_existing') == 'on'
+
+    if not exam_format_id_raw or not type_number_raw or not task_id_raw:
+        return JsonResponse({'error': 'Missing required fields'}, status=400)
+
+    try:
+        exam_format_id = int(exam_format_id_raw)
+        type_number = int(type_number_raw)
+
+        from .services_reshuege import import_one_task_from_sdamgia, resolve_sdamgia_base_url
+
+        if not base_url:
+            ef = ExamFormat.objects.select_related("subject").get(id=exam_format_id)
+            base_url = resolve_sdamgia_base_url(ef)
+
+        item = import_one_task_from_sdamgia(
+            exam_format_id=exam_format_id,
+            type_number=type_number,
+            task_id=task_id_raw,
+            base_url=base_url,
+            skip_no_answer=skip_no_answer,
+            skip_prototype=skip_prototype,
+            skip_no_solution=skip_no_solution,
+            skip_existing=skip_existing,
+            theme="classic",
+        )
+
+        return JsonResponse(item)
+    except Exception as e:
+        return JsonResponse({'task_id': task_id_raw, 'status': 'error', 'detail': str(e)[:200]}, status=200)
+
 import random
 import base64
 from io import BytesIO
