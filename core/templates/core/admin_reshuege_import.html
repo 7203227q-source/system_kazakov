@@ -142,8 +142,14 @@
                                 <div id="reshuege-progress-text">Скачано 0 из 0</div>
                                 <div id="reshuege-progress-subtext" class="text-gray-500"></div>
                             </div>
+                            <div id="reshuege-progress-last" class="mt-2 text-xs text-gray-500 font-mono"></div>
                             <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                                 <div id="reshuege-progress-bar" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                            <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                                <button id="reshuege-import-cancel" type="button" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200 transition">
+                                    Остановить
+                                </button>
                             </div>
                         </div>
                     </form>
@@ -227,17 +233,20 @@
             const text = document.getElementById('reshuege-progress-text');
             const sub = document.getElementById('reshuege-progress-subtext');
             const bar = document.getElementById('reshuege-progress-bar');
+            const last = document.getElementById('reshuege-progress-last');
             if (!text || !sub || !bar) return;
             text.textContent = `Скачано ${saved} из ${target}`;
             sub.textContent = totalCandidates ? `Проверено: ${checked} / ${totalCandidates}` : `Проверено: ${checked}`;
             const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
             bar.style.width = `${pct}%`;
+            if (last) last.textContent = '';
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('reshuege-import-form');
             const submitBtn = document.getElementById('reshuege-import-submit');
             const wrap = document.getElementById('reshuege-progress-wrap');
+            const cancelBtn = document.getElementById('reshuege-import-cancel');
             if (!form || !submitBtn || !wrap) return;
 
             form.addEventListener('submit', async (e) => {
@@ -250,13 +259,28 @@
                 wrap.classList.remove('hidden');
 
                 const formData = new FormData(form);
+                const last = document.getElementById('reshuege-progress-last');
                 setProgress(0, 0, 0, 0);
 
                 try {
+                    let cancelled = false;
+                    const controller = new AbortController();
+                    if (cancelBtn) {
+                        cancelBtn.disabled = false;
+                        cancelBtn.onclick = () => {
+                            cancelled = true;
+                            controller.abort();
+                            if (last) last.textContent = 'Остановлено пользователем';
+                            submitBtn.disabled = false;
+                            submitBtn.classList.remove('opacity-60');
+                        };
+                    }
+
                     const startRes = await fetch("{% url 'admin_reshuege_import_start' %}", {
                         method: 'POST',
                         headers: { 'X-CSRFToken': csrf },
-                        body: formData
+                        body: formData,
+                        signal: controller.signal
                     });
 
                     const start = await startRes.json();
@@ -276,6 +300,7 @@
                     setProgress(saved, target, checked, candidates.length);
 
                     for (const taskId of candidates) {
+                        if (cancelled) break;
                         if (saved >= target) break;
                         checked += 1;
 
@@ -292,17 +317,23 @@
                         const stepRes = await fetch("{% url 'admin_reshuege_import_step' %}", {
                             method: 'POST',
                             headers: { 'X-CSRFToken': csrf },
-                            body: stepData
+                            body: stepData,
+                            signal: controller.signal
                         });
 
                         const step = await stepRes.json();
                         if (step && step.status === 'ok') saved += 1;
+                        if (last) {
+                            const detail = step?.detail ? String(step.detail) : '';
+                            last.textContent = `${taskId} → ${step?.status || 'unknown'} ${detail}`;
+                        }
 
                         setProgress(saved, target, checked, candidates.length);
                     }
 
-                    window.location.reload();
+                    if (!cancelled) window.location.reload();
                 } catch (err) {
+                    if (err && err.name === 'AbortError') return;
                     alert('Ошибка импорта');
                     submitBtn.disabled = false;
                     submitBtn.classList.remove('opacity-60');
