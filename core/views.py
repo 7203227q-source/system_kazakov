@@ -109,6 +109,15 @@ def admin_reshuege_import(request):
     formats = ExamFormat.objects.filter(is_active=True).select_related('subject').order_by('subject__name', '-year', 'name')
 
     report = None
+    form = {
+        "exam_format": "",
+        "type_number": "",
+        "limit": "25",
+        "task_ids": "",
+        "skip_existing": True,
+        "skip_no_answer": True,
+        "skip_prototype": True,
+    }
 
     if request.method == 'POST':
         exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
@@ -119,6 +128,16 @@ def admin_reshuege_import(request):
         skip_no_answer = request.POST.get('skip_no_answer') == 'on'
         skip_prototype = request.POST.get('skip_prototype') == 'on'
         skip_existing = request.POST.get('skip_existing') == 'on'
+
+        form = {
+            "exam_format": exam_format_id_raw,
+            "type_number": type_number_raw,
+            "limit": limit_raw or "25",
+            "task_ids": request.POST.get('task_ids') or "",
+            "skip_existing": skip_existing,
+            "skip_no_answer": skip_no_answer,
+            "skip_prototype": skip_prototype,
+        }
 
         if not exam_format_id_raw:
             messages.error(request, "Выберите формат экзамена.")
@@ -152,10 +171,12 @@ def admin_reshuege_import(request):
                 )
 
                 stats = report.get("stats") or {}
+                if stats.get("recognized", 0) == 0 and stats.get("requested", 0) > 0:
+                    messages.warning(request, "Не удалось распознать ни одного ID из введённых строк.")
                 messages.success(
                     request,
                     f"Импорт завершён. Новых: {stats.get('imported', 0)}, обновлено: {stats.get('updated', 0)}, "
-                    f"пропущено: {stats.get('skipped_existing', 0) + stats.get('skipped_no_answer', 0) + stats.get('skipped_prototype', 0)}, "
+                    f"пропущено: {stats.get('skipped_existing', 0) + stats.get('skipped_no_answer', 0) + stats.get('skipped_prototype', 0) + stats.get('skipped_invalid', 0)}, "
                     f"ошибок: {stats.get('errors', 0)}.",
                 )
             except Exception as e:
@@ -164,6 +185,7 @@ def admin_reshuege_import(request):
     return render(request, 'core/admin_reshuege_import.html', {
         'formats': formats,
         'report': report,
+        'form': form,
     })
 
 import random

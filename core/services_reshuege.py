@@ -109,26 +109,35 @@ def import_tasks_from_sdamgia_ids(
         defaults={"name": f"Тип {type_number}"},
     )
 
-    ids: list[str] = []
-    for raw in raw_ids:
-        task_id = extract_task_id(raw)
-        if task_id and task_id not in ids:
-            ids.append(task_id)
-        if len(ids) >= max(1, min(25, int(limit))):
-            break
-
     report_items: list[dict] = []
     stats = {
         "requested": len(raw_ids),
         "processed": 0,
+        "recognized": 0,
         "imported": 0,
         "updated": 0,
         "skipped_existing": 0,
         "skipped_no_answer": 0,
         "skipped_prototype": 0,
+        "skipped_invalid": 0,
         "errors": 0,
         "base_url": base_url,
     }
+
+    ids: list[str] = []
+    max_items = max(1, min(25, int(limit)))
+    for raw in raw_ids[:25]:
+        task_id = extract_task_id(raw)
+        if not task_id:
+            stats["skipped_invalid"] += 1
+            report_items.append({"task_id": raw[:80], "status": "skipped", "detail": "invalid id"})
+            continue
+        if task_id not in ids:
+            ids.append(task_id)
+        if len(ids) >= max_items:
+            break
+
+    stats["recognized"] = len(ids)
 
     for task_id in ids:
         stats["processed"] += 1
@@ -200,4 +209,3 @@ def import_tasks_from_sdamgia_ids(
             report_items.append(item)
 
     return {"stats": stats, "items": report_items}
-
