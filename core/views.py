@@ -16,6 +16,7 @@ from .system_info import get_system_metrics, check_openrouter_api
 
 from django.core.management import call_command
 from django.http import HttpResponse
+from urllib.parse import urlparse
 
 def run_migrations(request):
     try:
@@ -284,6 +285,70 @@ def admin_reshuege_import_step(request):
         return JsonResponse(item)
     except Exception as e:
         return JsonResponse({'task_id': task_id_raw, 'status': 'error', 'detail': str(e)[:200]}, status=200)
+
+
+@login_required
+def proxy_image(request):
+    url = (request.GET.get('url') or '').strip()
+    if not url:
+        return HttpResponse("Missing url", status=400)
+
+    try:
+        p = urlparse(url)
+    except Exception:
+        return HttpResponse("Invalid url", status=400)
+
+    if p.scheme not in {"http", "https"} or not p.netloc:
+        return HttpResponse("Invalid url", status=400)
+
+    host = p.netloc.lower()
+    allowed_hosts = {
+        "ege.sdamgia.ru",
+        "math-ege.sdamgia.ru",
+        "mathb-ege.sdamgia.ru",
+        "inf-ege.sdamgia.ru",
+        "phys-ege.sdamgia.ru",
+        "chem-ege.sdamgia.ru",
+        "bio-ege.sdamgia.ru",
+        "rus-ege.sdamgia.ru",
+        "eng-ege.sdamgia.ru",
+        "hist-ege.sdamgia.ru",
+        "geo-ege.sdamgia.ru",
+        "soc-ege.sdamgia.ru",
+        "lit-ege.sdamgia.ru",
+    }
+    if host not in allowed_hosts:
+        return HttpResponse("Host not allowed", status=400)
+
+    try:
+        import requests
+
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            "Accept-Language": "ru,en;q=0.8",
+            "Referer": f"{p.scheme}://{p.netloc}/",
+        }
+
+        r = requests.get(url, headers=headers, timeout=15, stream=True)
+        if r.status_code != 200:
+            return HttpResponse("Upstream error", status=502)
+
+        content = b""
+        max_bytes = 6 * 1024 * 1024
+        for chunk in r.iter_content(chunk_size=65536):
+            if not chunk:
+                continue
+            content += chunk
+            if len(content) > max_bytes:
+                return HttpResponse("Too large", status=413)
+
+        content_type = (r.headers.get("Content-Type") or "application/octet-stream").split(";")[0].strip()
+        resp = HttpResponse(content, content_type=content_type)
+        resp["Cache-Control"] = "public, max-age=86400"
+        return resp
+    except Exception:
+        return HttpResponse("Proxy failed", status=502)
 
 import random
 import base64

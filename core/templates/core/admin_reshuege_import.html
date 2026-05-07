@@ -117,6 +117,9 @@
                                 <input type="checkbox" name="skip_existing" {% if form.skip_existing %}checked{% endif %} class="rounded border-gray-300 text-primary focus:ring-primary">
                                 Пропускать уже загруженные
                             </label>
+                            <div class="md:col-span-4 text-xs text-gray-500">
+                                Чтобы переимпортировать и перезаписать уже загруженные задачи (починить картинки/HTML), снимите галочку «Пропускать уже загруженные».
+                            </div>
                             <label class="flex items-center gap-2 text-sm text-gray-700">
                                 <input type="checkbox" name="skip_no_answer" {% if form.skip_no_answer %}checked{% endif %} class="rounded border-gray-300 text-primary focus:ring-primary">
                                 Пропускать без ответа

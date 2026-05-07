@@ -37,6 +37,7 @@ urlpatterns = [
     path('platform-admin/reshuege-import/', views.admin_reshuege_import, name='admin_reshuege_import'),
     path('platform-admin/reshuege-import/start/', views.admin_reshuege_import_start, name='admin_reshuege_import_start'),
     path('platform-admin/reshuege-import/step/', views.admin_reshuege_import_step, name='admin_reshuege_import_step'),
+    path('proxy-image/', views.proxy_image, name='proxy_image'),
     path('platform-admin/system/', views.admin_system_status, name='admin_system'),
     path('apply-migrations/', views.run_migrations, name='run_migrations'),
     

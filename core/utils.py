@@ -3,7 +3,7 @@ import uuid
 import requests
 import imghdr
 import gzip
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -57,7 +57,14 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
             origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
             img_url = origin + img_url
 
-        img['src'] = img_url
+        try:
+            p = urlparse(img_url)
+            if p.scheme in ('http', 'https') and p.netloc and p.netloc.endswith('sdamgia.ru'):
+                img['src'] = f"/proxy-image/?url={quote(img_url, safe='')}"
+            else:
+                img['src'] = img_url
+        except Exception:
+            img['src'] = img_url
             
         try:
             origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
