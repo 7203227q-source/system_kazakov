@@ -135,13 +135,17 @@ def fetch_view_many_ids(list_url: str, limit: int = 300) -> list[str]:
 def parse_task_page(html: str) -> tuple[str, str, str]:
     soup = BeautifulSoup(html or "", "html.parser")
 
-    content_node = (
+    statement_node = soup.find("div", id=re.compile(r"^body\d+$"))
+    solution_node = soup.find("div", id=re.compile(r"^sol\d+$")) or soup.find("div", class_=re.compile(r"\bsolution\b", flags=re.IGNORECASE))
+
+    content_node = statement_node or (
         soup.select_one("div.prob_maindiv")
         or soup.select_one("div.problem")
         or soup.select_one("div#problem")
         or soup.select_one("div.task")
         or soup.select_one("div#task")
     )
+
     content_html = str(content_node) if content_node else ""
 
     text = normalize_sdamgia_text(soup.get_text("\n", strip=True))
@@ -152,11 +156,15 @@ def parse_task_page(html: str) -> tuple[str, str, str]:
         answer = re.sub(r"^\s*[:\-]\s*", "", answer)
         answer = answer.split("\n", 1)[0].strip()
 
-    solution_node = (
-        soup.find("div", id=re.compile(r"(?:solution|reshen)", flags=re.IGNORECASE))
-        or soup.find("div", class_=re.compile(r"(?:solution|reshen)", flags=re.IGNORECASE))
-    )
     solution_html = str(solution_node) if solution_node else ""
+
+    if content_node and solution_node:
+        try:
+            solution_html = str(solution_node)
+            solution_node.decompose()
+            content_html = str(content_node)
+        except Exception:
+            pass
 
     if content_node and not solution_html:
         marker = None

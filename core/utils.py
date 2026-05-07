@@ -2,6 +2,7 @@ import os
 import uuid
 import requests
 import imghdr
+import gzip
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
@@ -65,13 +66,20 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
             }
             response = requests.get(img_url, headers=headers, timeout=15)
             if response.status_code == 200 and response.content:
+                raw = response.content
+                if raw[:2] == b'\x1f\x8b':
+                    try:
+                        raw = gzip.decompress(raw)
+                    except Exception:
+                        pass
+
                 content_type = (response.headers.get('Content-Type') or '').lower()
-                if 'text/html' in content_type or response.content.lstrip().startswith(b'<!doctype html') or response.content.lstrip().startswith(b'<html'):
+                if 'text/html' in content_type or raw.lstrip().startswith(b'<!doctype html') or raw.lstrip().startswith(b'<html'):
                     continue
-                if content_type and not content_type.startswith('image/') and b'<svg' not in response.content[:1024]:
+                if content_type and not content_type.startswith('image/') and b'<svg' not in raw[:1024]:
                     continue
                 # Always determine extension from the actual downloaded content
-                ext = get_extension_from_content(response.content)
+                ext = get_extension_from_content(raw)
                 
                 # Generate unique filename (we overwrite to avoid duplicating on re-imports)
                 filename = f"tasks/{task_fipi_id}_{theme}_{idx}{ext}"
@@ -88,7 +96,7 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
                             default_storage.delete(old_filename)
                 
                 # Save file
-                saved_path = default_storage.save(filename, ContentFile(response.content))
+                saved_path = default_storage.save(filename, ContentFile(raw))
                 
                 # Update img src
                 img['src'] = f"/media/{saved_path}"
