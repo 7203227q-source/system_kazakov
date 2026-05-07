@@ -287,7 +287,6 @@ def admin_reshuege_import_step(request):
         return JsonResponse({'task_id': task_id_raw, 'status': 'error', 'detail': str(e)[:200]}, status=200)
 
 
-@login_required
 def proxy_image(request):
     url = (request.GET.get('url') or '').strip()
     if not url:
@@ -322,6 +321,7 @@ def proxy_image(request):
 
     try:
         import requests
+        import gzip
 
         headers = {
             "User-Agent": "Mozilla/5.0",
@@ -344,6 +344,11 @@ def proxy_image(request):
                 return HttpResponse("Too large", status=413)
 
         content_type = (r.headers.get("Content-Type") or "application/octet-stream").split(";")[0].strip()
+        if content[:2] == b"\x1f\x8b":
+            try:
+                content = gzip.decompress(content)
+            except Exception:
+                pass
         resp = HttpResponse(content, content_type=content_type)
         resp["Cache-Control"] = "public, max-age=86400"
         return resp

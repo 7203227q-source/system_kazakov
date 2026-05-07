@@ -57,13 +57,16 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
             origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
             img_url = origin + img_url
 
+        use_proxy = False
         try:
             p = urlparse(img_url)
-            if p.scheme in ('http', 'https') and p.netloc and p.netloc.endswith('sdamgia.ru'):
-                img['src'] = f"/proxy-image/?url={quote(img_url, safe='')}"
-            else:
-                img['src'] = img_url
+            use_proxy = p.scheme in ('http', 'https') and p.netloc and p.netloc.endswith('sdamgia.ru')
         except Exception:
+            use_proxy = False
+
+        if use_proxy:
+            img['src'] = f"/proxy-image/?url={quote(img_url, safe='')}"
+        else:
             img['src'] = img_url
             
         try:
@@ -89,6 +92,9 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
                     continue
                 # Always determine extension from the actual downloaded content
                 ext = get_extension_from_content(raw)
+
+                if ext == '.svg' and use_proxy:
+                    continue
                 
                 # Generate unique filename (we overwrite to avoid duplicating on re-imports)
                 filename = f"tasks/{task_fipi_id}_{theme}_{idx}{ext}"

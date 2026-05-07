@@ -321,8 +321,6 @@ def import_one_task_from_sdamgia(
 
     processed_content = download_and_replace_images(content_html, task_id, theme, base_url=base_url)
     processed_solution = download_and_replace_images(solution_html, task_id, theme, base_url=base_url)
-    processed_content = normalize_task_html(processed_content)
-    processed_solution = normalize_task_html(processed_solution)
 
     task, created = Task.objects.update_or_create(
         fipi_id=task_id,
