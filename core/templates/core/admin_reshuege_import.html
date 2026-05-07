@@ -143,6 +143,7 @@
                                 <div id="reshuege-progress-subtext" class="text-gray-500"></div>
                             </div>
                             <div id="reshuege-progress-last" class="mt-2 text-xs text-gray-500 font-mono"></div>
+                            <div id="reshuege-progress-summary" class="mt-1 text-xs text-gray-500"></div>
                             <div class="mt-2 w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                                 <div id="reshuege-progress-bar" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
                             </div>
@@ -233,13 +234,23 @@
             const text = document.getElementById('reshuege-progress-text');
             const sub = document.getElementById('reshuege-progress-subtext');
             const bar = document.getElementById('reshuege-progress-bar');
-            const last = document.getElementById('reshuege-progress-last');
             if (!text || !sub || !bar) return;
             text.textContent = `Скачано ${saved} из ${target}`;
             sub.textContent = totalCandidates ? `Проверено: ${checked} / ${totalCandidates}` : `Проверено: ${checked}`;
             const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
             bar.style.width = `${pct}%`;
-            if (last) last.textContent = '';
+        }
+
+        function setSummary(ok, skipped, error) {
+            const el = document.getElementById('reshuege-progress-summary');
+            if (!el) return;
+            el.textContent = `OK: ${ok} • SKIP: ${skipped} • ERR: ${error}`;
+        }
+
+        function setLastStatus(text) {
+            const el = document.getElementById('reshuege-progress-last');
+            if (!el) return;
+            el.textContent = text || '';
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -259,8 +270,9 @@
                 wrap.classList.remove('hidden');
 
                 const formData = new FormData(form);
-                const last = document.getElementById('reshuege-progress-last');
                 setProgress(0, 0, 0, 0);
+                setSummary(0, 0, 0);
+                setLastStatus('');
 
                 try {
                     let cancelled = false;
@@ -270,7 +282,7 @@
                         cancelBtn.onclick = () => {
                             cancelled = true;
                             controller.abort();
-                            if (last) last.textContent = 'Остановлено пользователем';
+                            setLastStatus('Остановлено пользователем');
                             submitBtn.disabled = false;
                             submitBtn.classList.remove('opacity-60');
                         };
@@ -297,7 +309,11 @@
 
                     let saved = 0;
                     let checked = 0;
+                    let okCount = 0;
+                    let skipCount = 0;
+                    let errCount = 0;
                     setProgress(saved, target, checked, candidates.length);
+                    setSummary(okCount, skipCount, errCount);
 
                     for (const taskId of candidates) {
                         if (cancelled) break;
@@ -322,13 +338,20 @@
                         });
 
                         const step = await stepRes.json();
-                        if (step && step.status === 'ok') saved += 1;
-                        if (last) {
-                            const detail = step?.detail ? String(step.detail) : '';
-                            last.textContent = `${taskId} → ${step?.status || 'unknown'} ${detail}`;
+                        const status = step?.status || 'unknown';
+                        const detail = step?.detail ? String(step.detail) : '';
+                        if (status === 'ok') {
+                            saved += 1;
+                            okCount += 1;
+                        } else if (status === 'skipped') {
+                            skipCount += 1;
+                        } else {
+                            errCount += 1;
                         }
+                        setLastStatus(`${taskId} → ${status} ${detail}`.trim());
 
                         setProgress(saved, target, checked, candidates.length);
+                        setSummary(okCount, skipCount, errCount);
                     }
 
                     if (!cancelled) window.location.reload();
