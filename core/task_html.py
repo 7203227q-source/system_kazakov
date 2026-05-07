@@ -29,7 +29,7 @@ def normalize_task_html(html: str, *, br_threshold: int = DEFAULT_BR_THRESHOLD) 
     excluded_parents = {"ul", "ol", "li", "table", "tr", "td", "th", "pre", "code"}
 
     for block in soup.find_all(["p", "div", "span"]):
-        if block.find(["ul", "ol", "li", "table", "tr", "td", "th", "pre", "code"]):
+        if block.find(["ul", "ol", "li", "table", "tr", "td", "th", "pre", "code", "img", "math", "svg"]):
             continue
 
         brs = block.find_all("br")
@@ -64,6 +64,9 @@ def normalize_task_html(html: str, *, br_threshold: int = DEFAULT_BR_THRESHOLD) 
                     block.clear()
                     block.append(normalized_text)
                 modified = True
+            continue
+
+        if any(tag.name != "br" for tag in block.find_all(True)):
             continue
 
         for br in brs:

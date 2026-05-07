@@ -39,7 +39,7 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
         return html_content
 
     for idx, img in enumerate(images):
-        img_url = img.get('src')
+        img_url = img.get('src') or img.get('data-src') or img.get('data-original')
         
         # Clean up the URL from extra quotes that might come from CSV escaping
         if img_url:
@@ -57,9 +57,19 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
             img_url = origin + img_url
             
         try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(img_url, headers=headers, timeout=10)
-            if response.status_code == 200:
+            origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
+            headers = {
+                'User-Agent': 'Mozilla/5.0',
+                'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                'Referer': origin + '/',
+            }
+            response = requests.get(img_url, headers=headers, timeout=15)
+            if response.status_code == 200 and response.content:
+                content_type = (response.headers.get('Content-Type') or '').lower()
+                if 'text/html' in content_type or response.content.lstrip().startswith(b'<!doctype html') or response.content.lstrip().startswith(b'<html'):
+                    continue
+                if content_type and not content_type.startswith('image/') and b'<svg' not in response.content[:1024]:
+                    continue
                 # Always determine extension from the actual downloaded content
                 ext = get_extension_from_content(response.content)
                 
@@ -82,6 +92,10 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
                 
                 # Update img src
                 img['src'] = f"/media/{saved_path}"
+                if img.has_attr('data-src'):
+                    del img['data-src']
+                if img.has_attr('data-original'):
+                    del img['data-original']
         except Exception as e:
             print(f"Failed to download image {img_url}: {e}")
             
