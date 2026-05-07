@@ -150,11 +150,12 @@ def parse_task_page(html: str) -> tuple[str, str, str]:
 
     text = normalize_sdamgia_text(soup.get_text("\n", strip=True))
     answer = ""
-    m = re.search(r"Ответ\s*:?\s*([^\n]+)", text, flags=re.IGNORECASE)
-    if m:
-        answer = m.group(1).strip()
-        answer = re.sub(r"^\s*[:\-]\s*", "", answer)
-        answer = answer.split("\n", 1)[0].strip()
+    matches = list(re.finditer(r"\bОтвет\s*:\s*([^\n\r]+)", text, flags=re.IGNORECASE))
+    if matches:
+        raw_answer = matches[-1].group(1).strip()
+        raw_answer = raw_answer.split("\n", 1)[0].strip()
+        raw_answer = raw_answer.rstrip(". ")
+        answer = raw_answer
 
     solution_html = str(solution_node) if solution_node else ""
 

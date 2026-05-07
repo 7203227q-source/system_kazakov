@@ -56,6 +56,8 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
             # If the HTML contains relative paths, assume they are from sdamgia.ru
             origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
             img_url = origin + img_url
+
+        img['src'] = img_url
             
         try:
             origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
