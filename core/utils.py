@@ -92,6 +92,9 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
                     continue
                 # Always determine extension from the actual downloaded content
                 ext = get_extension_from_content(raw)
+
+                if ext == '.svg' and use_proxy:
+                    continue
                 
                 # Generate unique filename (we overwrite to avoid duplicating on re-imports)
                 filename = f"tasks/{task_fipi_id}_{theme}_{idx}{ext}"
