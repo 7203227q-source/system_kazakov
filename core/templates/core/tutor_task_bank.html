@@ -265,7 +265,7 @@
                                     <span id="task-answer-{{ task.id }}" class="font-bold text-green-600">{{ task.correct_answer }}</span>
                                 </div>
                                 {% if task.get_solution_for_theme %}
-                                <button onclick="document.getElementById('solution-{{ task.id }}').classList.toggle('hidden')" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium underline transition">
+                                <button type="button" onclick="document.getElementById('solution-{{ task.id }}').classList.toggle('hidden')" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium underline transition">
                                     Показать решение
                                 </button>
                                 {% endif %}
@@ -275,7 +275,7 @@
                                 <i class="fas fa-wand-magic-sparkles mr-2"></i> ИИ: Регенерировать
                             </button>
                             {% else %}
-                            <button class="text-primary hover:text-indigo-700 text-sm font-medium flex items-center transition">
+                            <button type="button" class="text-primary hover:text-indigo-700 text-sm font-medium flex items-center transition">
                                 <i class="fas fa-plus mr-1"></i> Добавить в ДЗ
                             </button>
                             {% endif %}
