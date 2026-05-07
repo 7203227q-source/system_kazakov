@@ -138,6 +138,36 @@ def parse_task_page(html: str) -> tuple[str, str, str]:
     )
     solution_html = str(solution_node) if solution_node else ""
 
+    if content_node and not solution_html:
+        marker = None
+        for tag in content_node.find_all(True):
+            t = tag.get_text(" ", strip=True)
+            if not t:
+                continue
+            if re.match(r"^Решение\.?\s*$", t, flags=re.IGNORECASE) or re.match(r"^Решение\s*:", t, flags=re.IGNORECASE):
+                marker = tag
+                break
+        if marker is not None:
+            marker_direct = marker
+            while marker_direct.parent and marker_direct.parent is not content_node:
+                marker_direct = marker_direct.parent
+
+            children = [c for c in content_node.contents if str(c).strip()]
+            before: list[str] = []
+            after: list[str] = []
+            found = False
+            for c in children:
+                if not found and c is marker_direct:
+                    found = True
+                if found:
+                    after.append(str(c))
+                else:
+                    before.append(str(c))
+
+            if after:
+                content_html = "".join(before).strip() or content_html
+                solution_html = "".join(after).strip()
+
     return content_html, answer, solution_html
 
 
@@ -149,6 +179,7 @@ def import_tasks_from_sdamgia_ids(
     limit: int = 25,
     skip_no_answer: bool = True,
     skip_prototype: bool = True,
+    skip_no_solution: bool = True,
     skip_existing: bool = True,
     theme: str = "classic",
 ) -> dict:
@@ -173,6 +204,7 @@ def import_tasks_from_sdamgia_ids(
         "skipped_existing": 0,
         "skipped_no_answer": 0,
         "skipped_prototype": 0,
+        "skipped_no_solution": 0,
         "skipped_invalid": 0,
         "errors": 0,
         "base_url": base_url,
@@ -236,6 +268,14 @@ def import_tasks_from_sdamgia_ids(
             html = fetch_task_page_html(base_url, task_id)
             content_html, answer, solution_html = parse_task_page(html)
 
+            page_text = BeautifulSoup(html or "", "html.parser").get_text(" ", strip=True).lower()
+            if "прототип" in page_text:
+                stats["skipped_prototype"] += 1
+                item["status"] = "skipped"
+                item["detail"] = "prototype solution"
+                report_items.append(item)
+                continue
+
             if skip_no_answer and not answer:
                 stats["skipped_no_answer"] += 1
                 item["status"] = "skipped"
@@ -243,12 +283,12 @@ def import_tasks_from_sdamgia_ids(
                 report_items.append(item)
                 continue
 
-            if skip_prototype:
-                sol_text = BeautifulSoup(solution_html or "", "html.parser").get_text(" ", strip=True).lower()
-                if "прототип" in sol_text:
-                    stats["skipped_prototype"] += 1
+            if skip_no_solution:
+                sol_text = BeautifulSoup(solution_html or "", "html.parser").get_text(" ", strip=True)
+                if not sol_text:
+                    stats["skipped_no_solution"] += 1
                     item["status"] = "skipped"
-                    item["detail"] = "prototype solution"
+                    item["detail"] = "no solution"
                     report_items.append(item)
                     continue
 

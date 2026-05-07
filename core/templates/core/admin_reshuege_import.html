@@ -112,7 +112,7 @@
                             <textarea name="task_ids" rows="8" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary bg-white font-mono text-xs" placeholder="116125&#10;https://math-ege.sdamgia.ru/problem?id=116125&#10;https://math-ege.sdamgia.ru/test?a=view_many&...">{{ form.task_ids }}</textarea>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <label class="flex items-center gap-2 text-sm text-gray-700">
                                 <input type="checkbox" name="skip_existing" {% if form.skip_existing %}checked{% endif %} class="rounded border-gray-300 text-primary focus:ring-primary">
                                 Пропускать уже загруженные
@@ -124,6 +124,10 @@
                             <label class="flex items-center gap-2 text-sm text-gray-700">
                                 <input type="checkbox" name="skip_prototype" {% if form.skip_prototype %}checked{% endif %} class="rounded border-gray-300 text-primary focus:ring-primary">
                                 Пропускать «прототип»
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="skip_no_solution" {% if form.skip_no_solution %}checked{% endif %} class="rounded border-gray-300 text-primary focus:ring-primary">
+                                Пропускать без решения
                             </label>
                         </div>
 

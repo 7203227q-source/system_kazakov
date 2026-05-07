@@ -117,6 +117,7 @@ def admin_reshuege_import(request):
         "skip_existing": True,
         "skip_no_answer": True,
         "skip_prototype": True,
+        "skip_no_solution": True,
     }
 
     if request.method == 'POST':
@@ -127,6 +128,7 @@ def admin_reshuege_import(request):
 
         skip_no_answer = request.POST.get('skip_no_answer') == 'on'
         skip_prototype = request.POST.get('skip_prototype') == 'on'
+        skip_no_solution = request.POST.get('skip_no_solution') == 'on'
         skip_existing = request.POST.get('skip_existing') == 'on'
 
         form = {
@@ -137,6 +139,7 @@ def admin_reshuege_import(request):
             "skip_existing": skip_existing,
             "skip_no_answer": skip_no_answer,
             "skip_prototype": skip_prototype,
+            "skip_no_solution": skip_no_solution,
         }
 
         if not exam_format_id_raw:
@@ -166,6 +169,7 @@ def admin_reshuege_import(request):
                     limit=limit,
                     skip_no_answer=skip_no_answer,
                     skip_prototype=skip_prototype,
+                    skip_no_solution=skip_no_solution,
                     skip_existing=skip_existing,
                     theme="classic",
                 )
@@ -176,7 +180,7 @@ def admin_reshuege_import(request):
                 messages.success(
                     request,
                     f"Импорт завершён. Новых: {stats.get('imported', 0)}, обновлено: {stats.get('updated', 0)}, "
-                    f"пропущено: {stats.get('skipped_existing', 0) + stats.get('skipped_no_answer', 0) + stats.get('skipped_prototype', 0) + stats.get('skipped_invalid', 0)}, "
+                    f"пропущено: {stats.get('skipped_existing', 0) + stats.get('skipped_no_answer', 0) + stats.get('skipped_prototype', 0) + stats.get('skipped_no_solution', 0) + stats.get('skipped_invalid', 0)}, "
                     f"ошибок: {stats.get('errors', 0)}.",
                 )
             except Exception as e:
