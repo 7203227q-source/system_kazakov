@@ -66,8 +66,12 @@ def extract_task_id(value: str) -> str | None:
 
 def fetch_task_page_html(base_url: str, task_id: str) -> str:
     url = f"{base_url.rstrip('/')}/problem?id={task_id}"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "ru,en;q=0.8"}
     res = requests.get(url, headers=headers, timeout=20)
+    try:
+        res.encoding = res.apparent_encoding or res.encoding or "utf-8"
+    except Exception:
+        pass
     res.raise_for_status()
     return res.text
 
@@ -93,8 +97,12 @@ def base_url_from_any_url(value: str) -> str | None:
 
 
 def fetch_view_many_ids(list_url: str, limit: int = 300) -> list[str]:
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "ru,en;q=0.8"}
     res = requests.get(list_url, headers=headers, timeout=30)
+    try:
+        res.encoding = res.apparent_encoding or res.encoding or "utf-8"
+    except Exception:
+        pass
     res.raise_for_status()
     html = res.text
 
@@ -156,7 +164,11 @@ def parse_task_page(html: str) -> tuple[str, str, str]:
             t = normalize_sdamgia_text(tag.get_text(" ", strip=True))
             if not t:
                 continue
-            if re.match(r"^Решение\.?\s*$", t, flags=re.IGNORECASE) or re.match(r"^Решение\s*:", t, flags=re.IGNORECASE):
+            key = re.sub(r"[^a-zа-я]+", "", t.lower())
+            if key in {"решение", "спрятатьрешение", "показатьрешение"}:
+                marker = tag
+                break
+            if "решение" in key and len(key) <= 24:
                 marker = tag
                 break
         if marker is not None:

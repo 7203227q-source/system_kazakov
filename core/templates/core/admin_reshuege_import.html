@@ -352,6 +352,15 @@
 
                         setProgress(saved, target, checked, candidates.length);
                         setSummary(okCount, skipCount, errCount);
+
+                        if (checked >= 200 && okCount === 0) {
+                            cancelled = true;
+                            controller.abort();
+                            setLastStatus('Автоостановка: 0 OK после 200 проверок');
+                            submitBtn.disabled = false;
+                            submitBtn.classList.remove('opacity-60');
+                            break;
+                        }
                     }
 
                     if (!cancelled) window.location.reload();
