@@ -24,7 +24,7 @@ def get_extension_from_content(content):
         return f".{ext}"
     return '.jpg'
 
-def download_and_replace_images(html_content, task_fipi_id, theme):
+def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None):
     """
     Parses HTML content, finds all <img> tags, downloads the remote images,
     saves them locally, and updates the src attributes.
@@ -52,8 +52,9 @@ def download_and_replace_images(html_content, task_fipi_id, theme):
         if img_url.startswith('//'):
             img_url = 'https:' + img_url
         elif img_url.startswith('/'):
-            # If the CSV contains relative paths, assume they are from sdamgia.ru
-            img_url = 'https://math-ege.sdamgia.ru' + img_url
+            # If the HTML contains relative paths, assume they are from sdamgia.ru
+            origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
+            img_url = origin + img_url
             
         try:
             headers = {'User-Agent': 'Mozilla/5.0'}

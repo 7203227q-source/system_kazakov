@@ -100,6 +100,72 @@ def admin_system_status(request):
     
     return render(request, 'core/admin_system.html', context)
 
+
+@login_required
+def admin_reshuege_import(request):
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    formats = ExamFormat.objects.filter(is_active=True).select_related('subject').order_by('subject__name', '-year', 'name')
+
+    report = None
+
+    if request.method == 'POST':
+        exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
+        type_number_raw = (request.POST.get('type_number') or '').strip()
+        ids_raw = (request.POST.get('task_ids') or '').strip()
+        limit_raw = (request.POST.get('limit') or '25').strip()
+
+        skip_no_answer = request.POST.get('skip_no_answer') == 'on'
+        skip_prototype = request.POST.get('skip_prototype') == 'on'
+        skip_existing = request.POST.get('skip_existing') == 'on'
+
+        if not exam_format_id_raw:
+            messages.error(request, "Выберите формат экзамена.")
+        elif not type_number_raw:
+            messages.error(request, "Укажите номер типа.")
+        elif not ids_raw:
+            messages.error(request, "Вставьте список ID/ссылок задач (до 25).")
+        else:
+            try:
+                exam_format_id = int(exam_format_id_raw)
+                type_number = int(type_number_raw)
+                limit = int(limit_raw) if limit_raw.isdigit() else 25
+                limit = max(1, min(25, limit))
+
+                raw_ids = [line.strip() for line in ids_raw.splitlines() if line.strip()]
+                if len(raw_ids) > 25:
+                    raw_ids = raw_ids[:25]
+                    messages.warning(request, "Вставлено больше 25 строк — взяты первые 25.")
+
+                from .services_reshuege import import_tasks_from_sdamgia_ids
+
+                report = import_tasks_from_sdamgia_ids(
+                    exam_format_id=exam_format_id,
+                    type_number=type_number,
+                    raw_ids=raw_ids,
+                    limit=limit,
+                    skip_no_answer=skip_no_answer,
+                    skip_prototype=skip_prototype,
+                    skip_existing=skip_existing,
+                    theme="classic",
+                )
+
+                stats = report.get("stats") or {}
+                messages.success(
+                    request,
+                    f"Импорт завершён. Новых: {stats.get('imported', 0)}, обновлено: {stats.get('updated', 0)}, "
+                    f"пропущено: {stats.get('skipped_existing', 0) + stats.get('skipped_no_answer', 0) + stats.get('skipped_prototype', 0)}, "
+                    f"ошибок: {stats.get('errors', 0)}.",
+                )
+            except Exception as e:
+                messages.error(request, f"Ошибка импорта: {e}")
+
+    return render(request, 'core/admin_reshuege_import.html', {
+        'formats': formats,
+        'report': report,
+    })
+
 import random
 import base64
 from io import BytesIO

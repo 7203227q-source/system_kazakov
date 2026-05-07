@@ -34,6 +34,7 @@ urlpatterns = [
 
     path('parent/', views.parent_dashboard, name='parent_dashboard'),
     path('platform-admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('platform-admin/reshuege-import/', views.admin_reshuege_import, name='admin_reshuege_import'),
     path('platform-admin/system/', views.admin_system_status, name='admin_system'),
     path('apply-migrations/', views.run_migrations, name='run_migrations'),
     
