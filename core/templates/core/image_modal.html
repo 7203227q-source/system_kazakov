@@ -5,14 +5,17 @@
 </div>
 
 <style>
-    :root { --tex-img-height: 1.35em; }
-    .prose img.tex {
+    :root { --tex-img-height: 1.9em; }
+    .prose img.tex,
+    .prose img[src*="formula/svg"],
+    .prose img[src*="/formula/"] {
         display: inline-block;
         margin: 0;
-        vertical-align: -0.2em;
-        height: var(--tex-img-height);
-        width: auto;
-        max-height: none;
+        vertical-align: -0.15em !important;
+        height: var(--tex-img-height) !important;
+        width: auto !important;
+        max-height: none !important;
+        max-width: none !important;
     }
 </style>
 
