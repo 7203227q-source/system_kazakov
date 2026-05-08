@@ -154,7 +154,17 @@
                                 <button id="reshuege-import-cancel" type="button" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200 transition">
                                     Остановить
                                 </button>
+                                <button id="reshuege-import-resume" type="button" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-white text-primary font-bold text-sm border border-primary hover:bg-indigo-50 transition hidden">
+                                    Продолжить
+                                </button>
+                                <button id="reshuege-import-retry-errors" type="button" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-white text-primary font-bold text-sm border border-primary hover:bg-indigo-50 transition hidden">
+                                    Повторить ошибки
+                                </button>
+                                <button id="reshuege-import-clear-errors" type="button" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200 transition hidden">
+                                    Очистить ошибки
+                                </button>
                             </div>
+                            <div id="reshuege-errors-saved" class="mt-1 text-xs text-gray-500"></div>
                         </div>
                     </form>
                 </div>
@@ -256,41 +266,129 @@
             el.textContent = text || '';
         }
 
+        function hashString(s) {
+            let h = 5381;
+            for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+            return (h >>> 0).toString(16);
+        }
+
+        function reshuegeStateKey(formData) {
+            const exam = String(formData.get('exam_format') || '');
+            const type = String(formData.get('type_number') || '');
+            const idsRaw = String(formData.get('task_ids') || '').trim();
+            return `reshuege_import_state:v1:${exam}:${type}:${hashString(idsRaw)}`;
+        }
+
+        function reshuegeErrorsKey(formData) {
+            const exam = String(formData.get('exam_format') || '');
+            const type = String(formData.get('type_number') || '');
+            const idsRaw = String(formData.get('task_ids') || '').trim();
+            return `reshuege_import_errors:v1:${exam}:${type}:${hashString(idsRaw)}`;
+        }
+
+        function loadJson(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) return fallback;
+                return JSON.parse(raw);
+            } catch {
+                return fallback;
+            }
+        }
+
+        function saveJson(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch {}
+        }
+
+        function clearKey(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch {}
+        }
+
+        function refreshErrorsUi(errorsKey) {
+            const retryBtn = document.getElementById('reshuege-import-retry-errors');
+            const clearBtn = document.getElementById('reshuege-import-clear-errors');
+            const label = document.getElementById('reshuege-errors-saved');
+            const items = loadJson(errorsKey, []);
+            const n = Array.isArray(items) ? items.length : 0;
+            if (label) label.textContent = n ? `Ошибок сохранено: ${n}` : '';
+            if (retryBtn) retryBtn.classList.toggle('hidden', n === 0);
+            if (clearBtn) clearBtn.classList.toggle('hidden', n === 0);
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('reshuege-import-form');
             const submitBtn = document.getElementById('reshuege-import-submit');
             const wrap = document.getElementById('reshuege-progress-wrap');
             const cancelBtn = document.getElementById('reshuege-import-cancel');
+            const resumeBtn = document.getElementById('reshuege-import-resume');
+            const retryBtn = document.getElementById('reshuege-import-retry-errors');
+            const clearBtn = document.getElementById('reshuege-import-clear-errors');
             if (!form || !submitBtn || !wrap) return;
 
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
+            let running = false;
+
+            const runImport = async ({ resume = false, onlyErrors = false, auto = false } = {}) => {
+                if (running) return;
                 const csrf = form.querySelector('[name=csrfmiddlewaretoken]')?.value;
                 if (!csrf) return;
 
+                running = true;
                 submitBtn.disabled = true;
                 submitBtn.classList.add('opacity-60');
                 wrap.classList.remove('hidden');
+                if (resumeBtn) resumeBtn.classList.add('hidden');
+                if (retryBtn) retryBtn.classList.add('hidden');
+                if (clearBtn) clearBtn.classList.add('hidden');
 
                 const formData = new FormData(form);
-                setProgress(0, 0, 0, 0);
-                setSummary(0, 0, 0);
-                setLastStatus('');
+                const stateKey = reshuegeStateKey(formData);
+                const errorsKey = reshuegeErrorsKey(formData);
+
+                const prevState = loadJson(stateKey, null);
+                let saved = resume && prevState ? Number(prevState.saved || 0) : 0;
+                let okCount = resume && prevState ? Number(prevState.ok || 0) : 0;
+                let skipCount = resume && prevState ? Number(prevState.skip || 0) : 0;
+                let errCount = resume && prevState ? Number(prevState.err || 0) : 0;
+                let cursor = resume && prevState ? Number(prevState.cursor || 0) : 0;
+
+                setProgress(saved, 0, cursor, 0);
+                setSummary(okCount, skipCount, errCount);
+                setLastStatus(auto ? 'Возобновление импорта…' : '');
+
+                let cancelled = false;
+                const controller = new AbortController();
+                if (cancelBtn) {
+                    cancelBtn.disabled = false;
+                    cancelBtn.onclick = () => {
+                        cancelled = true;
+                        controller.abort();
+                        saveJson(stateKey, { ...(loadJson(stateKey, {}) || {}), inProgress: false, updatedAt: Date.now() });
+                        setLastStatus('Остановлено пользователем');
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('opacity-60');
+                        running = false;
+                        refreshErrorsUi(errorsKey);
+                        refreshResumeUi();
+                    };
+                }
+
+                const refreshResumeUi = () => {
+                    const s = loadJson(stateKey, null);
+                    if (!resumeBtn) return;
+                    if (!s || !s.total || s.cursor == null) {
+                        resumeBtn.classList.add('hidden');
+                        return;
+                    }
+                    const canResume = !running && Number(s.cursor || 0) < Number(s.total || 0) && s.inProgress !== true;
+                    resumeBtn.classList.toggle('hidden', !canResume);
+                    if (canResume) resumeBtn.textContent = `Продолжить (${s.cursor}/${s.total})`;
+                };
 
                 try {
-                    let cancelled = false;
-                    const controller = new AbortController();
-                    if (cancelBtn) {
-                        cancelBtn.disabled = false;
-                        cancelBtn.onclick = () => {
-                            cancelled = true;
-                            controller.abort();
-                            setLastStatus('Остановлено пользователем');
-                            submitBtn.disabled = false;
-                            submitBtn.classList.remove('opacity-60');
-                        };
-                    }
-
                     const startRes = await fetch("{% url 'admin_reshuege_import_start' %}", {
                         method: 'POST',
                         headers: { 'X-CSRFToken': csrf },
@@ -303,6 +401,7 @@
                         alert(start.error || 'Ошибка старта импорта');
                         submitBtn.disabled = false;
                         submitBtn.classList.remove('opacity-60');
+                        running = false;
                         return;
                     }
 
@@ -310,18 +409,36 @@
                     const candidates = start.candidates || [];
                     const baseUrl = start.base_url || '';
 
-                    let saved = 0;
-                    let checked = 0;
-                    let okCount = 0;
-                    let skipCount = 0;
-                    let errCount = 0;
-                    setProgress(saved, target, checked, candidates.length);
-                    setSummary(okCount, skipCount, errCount);
+                    if (!resume) {
+                        cursor = 0;
+                        saved = 0;
+                        okCount = 0;
+                        skipCount = 0;
+                        errCount = 0;
+                        saveJson(stateKey, { inProgress: true, cursor: 0, total: candidates.length, target, saved: 0, ok: 0, skip: 0, err: 0, updatedAt: Date.now() });
+                    } else {
+                        cursor = Math.min(cursor, candidates.length);
+                        saveJson(stateKey, { ...(prevState || {}), inProgress: true, total: candidates.length, target, updatedAt: Date.now() });
+                    }
 
-                    for (const taskId of candidates) {
+                    const errorsList = Array.isArray(loadJson(errorsKey, [])) ? loadJson(errorsKey, []) : [];
+                    const errorIds = onlyErrors ? errorsList.map(x => x?.taskId).filter(Boolean) : null;
+
+                    const listToProcess = onlyErrors ? errorIds : candidates;
+                    const totalCandidates = onlyErrors ? (errorIds ? errorIds.length : 0) : candidates.length;
+                    const effectiveTarget = Math.min(Number(target || 0), totalCandidates);
+
+                    setProgress(saved, effectiveTarget, cursor, totalCandidates);
+                    setSummary(okCount, skipCount, errCount);
+                    refreshErrorsUi(errorsKey);
+
+                    const startIndex = onlyErrors ? 0 : cursor;
+                    for (let i = startIndex; i < listToProcess.length; i++) {
                         if (cancelled) break;
-                        if (saved >= target) break;
-                        checked += 1;
+                        if (saved >= effectiveTarget) break;
+
+                        const taskId = listToProcess[i];
+                        const checked = i + 1;
 
                         const stepData = new FormData();
                         stepData.set('exam_format', String(formData.get('exam_format') || ''));
@@ -343,28 +460,91 @@
                         const step = await stepRes.json();
                         const status = step?.status || 'unknown';
                         const detail = step?.detail ? String(step.detail) : '';
+
                         if (status === 'ok') {
                             saved += 1;
                             okCount += 1;
+                            if (onlyErrors) {
+                                const cur = loadJson(errorsKey, []);
+                                const next = Array.isArray(cur) ? cur.filter(x => x && x.taskId !== String(taskId)) : [];
+                                saveJson(errorsKey, next);
+                            }
                         } else if (status === 'skipped') {
                             skipCount += 1;
                         } else {
                             errCount += 1;
+                            const cur = loadJson(errorsKey, []);
+                            const next = Array.isArray(cur) ? cur.filter(x => x && x.taskId !== String(taskId)) : [];
+                            next.push({ taskId: String(taskId), detail, ts: Date.now() });
+                            saveJson(errorsKey, next);
                         }
-                        setLastStatus(`${taskId} → ${status} ${detail}`.trim());
 
-                        setProgress(saved, target, checked, candidates.length);
+                        if (!onlyErrors) cursor = checked;
+                        saveJson(stateKey, { inProgress: true, cursor, total: candidates.length, target, saved, ok: okCount, skip: skipCount, err: errCount, updatedAt: Date.now(), lastTaskId: String(taskId) });
+
+                        setLastStatus(`${taskId} → ${status} ${detail}`.trim());
+                        setProgress(saved, effectiveTarget, onlyErrors ? checked : cursor, totalCandidates);
                         setSummary(okCount, skipCount, errCount);
+                        refreshErrorsUi(errorsKey);
                     }
 
-                    if (!cancelled) window.location.reload();
-                } catch (err) {
-                    if (err && err.name === 'AbortError') return;
-                    alert('Ошибка импорта');
+                    saveJson(stateKey, { ...(loadJson(stateKey, {}) || {}), inProgress: false, updatedAt: Date.now() });
+                    running = false;
+                    refreshErrorsUi(errorsKey);
+                    refreshResumeUi();
                     submitBtn.disabled = false;
                     submitBtn.classList.remove('opacity-60');
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return;
+                    saveJson(stateKey, { ...(loadJson(stateKey, {}) || {}), inProgress: false, updatedAt: Date.now() });
+                    running = false;
+                    refreshErrorsUi(errorsKey);
+                    if (resumeBtn) resumeBtn.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-60');
+                    alert('Ошибка импорта');
                 }
+            };
+
+            const refreshButtonsFromCurrentForm = () => {
+                const formData = new FormData(form);
+                const stateKey = reshuegeStateKey(formData);
+                const errorsKey = reshuegeErrorsKey(formData);
+                const state = loadJson(stateKey, null);
+
+                if (resumeBtn) {
+                    const canResume = state && state.inProgress !== true && Number(state.cursor || 0) < Number(state.total || 0);
+                    resumeBtn.classList.toggle('hidden', !canResume);
+                    if (canResume) resumeBtn.textContent = `Продолжить (${state.cursor}/${state.total})`;
+                }
+
+                refreshErrorsUi(errorsKey);
+
+                if (clearBtn) {
+                    clearBtn.onclick = () => {
+                        clearKey(errorsKey);
+                        refreshErrorsUi(errorsKey);
+                    };
+                }
+                if (retryBtn) {
+                    retryBtn.onclick = () => runImport({ resume: true, onlyErrors: true });
+                }
+                if (resumeBtn) {
+                    resumeBtn.onclick = () => runImport({ resume: true });
+                }
+
+                if (state && state.inProgress === true && Date.now() - Number(state.updatedAt || 0) < 30 * 60 * 1000) {
+                    runImport({ resume: true, auto: true });
+                }
+            };
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await runImport({ resume: false });
             });
+
+            form.addEventListener('change', () => refreshButtonsFromCurrentForm());
+            refreshButtonsFromCurrentForm();
         });
     </script>
 
