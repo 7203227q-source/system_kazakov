@@ -148,18 +148,15 @@ def admin_reshuege_import(request):
         elif not type_number_raw:
             messages.error(request, "Укажите номер типа.")
         elif not ids_raw:
-            messages.error(request, "Вставьте список ID/ссылок задач (до 25).")
+            messages.error(request, "Вставьте список ID/ссылок задач.")
         else:
             try:
                 exam_format_id = int(exam_format_id_raw)
                 type_number = int(type_number_raw)
                 limit = int(limit_raw) if limit_raw.isdigit() else 25
-                limit = max(1, min(25, limit))
+                limit = max(1, min(10_000, limit))
 
                 raw_ids = [line.strip() for line in ids_raw.splitlines() if line.strip()]
-                if len(raw_ids) > 25:
-                    raw_ids = raw_ids[:25]
-                    messages.warning(request, "Вставлено больше 25 строк — взяты первые 25.")
 
                 from .services_reshuege import import_tasks_from_sdamgia_ids
 
@@ -214,7 +211,7 @@ def admin_reshuege_import_start(request):
         exam_format_id = int(exam_format_id_raw)
         type_number = int(type_number_raw)
         limit = int(limit_raw) if limit_raw.isdigit() else 25
-        limit = max(1, min(25, limit))
+        limit = max(1, min(10_000, limit))
 
         raw_lines = [line.strip() for line in ids_raw.splitlines() if line.strip()]
 
@@ -226,7 +223,7 @@ def admin_reshuege_import_start(request):
             raw_lines=raw_lines,
             limit=limit,
             skip_existing=skip_existing,
-            expanded_limit=500,
+            expanded_limit=200_000,
         )
 
         return JsonResponse({

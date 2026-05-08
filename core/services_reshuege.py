@@ -9,6 +9,10 @@ from .task_html import normalize_task_html
 from .utils import download_and_replace_images
 
 
+MAX_RESHUEGE_IMPORT_LIMIT = 10_000
+MAX_VIEW_MANY_IDS = 200_000
+
+
 def normalize_sdamgia_text(value: str) -> str:
     if value is None:
         return ""
@@ -96,7 +100,7 @@ def base_url_from_any_url(value: str) -> str | None:
     return None
 
 
-def fetch_view_many_ids(list_url: str, limit: int = 300) -> list[str]:
+def fetch_view_many_ids(list_url: str, limit: int | None = 300) -> list[str]:
     headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "ru,en;q=0.8"}
     res = requests.get(list_url, headers=headers, timeout=30)
     try:
@@ -111,7 +115,7 @@ def fetch_view_many_ids(list_url: str, limit: int = 300) -> list[str]:
         tid = m.group(1)
         if tid not in ids:
             ids.append(tid)
-        if len(ids) >= limit:
+        if limit is not None and len(ids) >= limit:
             break
 
     if ids:
@@ -126,7 +130,7 @@ def fetch_view_many_ids(list_url: str, limit: int = 300) -> list[str]:
         tid = m.group(1)
         if tid not in ids:
             ids.append(tid)
-        if len(ids) >= limit:
+        if limit is not None and len(ids) >= limit:
             break
 
     return ids
@@ -224,7 +228,7 @@ def prepare_candidate_ids(
     expanded_limit: int = 500,
 ) -> dict:
     base_url = resolve_sdamgia_base_url(exam_format)
-    max_items = max(1, min(25, int(limit)))
+    max_items = max(1, min(MAX_RESHUEGE_IMPORT_LIMIT, int(limit)))
 
     report_items: list[dict] = []
     stats = {
@@ -271,6 +275,7 @@ def prepare_candidate_ids(
         candidates = [tid for tid in candidates if not Task.objects.filter(fipi_id=tid).exists()]
 
     stats["recognized"] = len(candidates)
+    max_items = min(max_items, len(candidates)) if candidates else 0
 
     return {
         "base_url": base_url,
@@ -361,7 +366,7 @@ def import_tasks_from_sdamgia_ids(
         raw_lines=raw_ids,
         limit=limit,
         skip_existing=skip_existing,
-        expanded_limit=500,
+        expanded_limit=MAX_VIEW_MANY_IDS,
     )
 
     base_url = prep["base_url"]

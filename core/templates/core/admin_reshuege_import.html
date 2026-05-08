@@ -103,7 +103,7 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Лимит</label>
-                                <input name="limit" inputmode="numeric" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary bg-white" value="{{ form.limit|default:"25" }}">
+                                <input name="limit" inputmode="numeric" max="10000" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary bg-white" value="{{ form.limit|default:"25" }}">
                             </div>
                         </div>
 
@@ -355,15 +355,6 @@
 
                         setProgress(saved, target, checked, candidates.length);
                         setSummary(okCount, skipCount, errCount);
-
-                        if (checked >= 200 && okCount === 0) {
-                            cancelled = true;
-                            controller.abort();
-                            setLastStatus('Автоостановка: 0 OK после 200 проверок');
-                            submitBtn.disabled = false;
-                            submitBtn.classList.remove('opacity-60');
-                            break;
-                        }
                     }
 
                     if (!cancelled) window.location.reload();
