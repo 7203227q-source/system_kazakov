@@ -1417,6 +1417,7 @@ def tutor_task_bank(request):
     base_query = request.GET.copy()
     base_query.pop('page', None)
     base_query_prefix = f"&{base_query.urlencode()}" if base_query else ""
+    base_query_items = list(base_query.items())
 
     paginator = Paginator(tasks, 25)
     page_obj = paginator.get_page(request.GET.get('page', 1))
@@ -1459,6 +1460,7 @@ def tutor_task_bank(request):
         'tasks': tasks_list,
         'page_obj': page_obj,
         'base_query_prefix': base_query_prefix,
+        'base_query_items': base_query_items,
         'search_query': search_query,
         'subjects': subjects,
         'exam_formats': exam_formats,

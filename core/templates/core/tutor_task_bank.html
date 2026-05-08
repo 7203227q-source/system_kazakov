@@ -140,7 +140,6 @@
                     </form>
                 </div>
             </div>
-
             <div class="mt-4 mb-6 bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="font-bold text-gray-800">Масштаб формул</div>
                 <div class="flex items-center gap-3">
@@ -205,6 +204,55 @@
                     </div>
                     <button type="submit" class="px-4 py-2 rounded-lg bg-red-700 text-white font-bold text-sm hover:bg-red-800 transition">Очистить всю базу</button>
                 </form>
+            </div>
+            {% endif %}
+
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="flex items-center justify-center mb-6">
+                <div class="inline-flex items-center bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    {% if page_obj.has_previous %}
+                    <a href="?page=1{{ base_query_prefix }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center" title="В начало">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    <a href="?page={{ page_obj.previous_page_number }}{{ base_query_prefix }}" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center">
+                        <i class="fas fa-chevron-left mr-2 text-xs"></i> Назад
+                    </a>
+                    {% else %}
+                    <span class="px-3 py-2 text-sm font-medium text-gray-300 flex items-center" title="В начало">
+                        <i class="fas fa-angle-double-left"></i>
+                    </span>
+                    <span class="px-4 py-2 text-sm font-medium text-gray-300 flex items-center">
+                        <i class="fas fa-chevron-left mr-2 text-xs"></i> Назад
+                    </span>
+                    {% endif %}
+
+                    <div class="px-4 py-2 text-sm font-bold text-gray-700 border-x border-gray-200 bg-gray-50 flex items-center gap-3">
+                        <span>Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                        <form method="GET" action="{% url 'tutor_task_bank' %}" class="flex items-center gap-2">
+                            {% for k, v in base_query_items %}
+                            <input type="hidden" name="{{ k }}" value="{{ v }}">
+                            {% endfor %}
+                            <input name="page" type="number" min="1" max="{{ page_obj.paginator.num_pages }}" class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm bg-white" placeholder="№">
+                            <button type="submit" class="px-3 py-1 bg-white text-primary border border-primary rounded-lg text-sm font-bold hover:bg-indigo-50 transition">Перейти</button>
+                        </form>
+                    </div>
+
+                    {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{{ base_query_prefix }}" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center">
+                        Вперёд <i class="fas fa-chevron-right ml-2 text-xs"></i>
+                    </a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}{{ base_query_prefix }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center" title="В конец">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                    {% else %}
+                    <span class="px-4 py-2 text-sm font-medium text-gray-300 flex items-center">
+                        Вперёд <i class="fas fa-chevron-right ml-2 text-xs"></i>
+                    </span>
+                    <span class="px-3 py-2 text-sm font-medium text-gray-300 flex items-center" title="В конец">
+                        <i class="fas fa-angle-double-right"></i>
+                    </span>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
 
@@ -306,26 +354,45 @@
                 <div class="flex items-center justify-center mt-8">
                     <div class="inline-flex items-center bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                         {% if page_obj.has_previous %}
+                        <a href="?page=1{{ base_query_prefix }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center" title="В начало">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
                         <a href="?page={{ page_obj.previous_page_number }}{{ base_query_prefix }}" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center">
                             <i class="fas fa-chevron-left mr-2 text-xs"></i> Назад
                         </a>
                         {% else %}
+                        <span class="px-3 py-2 text-sm font-medium text-gray-300 flex items-center" title="В начало">
+                            <i class="fas fa-angle-double-left"></i>
+                        </span>
                         <span class="px-4 py-2 text-sm font-medium text-gray-300 flex items-center">
                             <i class="fas fa-chevron-left mr-2 text-xs"></i> Назад
                         </span>
                         {% endif %}
 
-                        <span class="px-4 py-2 text-sm font-bold text-gray-700 border-x border-gray-200 bg-gray-50">
-                            Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
-                        </span>
+                        <div class="px-4 py-2 text-sm font-bold text-gray-700 border-x border-gray-200 bg-gray-50 flex items-center gap-3">
+                            <span>Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                            <form method="GET" action="{% url 'tutor_task_bank' %}" class="flex items-center gap-2">
+                                {% for k, v in base_query_items %}
+                                <input type="hidden" name="{{ k }}" value="{{ v }}">
+                                {% endfor %}
+                                <input name="page" type="number" min="1" max="{{ page_obj.paginator.num_pages }}" class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm bg-white" placeholder="№">
+                                <button type="submit" class="px-3 py-1 bg-white text-primary border border-primary rounded-lg text-sm font-bold hover:bg-indigo-50 transition">Перейти</button>
+                            </form>
+                        </div>
 
                         {% if page_obj.has_next %}
                         <a href="?page={{ page_obj.next_page_number }}{{ base_query_prefix }}" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center">
                             Вперёд <i class="fas fa-chevron-right ml-2 text-xs"></i>
                         </a>
+                        <a href="?page={{ page_obj.paginator.num_pages }}{{ base_query_prefix }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center" title="В конец">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
                         {% else %}
                         <span class="px-4 py-2 text-sm font-medium text-gray-300 flex items-center">
                             Вперёд <i class="fas fa-chevron-right ml-2 text-xs"></i>
+                        </span>
+                        <span class="px-3 py-2 text-sm font-medium text-gray-300 flex items-center" title="В конец">
+                            <i class="fas fa-angle-double-right"></i>
                         </span>
                         {% endif %}
                     </div>
