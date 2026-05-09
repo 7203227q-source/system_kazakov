@@ -18,9 +18,15 @@ class User(AbstractUser):
         ('cs2', 'CS2'),
         ('ussr', 'СССР'),
     ]
+    UI_THEME_CHOICES = [
+        ('light', 'Классическая белая'),
+        ('dark', 'Тёмная'),
+        ('dark_classic', 'Классическая чёрная'),
+    ]
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='unassigned')
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон")
     preferred_theme = models.CharField(max_length=20, choices=THEME_CHOICES, default='classic', verbose_name="Предпочитаемая тема")
+    ui_theme = models.CharField(max_length=20, choices=UI_THEME_CHOICES, default='light', verbose_name="Тема интерфейса")
     
     # Для связи учеников и репетиторов
     invite_code = models.CharField(max_length=10, unique=True, null=True, blank=True, verbose_name="Код-приглашение")

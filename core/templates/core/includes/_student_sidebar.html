@@ -27,6 +27,15 @@
         </a>
     </nav>
     <div class="p-4 border-t border-gray-200">
+        <form method="POST" action="{% url 'update_ui_theme' %}" class="mb-3">
+            {% csrf_token %}
+            <label class="block text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">Тема интерфейса</label>
+            <select name="ui_theme" onchange="this.form.submit()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                {% for code, name in user.UI_THEME_CHOICES %}
+                    <option value="{{ code }}" {% if user.ui_theme == code %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </form>
         <div class="flex items-center">
             <img src="https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&background=E0E7FF&color=4F46E5" alt="User" class="w-10 h-10 rounded-full">
             <div class="ml-3">

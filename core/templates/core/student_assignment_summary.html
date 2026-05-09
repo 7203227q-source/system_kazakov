@@ -26,8 +26,9 @@
         };
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    {% include 'core/includes/_ui_theme_css.html' %}
 </head>
-<body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] overflow-y-auto">
+<body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] overflow-y-auto {% if user.role == 'student' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">
 <div class="min-h-[100dvh] bg-gray-50 p-4 sm:p-8 w-full">
     <div class="max-w-4xl mx-auto">
         

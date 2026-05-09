@@ -923,6 +923,19 @@ def update_theme_view(request):
             messages.success(request, f"Тема изменена на: {dict(User.THEME_CHOICES)[theme]}")
     return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
 
+
+@login_required
+@require_POST
+def update_ui_theme_view(request):
+    if request.user.role not in ['student', 'tutor']:
+        return redirect(request.META.get('HTTP_REFERER', 'login'))
+
+    ui_theme = (request.POST.get('ui_theme') or '').strip()
+    if ui_theme in dict(User.UI_THEME_CHOICES):
+        request.user.ui_theme = ui_theme
+        request.user.save(update_fields=['ui_theme'])
+    return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
 @login_required
 def tutor_update_student_contacts(request, student_id):
     if request.user.role not in ['tutor', 'admin'] or request.method != 'POST':

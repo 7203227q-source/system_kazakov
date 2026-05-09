@@ -9,8 +9,9 @@
     <script>
         tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
     </script>
+    {% include 'core/includes/_ui_theme_css.html' %}
 </head>
-<body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] flex overflow-hidden">
+<body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] flex overflow-hidden {% if user.role == 'tutor' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">
 <div class="min-h-[100dvh] bg-gray-50 flex w-full">
     <!-- Sidebar -->
     {% include 'core/includes/_tutor_sidebar.html' with active_page='create_assignment' %}

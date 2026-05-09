@@ -10,8 +10,9 @@
         .animate-fade-in-up { animation: fadeInUp 0.3s ease-out; }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
+    {% include 'core/includes/_ui_theme_css.html' %}
 </head>
-<body class="bg-gray-50 h-screen flex flex-col overflow-hidden font-sans">
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden font-sans {% if user.role == 'student' or user.role == 'tutor' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">
 
     <!-- Top Navigation Bar -->
     <header class="bg-white shadow-sm z-20 h-16 shrink-0 flex items-center px-4 md:px-6 justify-between border-b border-gray-200">

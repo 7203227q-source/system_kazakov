@@ -9,8 +9,9 @@
     <script>
         tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
     </script>
+    {% include 'core/includes/_ui_theme_css.html' %}
 </head>
-<body class="bg-gray-50 font-sans text-gray-800 min-h-[100dvh]">
+<body class="bg-gray-50 font-sans text-gray-800 min-h-[100dvh] {% if user.role == 'tutor' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">
 <div class="min-h-[100dvh] p-4 sm:p-8">
     <div class="max-w-5xl mx-auto space-y-6">
         {% if messages %}

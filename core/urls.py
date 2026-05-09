@@ -17,6 +17,7 @@ urlpatterns = [
     path('student/assignment/<int:assignment_id>/', views.student_solve_assignment, name='student_solve_assignment'),
     path('student/assignment/<int:assignment_id>/check/<int:task_id>/', views.student_check_assignment_task, name='student_check_assignment_task'),
     path('student/update-theme/', views.update_theme_view, name='update_theme'),
+    path('update-ui-theme/', views.update_ui_theme_view, name='update_ui_theme'),
     
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/contacts/', views.tutor_update_student_contacts, name='tutor_update_student_contacts'),
