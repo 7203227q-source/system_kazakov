@@ -165,7 +165,33 @@
 
                 <!-- Прогноз и Аналитика -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                    <p class="text-sm font-medium text-gray-500 mb-4">Прогноз и Аналитика</p>
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                        <p class="text-sm font-medium text-gray-500">Прогноз и Аналитика</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">Попыток: {{ student_total_submissions|default:0 }}</span>
+                            <span class="text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">
+                                Точность:
+                                {% if student_correct_rate is None %}
+                                    —
+                                {% else %}
+                                    {{ student_correct_rate|floatformat:0 }}%
+                                {% endif %}
+                            </span>
+                            <form method="GET" class="flex flex-wrap items-center gap-2">
+                                <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+                                <select name="subject_id" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" onchange="this.form.submit()">
+                                    {% for profile in selected_student.subject_profiles.all %}
+                                    <option value="{{ profile.subject.id }}" {% if chart_subject_id == profile.subject.id %}selected{% endif %}>{{ profile.subject.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <select name="range" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" onchange="this.form.submit()">
+                                    <option value="30" {% if chart_range == 30 %}selected{% endif %}>30 дней</option>
+                                    <option value="90" {% if chart_range == 90 %}selected{% endif %}>90 дней</option>
+                                    <option value="365" {% if chart_range == 365 %}selected{% endif %}>12 месяцев</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
                     {% if selected_student.subject_profiles.exists %}
                         <div class="space-y-4">
                         {% for profile in selected_student.subject_profiles.all %}
@@ -190,6 +216,35 @@
                     {% else %}
                         <p class="text-sm text-gray-500">Нет данных</p>
                     {% endif %}
+
+                    <div class="mt-6 bg-gray-50 rounded-xl border border-gray-100 p-4">
+                        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">График (мастерство и прогноз)</div>
+                        <div class="relative h-56 w-full">
+                            <canvas id="studentProgressChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Решаемость по номерам</div>
+                            <div class="text-xs text-gray-400">0% → 100%</div>
+                        </div>
+                        <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+                            {% for item in task_type_rates %}
+                            <div class="rounded-lg border border-gray-200 p-2 text-center bg-white task-type-tile" data-rate="{% if item.rate is None %}{% else %}{{ item.rate|floatformat:0 }}{% endif %}">
+                                <div class="text-xs font-black text-gray-800">{{ item.number }}</div>
+                                <div class="text-[10px] text-gray-500 mt-1">
+                                    {% if item.rate is None %}
+                                        —
+                                    {% else %}
+                                        {{ item.rate|floatformat:0 }}%
+                                    {% endif %}
+                                </div>
+                                <div class="text-[10px] text-gray-400 mt-0.5">{{ item.correct }}/{{ item.total }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -449,5 +504,53 @@
     </main>
 
 {% include "core/image_modal.html" %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function () {
+        const raw = '{{ chart_data|default:""|escapejs }}';
+        if (raw) {
+            try {
+                const data = JSON.parse(raw);
+                const ctx = document.getElementById('studentProgressChart');
+                if (ctx && data && Array.isArray(data.labels) && data.labels.length) {
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [
+                                { label: 'Мастерство (%)', data: data.mastery, borderColor: '#4F46E5', backgroundColor: 'rgba(79,70,229,0.08)', tension: 0.3, fill: true, pointRadius: 2 },
+                                { label: 'Прогноз (/100)', data: data.predictions, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.08)', tension: 0.3, fill: true, pointRadius: 2 },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { min: 0, max: 100, ticks: { stepSize: 20 } },
+                            },
+                            plugins: {
+                                legend: { display: true, position: 'bottom' },
+                            },
+                        },
+                    });
+                }
+            } catch (e) {}
+        }
+
+        const tiles = document.querySelectorAll('.task-type-tile');
+        tiles.forEach((el) => {
+            const v = el.getAttribute('data-rate');
+            if (!v) {
+                el.style.backgroundColor = '#f9fafb';
+                return;
+            }
+            const r = Math.max(0, Math.min(100, parseInt(v, 10)));
+            const hue = Math.round((r / 100) * 120);
+            el.style.backgroundColor = `hsl(${hue} 80% 92%)`;
+            el.style.borderColor = `hsl(${hue} 60% 75%)`;
+        });
+    })();
+</script>
 </body>
 </html>

@@ -965,10 +965,18 @@ def tutor_dashboard(request):
     # Get students with their profiles
     students = request.user.students.all().prefetch_related('subject_profiles', 'subject_profiles__subject')
     selected_student_id = request.GET.get('student_id')
+    chart_range_raw = (request.GET.get('range') or '30').strip()
+    chart_subject_id_raw = (request.GET.get('subject_id') or '').strip()
     selected_student = None
     recent_payment = None
     active_assignments = []
     completed_assignments = []
+    chart_data = None
+    chart_range = None
+    chart_subject_id = None
+    task_type_rates = []
+    student_total_submissions = 0
+    student_correct_rate = None
     
     # Calculate idle status for all students
     from django.utils import timezone
@@ -1045,6 +1053,79 @@ def tutor_dashboard(request):
                 completed_assignments.append(a)
             else:
                 active_assignments.append(a)
+
+        profiles = list(selected_student.subject_profiles.all())
+        if profiles:
+            chart_subject_id = int(chart_subject_id_raw) if chart_subject_id_raw.isdigit() else profiles[0].subject_id
+            chart_range = int(chart_range_raw) if chart_range_raw.isdigit() else 30
+            if chart_range not in {30, 90, 365}:
+                chart_range = 30
+
+            active_profile = next((p for p in profiles if p.subject_id == chart_subject_id), None) or profiles[0]
+            chart_subject_id = active_profile.subject_id
+
+            from datetime import timedelta
+            from django.db.models.functions import TruncMonth
+
+            start_date = today - timedelta(days=chart_range)
+            snapshots_qs = DailySnapshot.objects.filter(student=selected_student, subject=active_profile.subject, date__gte=start_date)
+
+            labels: list[str] = []
+            mastery: list[float] = []
+            predictions: list[float] = []
+
+            if chart_range == 365:
+                rows = (
+                    snapshots_qs
+                    .annotate(m=TruncMonth('date'))
+                    .values('m')
+                    .annotate(avg_mastery=models.Avg('current_mastery'), avg_pred=models.Avg('predicted_exam_score'))
+                    .order_by('m')
+                )
+                for r in rows:
+                    m = r.get('m')
+                    if not m:
+                        continue
+                    labels.append(m.strftime('%m.%Y'))
+                    mastery.append(float(r.get('avg_mastery') or 0.0))
+                    predictions.append(float(r.get('avg_pred') or 0.0))
+            else:
+                for s in snapshots_qs.order_by('date'):
+                    labels.append(s.date.strftime('%d.%m'))
+                    mastery.append(float(s.current_mastery or 0.0))
+                    predictions.append(float(s.predicted_exam_score or 0.0))
+
+            chart_data = json.dumps(
+                {'labels': labels, 'mastery': mastery, 'predictions': predictions},
+                ensure_ascii=False,
+            )
+
+        rows = (
+            Submission.objects.filter(student=selected_student)
+            .exclude(task__task_type__number__isnull=True)
+            .values('task__task_type__number')
+            .annotate(
+                total=models.Count('id'),
+                correct=models.Count('id', filter=Q(is_correct=True)),
+            )
+        )
+        totals = Submission.objects.filter(student=selected_student).aggregate(
+            total=models.Count('id'),
+            correct=models.Count('id', filter=Q(is_correct=True)),
+        )
+        student_total_submissions = int(totals.get('total') or 0)
+        correct_total = int(totals.get('correct') or 0)
+        student_correct_rate = (correct_total / student_total_submissions * 100.0) if student_total_submissions else None
+        rate_map = {int(r['task__task_type__number']): r for r in rows if r.get('task__task_type__number') is not None}
+        for n in range(1, 20):
+            r = rate_map.get(n)
+            if not r:
+                task_type_rates.append({'number': n, 'rate': None, 'total': 0, 'correct': 0})
+                continue
+            total = int(r.get('total') or 0)
+            correct = int(r.get('correct') or 0)
+            rate = (correct / total * 100.0) if total > 0 else None
+            task_type_rates.append({'number': n, 'rate': rate, 'total': total, 'correct': correct})
     
     # Check if there are draft assignments we might want to resume or delete
     drafts = Assignment.objects.filter(tutor=request.user, is_draft=True)
@@ -1056,6 +1137,12 @@ def tutor_dashboard(request):
         'active_assignments': active_assignments,
         'completed_assignments': completed_assignments,
         'drafts': drafts,
+        'chart_data': chart_data,
+        'chart_range': chart_range or 30,
+        'chart_subject_id': chart_subject_id,
+        'task_type_rates': task_type_rates,
+        'student_total_submissions': student_total_submissions,
+        'student_correct_rate': student_correct_rate,
     }
     return render(request, 'core/tutor_dashboard.html', context)
 
