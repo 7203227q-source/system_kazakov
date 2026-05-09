@@ -234,6 +234,43 @@
 
                 <!-- Right Col: Feedback & Gamification -->
                 <div class="space-y-6">
+                    <!-- Recent Submissions -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <h3 class="font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-history text-primary mr-2"></i> Последние решения
+                        </h3>
+                        <div class="space-y-3">
+                            {% for sub in recent_submissions %}
+                            <div class="p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition">
+                                <div class="flex justify-between items-center">
+                                    <div class="text-sm font-bold text-gray-800">
+                                        {% if sub.task.task_type %}Тип {{ sub.task.task_type.number }}{% else %}Задача{% endif %} · {{ sub.task.fipi_id|default:sub.task.id }}
+                                    </div>
+                                    <div class="text-xs font-bold {% if sub.is_correct %}text-green-600{% else %}text-red-600{% endif %}">
+                                        {% if sub.is_correct %}Верно{% else %}Ошибка{% endif %}
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between mt-2">
+                                    <span class="text-xs text-gray-500">{{ sub.created_at|date:"d M H:i" }}</span>
+                                    <span class="text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">
+                                        Баллы:
+                                        {% if sub.task.exam_points|default:1 > 1 %}
+                                            {{ sub.primary_score|default:0 }}/{{ sub.task.exam_points|default:0 }}
+                                        {% else %}
+                                            {% if sub.is_correct %}1{% else %}0{% endif %}/{{ sub.task.exam_points|default:1 }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="text-sm text-gray-500">Пока нет решений.</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-4 text-right">
+                            <a href="{% url 'student_history' %}" class="text-xs text-primary font-bold hover:underline">Открыть журнал</a>
+                        </div>
+                    </div>
+
                     <!-- Tutor Link Form -->
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <h3 class="font-bold text-gray-800 mb-4 flex items-center">

@@ -529,7 +529,11 @@ def student_dashboard(request):
             messages.error(request, "Репетитор с таким кодом не найден.")
         return redirect('student_dashboard')
 
-    recent_submissions = Submission.objects.filter(student=request.user).order_by('-created_at')[:5]
+    recent_submissions = (
+        Submission.objects.filter(student=request.user)
+        .select_related('task', 'task__task_type')
+        .order_by('-created_at')[:7]
+    )
     
     # Handle subjects
     profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related('subject')
@@ -677,7 +681,7 @@ def student_assignment_summary(request, assignment_id):
     if not assignment.is_completed:
         return redirect('student_solve_assignment', assignment_id=assignment.id)
         
-    tasks = assignment.tasks.all()
+    tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
     submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
     
     tasks_list = []
@@ -752,7 +756,7 @@ def student_solve_assignment(request, assignment_id):
     if assignment.is_completed:
         return redirect('student_assignment_summary', assignment_id=assignment.id)
 
-    tasks = assignment.tasks.all()
+    tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
     
     if request.method == 'POST':
         action = request.POST.get('action', 'finish')
@@ -1160,7 +1164,7 @@ def tutor_preview_assignment(request, assignment_id):
         return redirect('login')
 
     assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
-    tasks_qs = assignment.tasks.all()
+    tasks_qs = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
     
     # Расчет статистики по ученику
     success_rates = {}

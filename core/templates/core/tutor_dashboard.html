@@ -205,7 +205,17 @@
                             <div class="p-4 border border-red-100 bg-red-50/30 rounded-lg">
                                 <div class="flex justify-between items-center mb-2">
                                     <span class="text-sm font-bold text-gray-800">Задание {{ mistake.task.fipi_id|default:mistake.task.id }}</span>
-                                    <span class="text-xs text-gray-500">{{ mistake.created_at|date:"d M H:i" }}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">
+                                            Баллы:
+                                            {% if mistake.task.exam_points|default:1 > 1 %}
+                                                {{ mistake.primary_score|default:0 }}/{{ mistake.task.exam_points|default:0 }}
+                                            {% else %}
+                                                {% if mistake.is_correct %}1{% else %}0{% endif %}/{{ mistake.task.exam_points|default:1 }}
+                                            {% endif %}
+                                        </span>
+                                        <span class="text-xs text-gray-500">{{ mistake.created_at|date:"d M H:i" }}</span>
+                                    </div>
                                 </div>
                                 <div class="text-xs text-gray-600 mb-2 truncate">{{ mistake.task.content|striptags }}</div>
                                 <div class="flex items-center text-xs">
