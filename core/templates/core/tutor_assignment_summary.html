@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сводка варианта - Система Казакова</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-[100dvh]">
+<div class="min-h-[100dvh] p-4 sm:p-8">
+    <div class="max-w-5xl mx-auto space-y-6">
+        {% if messages %}
+        <div class="space-y-2">
+            {% for message in messages %}
+            <div class="p-4 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <div class="text-xs text-gray-500">Ученик: {{ student.get_full_name|default:student.username }}</div>
+                <h1 class="text-2xl font-bold text-gray-800">{{ assignment.title }}</h1>
+            </div>
+            <a href="{% url 'tutor_dashboard' %}?student_id={{ student.id }}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                <i class="fas fa-arrow-left mr-2"></i> Назад
+            </a>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
+            <div class="flex flex-wrap gap-4 items-center justify-between">
+                <div>
+                    <div class="text-xs text-gray-500 font-bold uppercase">Выполнено</div>
+                    <div class="text-2xl font-black text-gray-800">{{ solved_count }}<span class="text-gray-400 text-lg">/{{ total_tasks }}</span></div>
+                    <div class="text-xs text-gray-500 mt-1">Не выполнено: {{ unsolved_count }}</div>
+                </div>
+                <div>
+                    <div class="text-xs text-indigo-700 font-bold uppercase">Первичный балл</div>
+                    <div class="text-2xl font-black text-primary">{{ total_primary_earned }}<span class="text-indigo-300 text-lg">/{{ max_primary_possible }}</span></div>
+                </div>
+                <div>
+                    <div class="text-xs text-green-700 font-bold uppercase">Вторичный (ЕГЭ)</div>
+                    <div class="text-2xl font-black text-green-600">{{ secondary_score }}<span class="text-green-300 text-lg">/100</span></div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500 font-bold uppercase">Успех</div>
+                    <div class="text-2xl font-black text-gray-800">{{ success_rate }}%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider">Сводка по номерам</h3>
+                <span class="text-xs text-gray-500">Баллы · Статус</span>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for item in tasks_list %}
+                <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 {% if item.solved %}bg-green-50/30{% else %}bg-gray-50/30{% endif %}">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-black text-gray-800">№{{ item.task.task_type.number|default:"—" }}</span>
+                            <span class="text-sm font-bold text-gray-800 truncate">{{ item.task.task_type.name|default:"Без типа" }}</span>
+                            <span class="text-xs text-gray-500">ID: {{ item.task.fipi_id|default:item.task.id }}</span>
+                        </div>
+                        {% if item.submission %}
+                        <div class="text-xs text-gray-500 mt-1 truncate">Ответ: {{ item.submission.user_answer|default:"—" }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <span class="text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">
+                            {{ item.points_earned }}/{{ item.points_max }}
+                        </span>
+                        {% if item.solved %}
+                        <span class="text-xs font-bold {% if item.submission and item.submission.is_correct %}text-green-700{% else %}text-gray-700{% endif %}">
+                            Выполнено
+                        </span>
+                        {% else %}
+                        <span class="text-xs font-bold text-gray-500">Не выполнено</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+

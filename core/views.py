@@ -967,7 +967,8 @@ def tutor_dashboard(request):
     selected_student_id = request.GET.get('student_id')
     selected_student = None
     recent_payment = None
-    recent_mistakes = []
+    active_assignments = []
+    completed_assignments = []
     
     # Calculate idle status for all students
     from django.utils import timezone
@@ -994,8 +995,56 @@ def tutor_dashboard(request):
         
     if selected_student:
         recent_payment = Payment.objects.filter(student=selected_student, tutor=request.user).order_by('-created_at').first()
-        # Вытягиваем последние ошибки ученика для отображения
-        recent_mistakes = Submission.objects.filter(student=selected_student, is_correct=False).select_related('task').order_by('-created_at')[:5]
+
+        scale_2024 = {
+            0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58,
+            13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84,
+            24: 86, 25: 88, 26: 90, 27: 92, 28: 94, 29: 96, 30: 98, 31: 99, 32: 100
+        }
+
+        assignments = (
+            Assignment.objects
+            .filter(tutor=request.user, student=selected_student, is_draft=False)
+            .prefetch_related('tasks', 'tasks__task_type')
+            .order_by('-created_at')
+        )
+
+        for a in assignments:
+            tasks = list(a.tasks.all())
+            max_primary_possible = sum(int(t.exam_points or 0) for t in tasks)
+            subs = Submission.objects.filter(assignment=a, student=selected_student).select_related('task')
+            sub_map = {s.task_id: s for s in subs}
+            solved_count = len(sub_map)
+
+            total_primary_earned = 0
+            for t in tasks:
+                sub = sub_map.get(t.id)
+                if not sub:
+                    continue
+                if int(t.exam_points or 0) <= 1:
+                    total_primary_earned += 1 if sub.is_correct else 0
+                else:
+                    total_primary_earned += int(sub.primary_score or 0)
+
+            if max_primary_possible > 0:
+                if max_primary_possible <= 32:
+                    secondary_score = scale_2024.get(total_primary_earned, int((total_primary_earned / max_primary_possible) * 100))
+                else:
+                    secondary_score = int((total_primary_earned / max_primary_possible) * 100)
+                secondary_score = max(0, min(100, int(secondary_score)))
+            else:
+                secondary_score = 0
+
+            a.total_tasks_count = len(tasks)
+            a.solved_tasks_count = solved_count
+            a.total_primary_earned = total_primary_earned
+            a.max_primary_possible = max_primary_possible
+            a.secondary_score = secondary_score
+
+            if a.is_completed:
+                completed_assignments.append(a)
+            else:
+                active_assignments.append(a)
     
     # Check if there are draft assignments we might want to resume or delete
     drafts = Assignment.objects.filter(tutor=request.user, is_draft=True)
@@ -1004,10 +1053,88 @@ def tutor_dashboard(request):
         'students': students,
         'selected_student': selected_student,
         'recent_payment': recent_payment,
-        'recent_mistakes': recent_mistakes,
+        'active_assignments': active_assignments,
+        'completed_assignments': completed_assignments,
         'drafts': drafts,
     }
     return render(request, 'core/tutor_dashboard.html', context)
+
+
+@login_required
+def tutor_assignment_summary(request, assignment_id):
+    if request.user.role not in ['tutor', 'admin']:
+        return redirect('login')
+
+    qs = Assignment.objects.select_related('student', 'tutor')
+    if request.user.role == 'tutor':
+        assignment = get_object_or_404(qs, id=assignment_id, tutor=request.user, is_draft=False)
+    else:
+        assignment = get_object_or_404(qs, id=assignment_id, is_draft=False)
+
+    student = assignment.student
+    tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+    submissions = {s.task_id: s for s in Submission.objects.filter(assignment=assignment, student=student).select_related('task')}
+
+    scale_2024 = {
+        0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58,
+        13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84,
+        24: 86, 25: 88, 26: 90, 27: 92, 28: 94, 29: 96, 30: 98, 31: 99, 32: 100
+    }
+
+    tasks_list = []
+    solved_count = 0
+    total_primary_earned = 0
+    max_primary_possible = 0
+
+    for t in tasks:
+        max_points = int(t.exam_points or 0)
+        max_primary_possible += max_points
+
+        sub = submissions.get(t.id)
+        points_earned = 0
+        solved = False
+        if sub:
+            solved = True
+            if max_points <= 1:
+                points_earned = 1 if sub.is_correct else 0
+            else:
+                points_earned = int(sub.primary_score or 0)
+        if solved:
+            solved_count += 1
+        total_primary_earned += points_earned
+
+        tasks_list.append({
+            'task': t,
+            'submission': sub,
+            'solved': solved,
+            'points_earned': points_earned,
+            'points_max': max_points,
+        })
+
+    if max_primary_possible > 0:
+        if max_primary_possible <= 32:
+            secondary_score = scale_2024.get(total_primary_earned, int((total_primary_earned / max_primary_possible) * 100))
+        else:
+            secondary_score = int((total_primary_earned / max_primary_possible) * 100)
+        secondary_score = max(0, min(100, int(secondary_score)))
+    else:
+        secondary_score = 0
+
+    success_rate = int((total_primary_earned / max_primary_possible) * 100) if max_primary_possible > 0 else 0
+    total_tasks = tasks.count()
+
+    return render(request, 'core/tutor_assignment_summary.html', {
+        'assignment': assignment,
+        'student': student,
+        'tasks_list': tasks_list,
+        'total_tasks': total_tasks,
+        'solved_count': solved_count,
+        'unsolved_count': max(0, total_tasks - solved_count),
+        'success_rate': success_rate,
+        'total_primary_earned': total_primary_earned,
+        'max_primary_possible': max_primary_possible,
+        'secondary_score': secondary_score,
+    })
 
 @login_required
 def tutor_create_assignment(request):

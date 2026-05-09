@@ -192,44 +192,62 @@
                     {% endif %}
                 </div>
 
-                <!-- Problem Areas (AI Analysis) & Payments Row -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                    <!-- AI Analysis (Takes 2/3 width) -->
                     <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider mb-6 flex items-center">
-                            <i class="fas fa-robot text-primary mr-2"></i> Недавние ошибки ученика (Тренажер)
+                            <i class="fas fa-file-alt text-primary mr-2"></i> Варианты ученика
                         </h3>
-                        
-                        <div class="space-y-4">
-                            {% for mistake in recent_mistakes %}
-                            <div class="p-4 border border-red-100 bg-red-50/30 rounded-lg">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-sm font-bold text-gray-800">Задание {{ mistake.task.fipi_id|default:mistake.task.id }}</span>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">
-                                            Баллы:
-                                            {% if mistake.task.exam_points|default:1 > 1 %}
-                                                {{ mistake.primary_score|default:0 }}/{{ mistake.task.exam_points|default:0 }}
-                                            {% else %}
-                                                {% if mistake.is_correct %}1{% else %}0{% endif %}/{{ mistake.task.exam_points|default:1 }}
-                                            {% endif %}
-                                        </span>
-                                        <span class="text-xs text-gray-500">{{ mistake.created_at|date:"d M H:i" }}</span>
-                                    </div>
+
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Текущие</h4>
+                                    <span class="text-xs text-gray-500">{{ active_assignments|length }} шт.</span>
                                 </div>
-                                <div class="text-xs text-gray-600 mb-2 truncate">{{ mistake.task.content|striptags }}</div>
-                                <div class="flex items-center text-xs">
-                                    <span class="text-red-500 line-through mr-2">{{ mistake.user_answer }}</span>
-                                    <i class="fas fa-arrow-right text-gray-400 mr-2"></i>
-                                    <span class="text-green-600 font-bold">{{ mistake.task.correct_answer }}</span>
+                                <div class="space-y-3">
+                                    {% for a in active_assignments %}
+                                    <a href="{% url 'tutor_assignment_summary' a.id %}" class="block p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="min-w-0">
+                                                <div class="font-bold text-gray-800 truncate">{{ a.title }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">Создан: {{ a.created_at|date:"d M H:i" }} · Задач: {{ a.total_tasks_count }}</div>
+                                            </div>
+                                            <div class="shrink-0 text-right">
+                                                <div class="text-xs font-bold text-gray-700">{{ a.solved_tasks_count }}/{{ a.total_tasks_count }} выполнено</div>
+                                                <div class="text-xs text-gray-500 mt-1">Первичный: {{ a.total_primary_earned }}/{{ a.max_primary_possible }}</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                    {% empty %}
+                                    <div class="text-sm text-gray-500">Нет активных вариантов.</div>
+                                    {% endfor %}
                                 </div>
                             </div>
-                            {% empty %}
-                            <div class="text-center text-gray-500 py-4">
-                                <i class="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
-                                <p class="text-sm">Нет недавних ошибок в тренажере.</p>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Решённые</h4>
+                                    <span class="text-xs text-gray-500">{{ completed_assignments|length }} шт.</span>
+                                </div>
+                                <div class="space-y-3">
+                                    {% for a in completed_assignments %}
+                                    <a href="{% url 'tutor_assignment_summary' a.id %}" class="block p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
+                                        <div class="flex items-start justify-between gap-4">
+                                            <div class="min-w-0">
+                                                <div class="font-bold text-gray-800 truncate">{{ a.title }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">Завершён · {{ a.created_at|date:"d M H:i" }} · Задач: {{ a.total_tasks_count }}</div>
+                                            </div>
+                                            <div class="shrink-0 text-right">
+                                                <div class="text-xs font-bold text-gray-700">Первичный: {{ a.total_primary_earned }}/{{ a.max_primary_possible }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">Вторичный: {{ a.secondary_score }}/100</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                    {% empty %}
+                                    <div class="text-sm text-gray-500">Нет завершённых вариантов.</div>
+                                    {% endfor %}
+                                </div>
                             </div>
-                            {% endfor %}
                         </div>
                     </div>
 

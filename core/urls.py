@@ -28,6 +28,7 @@ urlpatterns = [
     path('tutor/tasks/<int:task_id>/regen/apply/', views.admin_task_regen_apply, name='admin_task_regen_apply'),
     path('tutor/create-assignment/', views.tutor_create_assignment, name='tutor_create_assignment'),
     path('tutor/assignment/<int:assignment_id>/preview/', views.tutor_preview_assignment, name='tutor_preview_assignment'),
+    path('tutor/assignment/<int:assignment_id>/summary/', views.tutor_assignment_summary, name='tutor_assignment_summary'),
     path('tutor/assignment/<int:assignment_id>/publish/', views.tutor_publish_assignment, name='tutor_publish_assignment'),
     path('tutor/assignment/<int:assignment_id>/regenerate/<int:task_id>/', views.tutor_regenerate_task, name='tutor_regenerate_task'),
     path('tutor/tasks/import/', views.import_tasks_view, name='import_tasks'),
