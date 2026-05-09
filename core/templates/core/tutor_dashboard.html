@@ -76,17 +76,15 @@
                 <div class="divide-y divide-gray-100">
                     {% for student in students %}
                      <a href="?student_id={{ student.id }}" class="block p-4 hover:bg-gray-50 cursor-pointer border-l-4 {% if selected_student.id == student.id %}border-primary bg-indigo-50/50{% else %}border-transparent{% endif %} transition">
-                         <div class="flex justify-between items-start mb-2">
-                             <div class="flex items-center">
-                                 <img src="https://ui-avatars.com/api/?name={{ student.get_full_name|urlencode }}&background=E0E7FF&color=4F46E5" class="w-10 h-10 rounded-full mr-3">
-                                 <div class="overflow-hidden">
-                                     <div class="flex items-center">
-                                         <h3 class="font-bold text-gray-800 text-sm truncate">{{ student.get_full_name|default:student.username }}</h3>
+                         <div class="flex justify-between items-center gap-3 mb-2">
+                             <div class="min-w-0">
+                                 <div class="flex items-center min-w-0">
+                                     <h3 class="font-bold text-gray-800 text-sm whitespace-normal break-words leading-snug min-w-0">{{ student.get_full_name|default:student.username }}</h3>
                                          {% if student.is_idle %}
                                          <span title="Нет активных вариантов и заданий для повторения" class="ml-2 w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_0_2px_rgba(239,68,68,0.2)] shrink-0"></span>
                                          {% endif %}
-                                     </div>
-                                    <div class="mt-1 flex flex-wrap gap-1">
+                                 </div>
+                                 <div class="mt-1 flex flex-wrap gap-1">
                                         {% if student.subject_profiles.exists %}
                                             {% for profile in student.subject_profiles.all %}
                                                 <a href="?student_id={{ student.id }}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-2 py-0.5 rounded-full text-[10px] font-bold border transition {% if selected_student.id == student.id and chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200{% endif %}">
@@ -96,10 +94,9 @@
                                         {% else %}
                                             <span class="text-[10px] font-bold text-gray-400">Нет предметов</span>
                                         {% endif %}
-                                    </div>
                                  </div>
                              </div>
-                             <div class="text-right">
+                             <div class="text-right shrink-0">
                                  <span class="text-lg font-bold text-gray-800">{{ student.total_xp|default:0 }} XP</span>
                              </div>
                          </div>
