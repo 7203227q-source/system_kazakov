@@ -66,6 +66,13 @@
                 </select>
                 {% else %}
                 <h1 class="text-2xl font-bold text-gray-800">Нет привязанных учеников</h1>
+                <form method="POST" class="mt-4 flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    {% csrf_token %}
+                    <input type="text" name="student_code" required placeholder="Код ученика" class="flex-1 border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent uppercase font-mono">
+                    <button type="submit" class="bg-primary text-white px-6 py-3 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">
+                        Привязать
+                    </button>
+                </form>
                 {% endif %}
             </div>
 

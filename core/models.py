@@ -24,6 +24,7 @@ class User(AbstractUser):
     
     # Для связи учеников и репетиторов
     invite_code = models.CharField(max_length=10, unique=True, null=True, blank=True, verbose_name="Код-приглашение")
+    parent_invite_code = models.CharField(max_length=10, unique=True, null=True, blank=True, verbose_name="Код для привязки родителя")
     role_assigned_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата назначения роли (для триала)")
 
     # Для учеников

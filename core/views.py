@@ -1002,6 +1002,7 @@ def tutor_dashboard(request):
         selected_student = students.first()
         
     if selected_student:
+        ensure_parent_invite_code(selected_student)
         recent_payment = Payment.objects.filter(student=selected_student, tutor=request.user).order_by('-created_at').first()
 
         scale_2024 = {
@@ -1868,6 +1869,16 @@ def parent_dashboard(request):
     """Дашборд Родителя"""
     if request.user.role != 'parent':
         return redirect('login')
+
+    if request.method == 'POST' and request.POST.get('student_code'):
+        code = (request.POST.get('student_code') or '').strip().upper()
+        try:
+            student = User.objects.get(parent_invite_code=code, role='student')
+            request.user.children.add(student)
+            messages.success(request, f"Ученик привязан: {student.get_full_name() or student.username}")
+        except User.DoesNotExist:
+            messages.error(request, "Ученик с таким кодом не найден.")
+        return redirect('parent_dashboard')
         
     children = request.user.children.all().prefetch_related('subject_profiles', 'subject_profiles__subject')
     
@@ -1993,6 +2004,22 @@ from .models import TutorStudentLink
 
 def generate_invite_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+
+def generate_parent_invite_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=7))
+
+
+def ensure_parent_invite_code(student: User):
+    if student.role != 'student':
+        return
+    if student.parent_invite_code:
+        return
+    code = generate_parent_invite_code()
+    while User.objects.filter(parent_invite_code=code).exists():
+        code = generate_parent_invite_code()
+    student.parent_invite_code = code
+    student.save(update_fields=['parent_invite_code'])
 
 @login_required
 def role_selection_view(request):
