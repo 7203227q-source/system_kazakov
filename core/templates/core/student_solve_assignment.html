@@ -46,13 +46,18 @@
             <div class="space-y-6">
                 {% for task in tasks %}
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden task-card" data-task-id="{{ task.id }}">
-                    <div class="bg-gray-50 px-6 py-3 border-b border-gray-100 flex justify-between items-center">
+                    <div class="bg-gray-50 px-6 py-3 border-b border-gray-100 flex justify-between items-center gap-3">
                         <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Задача №{{ forloop.counter }}</span>
-                        {% if task.task_type %}
-                        <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full">
-                            {{ task.task_type.name }}
-                        </span>
-                        {% endif %}
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openBoard({{ assignment.id }}, {{ task.id }})" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-1 rounded-lg text-xs font-bold transition">
+                                Доска
+                            </button>
+                            {% if task.task_type %}
+                            <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full">
+                                {{ task.task_type.name }}
+                            </span>
+                            {% endif %}
+                        </div>
                     </div>
                     <div class="p-6 prose max-w-none text-gray-800 task-content">
                         {{ task.get_content_for_theme|safe }}
@@ -220,6 +225,31 @@
     function toggleSolution(taskId) {
         const solDiv = document.getElementById(`solution_${taskId}`);
         solDiv.classList.toggle('hidden');
+    }
+
+    async function openBoard(assignmentId, taskId) {
+        try {
+            const listRes = await fetch(`/board/list/?student_id={{ user.id }}&assignment_id=${assignmentId}&task_id=${taskId}`, { credentials: 'same-origin' });
+            if (listRes.ok) {
+                const data = await listRes.json();
+                const sessions = data.sessions || [];
+                if (sessions.length) {
+                    window.location.href = `/board/${sessions[0].id}/`;
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        try {
+            const createRes = await fetch(`/board/${assignmentId}/${taskId}/create/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            });
+            if (!createRes.ok) return;
+            const data = await createRes.json();
+            if (data.session_id) window.location.href = `/board/${data.session_id}/`;
+        } catch (e) {}
     }
 
     async function verifyWithAI(submissionId, taskId) {

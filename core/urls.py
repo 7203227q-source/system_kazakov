@@ -18,6 +18,13 @@ urlpatterns = [
     path('student/assignment/<int:assignment_id>/check/<int:task_id>/', views.student_check_assignment_task, name='student_check_assignment_task'),
     path('student/update-theme/', views.update_theme_view, name='update_theme'),
     path('update-ui-theme/', views.update_ui_theme_view, name='update_ui_theme'),
+
+    path('board/<int:session_id>/', views.whiteboard_page, name='whiteboard_page'),
+    path('board/list/', views.whiteboard_list, name='whiteboard_list'),
+    path('board/<int:assignment_id>/<int:task_id>/create/', views.whiteboard_create, name='whiteboard_create'),
+    path('board/<int:session_id>/events/pull/', views.whiteboard_events_pull, name='whiteboard_events_pull'),
+    path('board/<int:session_id>/events/append/', views.whiteboard_events_append, name='whiteboard_events_append'),
+    path('board/<int:session_id>/save/', views.whiteboard_save, name='whiteboard_save'),
     
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/contacts/', views.tutor_update_student_contacts, name='tutor_update_student_contacts'),

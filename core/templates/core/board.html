@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Доска - Система Казакова</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
+    </script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["$", "$"], ["\\(", "\\)"]],
+                displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+                processEscapes: true,
+                packages: { "[+]": ["ams"] },
+                macros: { frac: ["\\dfrac{#1}{#2}", 2] }
+            },
+            chtml: { scale: 1.32 }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    {% include 'core/includes/_ui_theme_css.html' %}
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 min-h-[100dvh] {% if user.role == 'student' or user.role == 'tutor' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">
+<div class="min-h-[100dvh] flex flex-col">
+    <header class="bg-white border-b border-gray-200 h-16 flex items-center px-4 sm:px-6 gap-3 justify-between">
+        <div class="min-w-0">
+            <div class="text-xs text-gray-500 truncate">{{ session.assignment.title }}</div>
+            <div class="text-sm font-bold text-gray-800 truncate">Доска · {{ session.task.task_type.name|default:"Задача" }}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <select id="board-select" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white max-w-[200px]"></select>
+            <button id="new-board-btn" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-bold transition">
+                Новая доска
+            </button>
+            <button id="save-btn" class="bg-primary text-white hover:bg-indigo-700 px-3 py-2 rounded-lg text-sm font-bold transition">
+                Сохранить
+            </button>
+            {% if user.role == 'tutor' %}
+            <button id="toggle-solution-btn" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-bold transition">
+                Решение
+            </button>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if user.role == 'tutor' %}
+    <div id="solution-panel" class="hidden bg-white border-b border-gray-200 p-4">
+        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Решение</div>
+        <div class="prose max-w-none text-base task-solution">{{ solution_html|safe }}</div>
+    </div>
+    {% endif %}
+
+    <div class="flex-1 flex flex-col">
+        <div class="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-2 mr-2">
+                <button class="tool-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-gray-100 text-gray-700" data-tool="pen">Pen</button>
+                <button class="tool-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-white text-gray-700" data-tool="eraser">Eraser</button>
+                <button class="tool-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-white text-gray-700" data-tool="line">Line</button>
+                <button class="tool-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-white text-gray-700" data-tool="rect">Rect</button>
+                <button class="tool-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-white text-gray-700" data-tool="triangle">Triangle</button>
+                <button class="tool-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-white text-gray-700" data-tool="table">Table</button>
+            </div>
+            <div class="flex items-center gap-2 mr-2">
+                <button class="color-btn w-7 h-7 rounded-full border border-gray-200" style="background:#111827" data-color="#111827"></button>
+                <button class="color-btn w-7 h-7 rounded-full border border-gray-200" style="background:#2563eb" data-color="#2563eb"></button>
+                <button class="color-btn w-7 h-7 rounded-full border border-gray-200" style="background:#16a34a" data-color="#16a34a"></button>
+                <button class="color-btn w-7 h-7 rounded-full border border-gray-200" style="background:#dc2626" data-color="#dc2626"></button>
+                <button class="color-btn w-7 h-7 rounded-full border border-gray-200" style="background:#f59e0b" data-color="#f59e0b"></button>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="width-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-white text-gray-700" data-width="2">2</button>
+                <button class="width-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-gray-100 text-gray-700" data-width="4">4</button>
+                <button class="width-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold bg-white text-gray-700" data-width="8">8</button>
+            </div>
+            <div class="ml-auto text-xs text-gray-500" id="save-state"></div>
+        </div>
+
+        <div class="flex-1 p-3 sm:p-6 bg-gray-50">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <svg id="wb-canvas" viewBox="0 0 1600 900" class="w-full h-[70vh] block bg-white touch-none"></svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    const sessionId = {{ session.id }};
+    const assignmentId = {{ session.assignment_id }};
+    const taskId = {{ session.task_id }};
+    const studentId = {{ session.student_id }};
+    const initialSnapshot = '{{ session.snapshot_json|default:""|escapejs }}';
+    const taskHtml = '{{ task_html|escapejs }}';
+    const csrfToken = getCookie('csrftoken');
+
+    let tool = 'pen';
+    let color = '#111827';
+    let width = 4;
+    let lastEventId = 0;
+    let dirty = false;
+    let pending = [];
+    let state = { version: 1, objects: [] };
+    let drawing = null;
+    let previewId = null;
+
+    function uid(prefix) {
+        return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+    }
+
+    function findObj(id) {
+        return state.objects.find(o => o.id === id);
+    }
+
+    function upsertObj(obj) {
+        const idx = state.objects.findIndex(o => o.id === obj.id);
+        if (idx >= 0) state.objects[idx] = obj;
+        else state.objects.push(obj);
+    }
+
+    function removeObj(id) {
+        state.objects = state.objects.filter(o => o.id !== id);
+    }
+
+    function markDirty() {
+        dirty = true;
+        const el = document.getElementById('save-state');
+        if (el) el.textContent = 'Есть несохранённые изменения';
+    }
+
+    function clearDirty() {
+        dirty = false;
+        const el = document.getElementById('save-state');
+        if (el) el.textContent = 'Сохранено';
+    }
+
+    function toPath(points) {
+        if (!points || points.length < 2) return '';
+        let d = `M ${points[0][0]} ${points[0][1]}`;
+        for (let i = 1; i < points.length; i++) d += ` L ${points[i][0]} ${points[i][1]}`;
+        return d;
+    }
+
+    function svgEl(name, attrs) {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', name);
+        Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, String(v)));
+        return el;
+    }
+
+    function render() {
+        const svg = document.getElementById('wb-canvas');
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+        for (const obj of state.objects) {
+            if (obj.type === 'pen') {
+                const path = svgEl('path', {
+                    d: toPath(obj.points),
+                    fill: 'none',
+                    stroke: obj.color,
+                    'stroke-width': obj.width,
+                    'stroke-linecap': 'round',
+                    'stroke-linejoin': 'round',
+                    'data-obj-id': obj.id
+                });
+                svg.appendChild(path);
+            } else if (obj.type === 'line') {
+                const line = svgEl('line', {
+                    x1: obj.x1, y1: obj.y1, x2: obj.x2, y2: obj.y2,
+                    stroke: obj.stroke, 'stroke-width': obj.width, 'stroke-linecap': 'round',
+                    'data-obj-id': obj.id
+                });
+                svg.appendChild(line);
+            } else if (obj.type === 'rect') {
+                const r = svgEl('rect', {
+                    x: obj.x, y: obj.y, width: obj.w, height: obj.h,
+                    fill: 'none', stroke: obj.stroke, 'stroke-width': obj.width,
+                    'data-obj-id': obj.id
+                });
+                svg.appendChild(r);
+            } else if (obj.type === 'triangle') {
+                const p = svgEl('path', {
+                    d: `M ${obj.a[0]} ${obj.a[1]} L ${obj.b[0]} ${obj.b[1]} L ${obj.c[0]} ${obj.c[1]} Z`,
+                    fill: 'none', stroke: obj.stroke, 'stroke-width': obj.width,
+                    'data-obj-id': obj.id
+                });
+                svg.appendChild(p);
+            } else if (obj.type === 'table') {
+                const g = svgEl('g', { 'data-obj-id': obj.id });
+                const w = obj.cols * obj.cellW;
+                const h = obj.rows * obj.cellH;
+                const border = svgEl('rect', { x: obj.x, y: obj.y, width: w, height: h, fill: 'none', stroke: obj.stroke, 'stroke-width': obj.width });
+                g.appendChild(border);
+                for (let c = 1; c < obj.cols; c++) {
+                    const x = obj.x + c * obj.cellW;
+                    g.appendChild(svgEl('line', { x1: x, y1: obj.y, x2: x, y2: obj.y + h, stroke: obj.stroke, 'stroke-width': obj.width }));
+                }
+                for (let r = 1; r < obj.rows; r++) {
+                    const y = obj.y + r * obj.cellH;
+                    g.appendChild(svgEl('line', { x1: obj.x, y1: y, x2: obj.x + w, y2: y, stroke: obj.stroke, 'stroke-width': obj.width }));
+                }
+                svg.appendChild(g);
+            } else if (obj.type === 'task_card') {
+                const fo = svgEl('foreignObject', { x: obj.x, y: obj.y, width: obj.w, height: obj.h, 'data-obj-id': obj.id });
+                const wrapper = document.createElement('div');
+                wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+                wrapper.className = 'h-full w-full overflow-auto bg-white border border-gray-200 rounded-xl p-3 text-gray-800';
+                wrapper.innerHTML = obj.content_html || '';
+                fo.appendChild(wrapper);
+                svg.appendChild(fo);
+            }
+        }
+
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            window.MathJax.typesetPromise();
+        }
+    }
+
+    function applyEvent(kind, payload) {
+        if (kind === 'set_object') {
+            upsertObj(payload.object);
+        } else if (kind === 'delete_object') {
+            removeObj(payload.id);
+        }
+        render();
+    }
+
+    async function pullLoop() {
+        try {
+            const res = await fetch(`/board/${sessionId}/events/pull/?after=${lastEventId}`, { credentials: 'same-origin' });
+            if (res.ok) {
+                const data = await res.json();
+                for (const e of (data.events || [])) {
+                    lastEventId = Math.max(lastEventId, e.id);
+                    try {
+                        applyEvent(e.kind, JSON.parse(e.payload || '{}'));
+                    } catch (err) {}
+                }
+            }
+        } catch (e) {}
+    }
+
+    async function flushLoop() {
+        if (!pending.length) return;
+        const batch = pending.splice(0, 100);
+        try {
+            await fetch(`/board/${sessionId}/events/append/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ events: batch }),
+            });
+        } catch (e) {
+            pending.unshift(...batch);
+        }
+    }
+
+    function queue(kind, payload) {
+        pending.push({ kind, payload });
+        markDirty();
+    }
+
+    function canvasPoint(evt) {
+        const svg = document.getElementById('wb-canvas');
+        const pt = svg.createSVGPoint();
+        pt.x = evt.clientX;
+        pt.y = evt.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return [0, 0];
+        const r = pt.matrixTransform(ctm.inverse());
+        return [Math.round(r.x), Math.round(r.y)];
+    }
+
+    function startPen(evt) {
+        const [x, y] = canvasPoint(evt);
+        drawing = { id: uid('pen'), type: 'pen', points: [[x, y]], color, width };
+        upsertObj(drawing);
+        queue('set_object', { object: drawing });
+        render();
+    }
+
+    function movePen(evt) {
+        if (!drawing) return;
+        const [x, y] = canvasPoint(evt);
+        drawing.points.push([x, y]);
+        upsertObj(drawing);
+        queue('set_object', { object: drawing });
+        render();
+    }
+
+    function endPen() {
+        drawing = null;
+    }
+
+    function startShape(evt) {
+        const [x, y] = canvasPoint(evt);
+        previewId = uid('shape');
+        if (tool === 'line') {
+            upsertObj({ id: previewId, type: 'line', x1: x, y1: y, x2: x, y2: y, stroke: color, width });
+        } else if (tool === 'rect') {
+            upsertObj({ id: previewId, type: 'rect', x, y, w: 1, h: 1, stroke: color, width });
+        } else if (tool === 'triangle') {
+            upsertObj({ id: previewId, type: 'triangle', a: [x, y], b: [x, y], c: [x, y], stroke: color, width });
+        }
+        render();
+    }
+
+    function moveShape(evt) {
+        if (!previewId) return;
+        const obj = findObj(previewId);
+        if (!obj) return;
+        const [x, y] = canvasPoint(evt);
+        if (obj.type === 'line') {
+            obj.x2 = x; obj.y2 = y;
+        } else if (obj.type === 'rect') {
+            obj.w = Math.max(1, x - obj.x);
+            obj.h = Math.max(1, y - obj.y);
+        } else if (obj.type === 'triangle') {
+            obj.b = [x, obj.a[1]];
+            obj.c = [Math.round((obj.a[0] + x) / 2), y];
+        }
+        upsertObj(obj);
+        render();
+    }
+
+    function endShape() {
+        if (!previewId) return;
+        const obj = findObj(previewId);
+        if (obj) queue('set_object', { object: obj });
+        previewId = null;
+    }
+
+    function eraser(evt) {
+        const t = evt.target;
+        const id = t && t.getAttribute ? t.getAttribute('data-obj-id') : null;
+        if (!id) return;
+        removeObj(id);
+        queue('delete_object', { id });
+        render();
+    }
+
+    function addTable(evt) {
+        const [x, y] = canvasPoint(evt);
+        const obj = { id: uid('table'), type: 'table', x, y, rows: 4, cols: 4, cellW: 80, cellH: 48, stroke: color, width: 2 };
+        upsertObj(obj);
+        queue('set_object', { object: obj });
+        render();
+    }
+
+    function ensureTaskCard() {
+        const exists = state.objects.some(o => o.type === 'task_card');
+        if (exists) return;
+        const obj = { id: 'task_card', type: 'task_card', x: 32, y: 32, w: 620, h: 320, content_html: taskHtml };
+        upsertObj(obj);
+        queue('set_object', { object: obj });
+        render();
+    }
+
+    async function saveSnapshot() {
+        try {
+            const res = await fetch(`/board/${sessionId}/save/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ snapshot_json: JSON.stringify(state) }),
+            });
+            if (res.ok) clearDirty();
+        } catch (e) {}
+    }
+
+    async function loadBoards() {
+        const res = await fetch(`/board/list/?student_id=${studentId}&assignment_id=${assignmentId}&task_id=${taskId}`, { credentials: 'same-origin' });
+        const data = res.ok ? await res.json() : { sessions: [] };
+        const sel = document.getElementById('board-select');
+        sel.innerHTML = '';
+        const sessions = data.sessions || [];
+        sessions.forEach((s) => {
+            const opt = document.createElement('option');
+            opt.value = String(s.id);
+            opt.textContent = s.title;
+            if (Number(s.id) === sessionId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.addEventListener('change', () => {
+            const id = sel.value;
+            if (id) window.location.href = `/board/${id}/`;
+        });
+    }
+
+    async function createBoard() {
+        const res = await fetch(`/board/${assignmentId}/${taskId}/create/`, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken } });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.session_id) window.location.href = `/board/${data.session_id}/`;
+    }
+
+    function setTool(next) {
+        tool = next;
+        document.querySelectorAll('.tool-btn').forEach((b) => {
+            const is = b.getAttribute('data-tool') === tool;
+            b.className = `tool-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold transition ${is ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+        });
+    }
+
+    function setWidth(next) {
+        width = next;
+        document.querySelectorAll('.width-btn').forEach((b) => {
+            const is = Number(b.getAttribute('data-width')) === width;
+            b.className = `width-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold transition ${is ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+        });
+    }
+
+    function initUI() {
+        document.querySelectorAll('.tool-btn').forEach((b) => b.addEventListener('click', () => setTool(b.getAttribute('data-tool'))));
+        document.querySelectorAll('.color-btn').forEach((b) => b.addEventListener('click', () => { color = b.getAttribute('data-color'); }));
+        document.querySelectorAll('.width-btn').forEach((b) => b.addEventListener('click', () => setWidth(Number(b.getAttribute('data-width')))));
+        document.getElementById('save-btn').addEventListener('click', saveSnapshot);
+        document.getElementById('new-board-btn').addEventListener('click', createBoard);
+        const toggle = document.getElementById('toggle-solution-btn');
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                const panel = document.getElementById('solution-panel');
+                if (panel) panel.classList.toggle('hidden');
+                if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+            });
+        }
+    }
+
+    function initCanvas() {
+        const svg = document.getElementById('wb-canvas');
+        svg.addEventListener('pointerdown', (evt) => {
+            svg.setPointerCapture(evt.pointerId);
+            if (tool === 'eraser') return eraser(evt);
+            if (tool === 'table') return addTable(evt);
+            if (tool === 'pen') return startPen(evt);
+            if (tool === 'line' || tool === 'rect' || tool === 'triangle') return startShape(evt);
+        });
+        svg.addEventListener('pointermove', (evt) => {
+            if (tool === 'pen') return movePen(evt);
+            if (tool === 'line' || tool === 'rect' || tool === 'triangle') return moveShape(evt);
+        });
+        svg.addEventListener('pointerup', () => {
+            if (tool === 'pen') return endPen();
+            if (tool === 'line' || tool === 'rect' || tool === 'triangle') return endShape();
+        });
+    }
+
+    function initState() {
+        let hadSnapshot = false;
+        if (initialSnapshot) {
+            try {
+                state = JSON.parse(initialSnapshot);
+                hadSnapshot = true;
+            } catch (e) {}
+        }
+        ensureTaskCard();
+        render();
+        if (hadSnapshot) clearDirty();
+    }
+
+    initUI();
+    initCanvas();
+    initState();
+    loadBoards();
+
+    setTool('pen');
+    setWidth(4);
+
+    setInterval(pullLoop, 500);
+    setInterval(flushLoop, 250);
+    setInterval(() => { if (dirty) saveSnapshot(); }, 60000);
+
+    window.addEventListener('beforeunload', (e) => {
+        if (!dirty) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
+</script>
+</body>
+</html>

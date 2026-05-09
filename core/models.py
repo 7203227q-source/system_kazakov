@@ -350,6 +350,34 @@ class Payment(models.Model):
     def __str__(self):
         return f"Payment {self.amount} by {self.parent.username} for {self.student.username}"
 
+
+class WhiteboardSession(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='whiteboard_sessions_as_student')
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='whiteboard_sessions_as_tutor')
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='whiteboard_sessions')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='whiteboard_sessions')
+    title = models.CharField(max_length=120, blank=True, null=True)
+    snapshot_json = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'assignment', 'task', 'created_at']),
+        ]
+
+
+class WhiteboardEvent(models.Model):
+    session = models.ForeignKey(WhiteboardSession, on_delete=models.CASCADE, related_name='events')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='whiteboard_events')
+    kind = models.CharField(max_length=40)
+    payload_json = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+
+
 class SystemConfig(models.Model):
     """
     Dummy model to provide a link to the System Status page in Django Admin.

@@ -54,6 +54,9 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" class="open-board-btn px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50 transition" data-task-id="{{ task.id }}">
+                            Доска
+                        </button>
                         <button type="button" class="copy-task-btn px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50 transition" data-task-id="{{ task.id }}">
                             <i class="fas fa-copy mr-2"></i> Копировать
                         </button>
@@ -138,6 +141,43 @@
             if (!box) return;
             box.classList.toggle('hidden');
         });
+    });
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    async function openBoard(taskId) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            const listRes = await fetch(`/board/list/?student_id={{ student.id }}&assignment_id={{ assignment.id }}&task_id=${taskId}`, { credentials: 'same-origin' });
+            if (listRes.ok) {
+                const data = await listRes.json();
+                const sessions = data.sessions || [];
+                if (sessions.length) {
+                    window.location.href = `/board/${sessions[0].id}/`;
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        try {
+            const createRes = await fetch(`/board/{{ assignment.id }}/${taskId}/create/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrfToken },
+            });
+            if (!createRes.ok) return;
+            const data = await createRes.json();
+            if (data.session_id) window.location.href = `/board/${data.session_id}/`;
+        } catch (e) {}
+    }
+
+    document.querySelectorAll('.open-board-btn').forEach((btn) => {
+        btn.addEventListener('click', () => openBoard(btn.getAttribute('data-task-id')));
     });
 </script>
 </body>

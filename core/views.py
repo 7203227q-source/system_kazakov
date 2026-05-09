@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.db import models
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
@@ -1257,6 +1257,176 @@ def tutor_assignment_view(request, assignment_id):
         'theme': theme,
         'tasks': tasks,
     })
+
+
+def _can_access_whiteboard_session(user: User, session: WhiteboardSession):
+    if user.role == 'student':
+        return session.student_id == user.id
+    if user.role == 'tutor':
+        return session.tutor_id == user.id
+    if user.role == 'admin':
+        return True
+    return False
+
+
+def _can_access_assignment_task(user: User, assignment: Assignment, task: Task, student: User):
+    if user.role == 'student':
+        return assignment.student_id == user.id and assignment.student_id == student.id
+    if user.role == 'tutor':
+        return assignment.tutor_id == user.id and assignment.student_id == student.id
+    if user.role == 'admin':
+        return True
+    return False
+
+
+@login_required
+def whiteboard_page(request, session_id):
+    session = get_object_or_404(
+        WhiteboardSession.objects.select_related('student', 'tutor', 'assignment', 'task'),
+        id=session_id,
+    )
+    if not _can_access_whiteboard_session(request.user, session):
+        return redirect('login')
+
+    theme = session.student.preferred_theme or 'classic'
+    task_html = session.task.get_content_for_theme(theme)
+    solution_html = session.task.get_solution_for_theme(theme) if request.user.role in ['tutor', 'admin'] else ''
+
+    return render(request, 'core/board.html', {
+        'session': session,
+        'task_html': task_html,
+        'solution_html': solution_html,
+    })
+
+
+@login_required
+def whiteboard_list(request):
+    try:
+        student_id = int(request.GET.get('student_id') or 0)
+        assignment_id = int(request.GET.get('assignment_id') or 0)
+        task_id = int(request.GET.get('task_id') or 0)
+    except ValueError:
+        return JsonResponse({'error': 'bad_request'}, status=400)
+
+    student = get_object_or_404(User, id=student_id, role='student')
+    assignment = get_object_or_404(Assignment, id=assignment_id, is_draft=False)
+    task = get_object_or_404(Task, id=task_id)
+
+    if not _can_access_assignment_task(request.user, assignment, task, student):
+        return JsonResponse({'error': 'forbidden'}, status=403)
+
+    sessions = (
+        WhiteboardSession.objects.filter(student=student, assignment=assignment, task=task)
+        .order_by('-created_at')[:50]
+    )
+    return JsonResponse({
+        'sessions': [
+            {
+                'id': s.id,
+                'title': s.title or f'Доска {s.id}',
+                'created_at': s.created_at.isoformat(),
+            }
+            for s in sessions
+        ]
+    })
+
+
+@login_required
+@require_POST
+def whiteboard_create(request, assignment_id, task_id):
+    assignment = get_object_or_404(Assignment, id=assignment_id, is_draft=False)
+    task = get_object_or_404(Task, id=task_id)
+    student = assignment.student
+
+    if not _can_access_assignment_task(request.user, assignment, task, student):
+        return JsonResponse({'error': 'forbidden'}, status=403)
+
+    session = WhiteboardSession.objects.create(
+        student=student,
+        tutor=assignment.tutor,
+        assignment=assignment,
+        task=task,
+        title=None,
+        snapshot_json=None,
+    )
+    return JsonResponse({'session_id': session.id})
+
+
+@login_required
+def whiteboard_events_pull(request, session_id):
+    session = get_object_or_404(WhiteboardSession, id=session_id)
+    if not _can_access_whiteboard_session(request.user, session):
+        return JsonResponse({'error': 'forbidden'}, status=403)
+
+    try:
+        after = int(request.GET.get('after') or 0)
+    except ValueError:
+        after = 0
+
+    qs = (
+        WhiteboardEvent.objects.filter(session=session, id__gt=after)
+        .order_by('id')[:500]
+    )
+    return JsonResponse({
+        'events': [
+            {
+                'id': e.id,
+                'kind': e.kind,
+                'payload': e.payload_json,
+                'author_id': e.author_id,
+            }
+            for e in qs
+        ]
+    })
+
+
+@login_required
+@require_POST
+def whiteboard_events_append(request, session_id):
+    session = get_object_or_404(WhiteboardSession, id=session_id)
+    if not _can_access_whiteboard_session(request.user, session):
+        return JsonResponse({'error': 'forbidden'}, status=403)
+
+    try:
+        body = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        body = {}
+
+    events = body.get('events') or []
+    created_ids = []
+    for item in events[:200]:
+        kind = (item.get('kind') or '')[:40]
+        payload = json.dumps(item.get('payload') or {}, ensure_ascii=False)
+        created = WhiteboardEvent.objects.create(
+            session=session,
+            author=request.user,
+            kind=kind,
+            payload_json=payload,
+        )
+        created_ids.append(created.id)
+
+    return JsonResponse({'ids': created_ids})
+
+
+@login_required
+@require_POST
+def whiteboard_save(request, session_id):
+    session = get_object_or_404(WhiteboardSession, id=session_id)
+    if not _can_access_whiteboard_session(request.user, session):
+        return JsonResponse({'error': 'forbidden'}, status=403)
+
+    try:
+        body = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        body = {}
+
+    snapshot = body.get('snapshot_json')
+    if not isinstance(snapshot, str):
+        return JsonResponse({'error': 'bad_request'}, status=400)
+
+    session.snapshot_json = snapshot
+    session.save(update_fields=['snapshot_json', 'updated_at'])
+    return JsonResponse({'status': 'ok'})
 
 @login_required
 def tutor_create_assignment(request):
