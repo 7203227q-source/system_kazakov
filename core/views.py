@@ -937,7 +937,10 @@ def tutor_update_student_contacts(request, student_id):
 @login_required
 def tutor_dashboard(request):
     """Дашборд Репетитора"""
-    # Предполагаем, что request.user.role == 'tutor'
+    if request.user.role != 'tutor':
+        if request.user.role == 'unassigned':
+            return redirect('select_role')
+        return redirect('login')
     
     # Self-healing for older tutor accounts without an invite code
     if request.user.role == 'tutor' and not request.user.invite_code:
@@ -1708,6 +1711,14 @@ def admin_dashboard(request):
         )
         
     users = users.order_by('-date_joined')
+
+    base_query = request.GET.copy()
+    base_query.pop('page', None)
+    base_query_prefix = f"&{base_query.urlencode()}" if base_query else ""
+    base_query_items = list(base_query.items())
+
+    paginator = Paginator(users, 25)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
     
     total_count = User.objects.count()
     student_count = User.objects.filter(role='student').count()
@@ -1715,7 +1726,10 @@ def admin_dashboard(request):
     parent_count = User.objects.filter(role='parent').count()
     
     context = {
-        'users': users,
+        'users': list(page_obj.object_list),
+        'page_obj': page_obj,
+        'base_query_prefix': base_query_prefix,
+        'base_query_items': base_query_items,
         'total_count': total_count,
         'student_count': student_count,
         'tutor_count': tutor_count,
@@ -1759,9 +1773,15 @@ def role_selection_view(request):
                     subjects = Subject.objects.all()
                     return render(request, 'core/select_role.html', {'subjects': subjects})
                 request.user.phone = phone
-                # Generate invite code and set trial start
-                request.user.invite_code = generate_invite_code()
+                # Generate unique invite code and set trial start
+                if not request.user.invite_code:
+                    code = generate_invite_code()
+                    while User.objects.filter(invite_code=code).exists():
+                        code = generate_invite_code()
+                    request.user.invite_code = code
                 request.user.role_assigned_at = timezone.now()
+                request.user.role = selected_role
+                request.user.save(update_fields=['role', 'phone', 'invite_code', 'role_assigned_at'])
 
             if selected_role == 'student':
                 subject_id = request.POST.get('subject_id')
@@ -1793,6 +1813,8 @@ def role_selection_view(request):
             elif selected_role == 'tutor':
                 return redirect('tutor_dashboard')
             elif selected_role == 'parent':
+                request.user.role = selected_role
+                request.user.save(update_fields=['role'])
                 return redirect('parent_dashboard')
                 
     subjects = Subject.objects.all()
