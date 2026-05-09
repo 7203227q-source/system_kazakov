@@ -44,7 +44,7 @@
                     <i class="fas fa-fire mr-2"></i> {{ user.current_streak }} дней в ударе
                 </div>
                 <div class="flex items-center bg-yellow-100 px-2 md:px-3 py-1 rounded-full text-yellow-700 font-bold text-xs md:text-sm">
-                    <i class="fas fa-star mr-1"></i> Уровень {{ user.level|default:1 }} ({{ user.xp|default:0 }} XP)
+                    <i class="fas fa-star mr-1"></i> Уровень {{ total_level|default:1 }} ({{ total_xp|default:0 }} XP)
                 </div>
             </div>
         </header>
@@ -64,6 +64,10 @@
             <h1 class="text-3xl font-bold text-gray-800 mb-2">Неправильно</h1>
             <p class="text-gray-500 mb-8">Алгоритм напомнит вам эту задачу позже.</p>
             {% endif %}
+
+            <div class="mb-6 inline-flex items-center bg-white border border-gray-200 rounded-full px-4 py-2 text-sm font-bold text-gray-700 shadow-sm">
+                <i class="fas fa-coins text-yellow-500 mr-2"></i> Баллы: {{ points_earned|default:0 }}/{{ points_max|default:0 }}
+            </div>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8 text-left">
                 <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between">

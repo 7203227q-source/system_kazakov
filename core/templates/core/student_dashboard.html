@@ -37,7 +37,7 @@
                     <i class="fas fa-fire mr-2"></i> {{ user.current_streak }} дней в ударе
                 </div>
                 <div class="flex items-center bg-yellow-100 px-2 md:px-3 py-1 rounded-full text-yellow-700 font-bold text-xs md:text-sm">
-                    <i class="fas fa-star mr-1"></i> Уровень {{ active_profile.level|default:1 }} ({{ active_profile.xp|default:0 }} XP)
+                    <i class="fas fa-star mr-1"></i> Уровень {{ total_level|default:1 }} ({{ total_xp|default:0 }} XP)
                 </div>
                 <button class="text-gray-400 hover:text-gray-600 hidden md:block">
                     <i class="fas fa-bell text-xl"></i>
@@ -280,14 +280,14 @@
                         <i class="fas fa-rocket absolute -right-4 -bottom-4 text-8xl text-white opacity-10"></i>
                         <div class="flex justify-between items-center mb-1">
                             <h3 class="font-bold">До следующего уровня</h3>
-                            <span class="bg-white/20 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Цель: {{ user.target_score|default:80 }} баллов</span>
+                            <span class="bg-white/20 px-2 py-0.5 rounded text-xs font-bold shadow-sm">Цель: {{ active_profile.target_score|default:80 }} баллов</span>
                         </div>
-                        <p class="text-indigo-100 text-sm mb-4">Осталось {{ xp_to_next }} XP до Уровня {{ user.level|add:"1" }}</p>
+                        <p class="text-indigo-100 text-sm mb-4">Осталось {{ xp_to_next }} XP до Уровня {{ total_level|add:"1" }}</p>
 
                         <div class="w-full bg-indigo-900/50 rounded-full h-2.5 mb-2">
                             <div class="bg-white h-2.5 rounded-full transition-all duration-1000" style="width: {{ progress_percent }}%"></div>
                         </div>
-                        <p class="text-xs text-indigo-100 text-right">{{ user.xp }} / {{ next_level_xp }} XP</p>
+                        <p class="text-xs text-indigo-100 text-right">{{ total_xp }} / {{ next_level_xp }} XP</p>
                     </div>
                 </div>
             </div>

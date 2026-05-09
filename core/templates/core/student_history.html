@@ -44,7 +44,7 @@
                     <i class="fas fa-fire mr-2"></i> {{ user.current_streak }} дней в ударе
                 </div>
                 <div class="flex items-center bg-yellow-100 px-2 md:px-3 py-1 rounded-full text-yellow-700 font-bold text-xs md:text-sm">
-                    <i class="fas fa-star mr-1"></i> Уровень {{ user.level|default:1 }} ({{ user.xp|default:0 }} XP)
+                    <i class="fas fa-star mr-1"></i> Уровень {{ total_level|default:1 }} ({{ total_xp|default:0 }} XP)
                 </div>
             </div>
         </header>
@@ -93,6 +93,15 @@
                             <span class="text-gray-500 mr-2">Ваш ответ:</span>
                             <span class="font-mono font-bold {% if sub.is_correct %}text-green-600{% else %}text-red-600 line-through{% endif %} mr-4">
                                 {{ sub.user_answer|default:"(пусто)" }}
+                            </span>
+
+                            <span class="ml-auto text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">
+                                Баллы:
+                                {% if sub.task.exam_points|default:1 > 1 %}
+                                    {{ sub.primary_score|default:0 }}/{{ sub.task.exam_points|default:0 }}
+                                {% else %}
+                                    {% if sub.is_correct %}1{% else %}0{% endif %}/{{ sub.task.exam_points|default:1 }}
+                                {% endif %}
                             </span>
                             
                             {% if not sub.is_correct %}

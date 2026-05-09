@@ -455,6 +455,9 @@ def login_view(request):
 @login_required
 def student_practice(request):
     """Страница тренажера (решение одной задачи)"""
+    total_xp = StudentSubjectProfile.objects.filter(student=request.user).aggregate(total=models.Sum('xp')).get('total') or 0
+    total_level = (int(total_xp) // 100) + 1
+
     if request.method == 'POST':
         task_id = request.POST.get('task_id')
         user_answer = request.POST.get('answer', '').strip()
@@ -491,16 +494,23 @@ def student_practice(request):
             profile.level = (profile.xp // 100) + 1
             profile.save()
 
+        points_max = int(task.exam_points or 0)
+        points_earned = points_max if is_correct else 0
+
         return render(request, 'core/student_practice_result.html', {
             'task': task,
             'user_answer': user_answer,
             'is_correct': is_correct,
-            'xp_gained': xp_gained
+            'xp_gained': xp_gained,
+            'total_xp': total_xp + xp_gained,
+            'total_level': ((int(total_xp + xp_gained) // 100) + 1),
+            'points_earned': points_earned,
+            'points_max': points_max,
         })
     
     # GET запрос: выбираем задачу с помощью алгоритма интервального повторения
     task = get_adaptive_task_for_student(request.user)
-    return render(request, 'core/student_practice.html', {'task': task})
+    return render(request, 'core/student_practice.html', {'task': task, 'total_xp': total_xp, 'total_level': total_level})
 
 @login_required
 def student_dashboard(request):
@@ -523,6 +533,8 @@ def student_dashboard(request):
     
     # Handle subjects
     profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related('subject')
+    total_xp = profiles.aggregate(total=models.Sum('xp')).get('total') or 0
+    total_level = (int(total_xp) // 100) + 1
     active_subject_id = request.GET.get('subject_id')
     
     if not active_subject_id and profiles.exists():
@@ -544,19 +556,14 @@ def student_dashboard(request):
         
     pending_assignments = pending_assignments.order_by('-created_at')
 
-    # Gamification calculations for active profile
+    # Gamification calculations (total across subjects)
     latest_snapshot = None
+    next_level_xp = total_level * 100
+    xp_to_next = next_level_xp - int(total_xp)
+    progress_percent = int((int(total_xp) % 100) / 100 * 100)
+
     if active_profile:
-        current_level = active_profile.level
-        next_level_xp = current_level * 100
-        xp_to_next = next_level_xp - active_profile.xp
-        progress_percent = int((active_profile.xp % 100) / 100 * 100)
         latest_snapshot = DailySnapshot.objects.filter(student=request.user, subject=active_profile.subject).order_by('-date').first()
-    else:
-        current_level = 1
-        next_level_xp = 100
-        xp_to_next = 100
-        progress_percent = 0
 
     # Prepare chart data (last 30 snapshots)
     chart_dates = []
@@ -587,6 +594,8 @@ def student_dashboard(request):
         'xp_to_next': xp_to_next,
         'progress_percent': progress_percent,
         'next_level_xp': next_level_xp,
+        'total_xp': total_xp,
+        'total_level': total_level,
         'chart_data': chart_data
     })
 
@@ -896,7 +905,9 @@ def student_practice_submit(request, task_id):
 def student_history(request):
     """История решений (Журнал) ученика"""
     submissions = Submission.objects.filter(student=request.user).select_related('task').order_by('-created_at')
-    return render(request, 'core/student_history.html', {'submissions': submissions})
+    total_xp = StudentSubjectProfile.objects.filter(student=request.user).aggregate(total=models.Sum('xp')).get('total') or 0
+    total_level = (int(total_xp) // 100) + 1
+    return render(request, 'core/student_history.html', {'submissions': submissions, 'total_xp': total_xp, 'total_level': total_level})
 
 @login_required
 def update_theme_view(request):
@@ -960,6 +971,7 @@ def tutor_dashboard(request):
     today = timezone.now().date()
     
     for s in students:
+        s.total_xp = sum(int(p.xp or 0) for p in s.subject_profiles.all())
         # Fetch latest snapshot for each profile
         for profile in s.subject_profiles.all():
             profile.latest_snapshot = DailySnapshot.objects.filter(student=s, subject=profile.subject).order_by('-date').first()
