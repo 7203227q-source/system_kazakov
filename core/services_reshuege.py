@@ -100,6 +100,44 @@ def base_url_from_any_url(value: str) -> str | None:
     return None
 
 
+def extract_view_many_ids(html: str, *, limit: int | None = 300) -> list[str]:
+    ids: list[str] = []
+
+    strict_pattern = re.compile(
+        r'class\s*=\s*"prob_nums"[^>]*>[^<]*?тип[^<]*?№[^<]*?<a\s+href="(?:https?://[^/]+)?/problem\?id=(\d+)"[^>]*>\s*\1\s*</a>',
+        flags=re.IGNORECASE,
+    )
+    for m in strict_pattern.finditer(html or ""):
+        tid = m.group(1)
+        if tid not in ids:
+            ids.append(tid)
+        if limit is not None and len(ids) >= limit:
+            return ids
+
+    if ids:
+        return ids
+
+    fallback = re.compile(
+        r'<a[^>]+href="(?:https?://[^/]+)?/problem\?id=(\d+)"[^>]*>\s*\1\s*</a>',
+        flags=re.IGNORECASE,
+    )
+    for m in fallback.finditer(html or ""):
+        tid = m.group(1)
+        if tid not in ids:
+            ids.append(tid)
+        if limit is not None and len(ids) >= limit:
+            return ids
+
+    for m in re.finditer(r"(?:problem\?id=)(\d+)", html or ""):
+        tid = m.group(1)
+        if tid not in ids:
+            ids.append(tid)
+        if limit is not None and len(ids) >= limit:
+            break
+
+    return ids
+
+
 def fetch_view_many_ids(list_url: str, limit: int | None = 300) -> list[str]:
     headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "ru,en;q=0.8"}
     res = requests.get(list_url, headers=headers, timeout=30)
@@ -108,32 +146,7 @@ def fetch_view_many_ids(list_url: str, limit: int | None = 300) -> list[str]:
     except Exception:
         pass
     res.raise_for_status()
-    html = res.text
-
-    ids: list[str] = []
-    for m in re.finditer(r"(?:problem\?id=)(\d+)", html):
-        tid = m.group(1)
-        if tid not in ids:
-            ids.append(tid)
-        if limit is not None and len(ids) >= limit:
-            break
-
-    if ids:
-        return ids
-
-    soup = BeautifulSoup(html, "html.parser")
-    for a in soup.find_all("a"):
-        href = a.get("href") or ""
-        m = re.search(r"[?&]id=(\d+)", href)
-        if not m:
-            continue
-        tid = m.group(1)
-        if tid not in ids:
-            ids.append(tid)
-        if limit is not None and len(ids) >= limit:
-            break
-
-    return ids
+    return extract_view_many_ids(res.text or "", limit=limit)
 
 
 def parse_task_page(html: str) -> tuple[str, str, str]:
