@@ -28,9 +28,14 @@
                 <div class="text-xs text-gray-500">Ученик: {{ student.get_full_name|default:student.username }}</div>
                 <h1 class="text-2xl font-bold text-gray-800">{{ assignment.title }}</h1>
             </div>
-            <a href="{% url 'tutor_dashboard' %}?student_id={{ student.id }}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
-                <i class="fas fa-arrow-left mr-2"></i> Назад
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{% url 'tutor_assignment_view' assignment.id %}" class="inline-flex items-center justify-center bg-primary text-white hover:bg-indigo-700 px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                    <i class="fas fa-eye mr-2"></i> Просмотр
+                </a>
+                <a href="{% url 'tutor_dashboard' %}?student_id={{ student.id }}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                    <i class="fas fa-arrow-left mr-2"></i> Назад
+                </a>
+            </div>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
@@ -93,4 +98,3 @@
 </div>
 </body>
 </html>
-

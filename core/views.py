@@ -1224,6 +1224,27 @@ def tutor_assignment_summary(request, assignment_id):
         'secondary_score': secondary_score,
     })
 
+
+@login_required
+def tutor_assignment_view(request, assignment_id):
+    if request.user.role not in ['tutor', 'admin']:
+        return redirect('login')
+
+    qs = Assignment.objects.select_related('student', 'tutor')
+    if request.user.role == 'tutor':
+        assignment = get_object_or_404(qs, id=assignment_id, tutor=request.user, is_draft=False)
+    else:
+        assignment = get_object_or_404(qs, id=assignment_id, is_draft=False)
+
+    theme = getattr(request.user, 'preferred_theme', None) or 'classic'
+    tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+    return render(request, 'core/tutor_assignment_view.html', {
+        'assignment': assignment,
+        'student': assignment.student,
+        'theme': theme,
+        'tasks': tasks,
+    })
+
 @login_required
 def tutor_create_assignment(request):
     """Страница создания варианта репетитором"""

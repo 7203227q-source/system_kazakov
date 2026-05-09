@@ -270,10 +270,13 @@
                                 </div>
                                 <div class="space-y-3">
                                     {% for a in active_assignments %}
-                                    <a href="{% url 'tutor_assignment_summary' a.id %}" class="block p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
+                                    <div class="block p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
                                         <div class="flex items-start justify-between gap-4">
                                             <div class="min-w-0">
-                                                <div class="font-bold text-gray-800 truncate">{{ a.title }}</div>
+                                                <div class="flex items-center gap-3 min-w-0">
+                                                    <a href="{% url 'tutor_assignment_summary' a.id %}" class="font-bold text-gray-800 truncate hover:underline">{{ a.title }}</a>
+                                                    <a href="{% url 'tutor_assignment_view' a.id %}" class="text-xs font-bold text-primary hover:underline shrink-0">Просмотр</a>
+                                                </div>
                                                 <div class="text-xs text-gray-500 mt-1">Создан: {{ a.created_at|date:"d M H:i" }} · Задач: {{ a.total_tasks_count }}</div>
                                             </div>
                                             <div class="shrink-0 text-right">
@@ -281,7 +284,7 @@
                                                 <div class="text-xs text-gray-500 mt-1">Первичный: {{ a.total_primary_earned }}/{{ a.max_primary_possible }}</div>
                                             </div>
                                         </div>
-                                    </a>
+                                    </div>
                                     {% empty %}
                                     <div class="text-sm text-gray-500">Нет активных вариантов.</div>
                                     {% endfor %}
@@ -295,10 +298,13 @@
                                 </div>
                                 <div class="space-y-3">
                                     {% for a in completed_assignments %}
-                                    <a href="{% url 'tutor_assignment_summary' a.id %}" class="block p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
+                                    <div class="block p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
                                         <div class="flex items-start justify-between gap-4">
                                             <div class="min-w-0">
-                                                <div class="font-bold text-gray-800 truncate">{{ a.title }}</div>
+                                                <div class="flex items-center gap-3 min-w-0">
+                                                    <a href="{% url 'tutor_assignment_summary' a.id %}" class="font-bold text-gray-800 truncate hover:underline">{{ a.title }}</a>
+                                                    <a href="{% url 'tutor_assignment_view' a.id %}" class="text-xs font-bold text-primary hover:underline shrink-0">Просмотр</a>
+                                                </div>
                                                 <div class="text-xs text-gray-500 mt-1">Завершён · {{ a.created_at|date:"d M H:i" }} · Задач: {{ a.total_tasks_count }}</div>
                                             </div>
                                             <div class="shrink-0 text-right">
@@ -306,7 +312,7 @@
                                                 <div class="text-xs text-gray-500 mt-1">Вторичный: {{ a.secondary_score }}/100</div>
                                             </div>
                                         </div>
-                                    </a>
+                                    </div>
                                     {% empty %}
                                     <div class="text-sm text-gray-500">Нет завершённых вариантов.</div>
                                     {% endfor %}
