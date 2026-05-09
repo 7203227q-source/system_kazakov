@@ -1756,6 +1756,22 @@ def admin_dashboard(request):
     
     return render(request, 'core/admin_dashboard.html', context)
 
+
+@login_required
+@require_POST
+def admin_delete_user(request, user_id):
+    if request.user.role != 'admin':
+        return HttpResponseForbidden()
+
+    user = get_object_or_404(User, id=user_id)
+    if user.role == 'admin':
+        messages.error(request, "Нельзя удалить администратора.")
+        return redirect(request.META.get('HTTP_REFERER', 'admin_dashboard'))
+
+    user.delete()
+    messages.success(request, "Пользователь удалён.")
+    return redirect(request.META.get('HTTP_REFERER', 'admin_dashboard'))
+
 import random
 import string
 from django.utils import timezone

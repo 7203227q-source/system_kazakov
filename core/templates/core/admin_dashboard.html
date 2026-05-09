@@ -238,6 +238,12 @@
                                     <td class="px-6 py-4 text-gray-500">{{ u.last_login|date:"d M Y, H:i"|default:"Никогда" }}</td>
                                     <td class="px-6 py-4 text-right space-x-2">
                                         <a href="{% url 'admin:core_user_change' u.id %}" target="_blank" class="text-gray-400 hover:text-primary transition inline-block" title="Редактировать в админке"><i class="fas fa-edit"></i></a>
+                                        <form method="POST" action="{% url 'admin_delete_user' u.id %}" class="inline" onsubmit="return confirm('Удалить пользователя? Это необратимо.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="text-gray-400 hover:text-red-500 transition" title="Удалить">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
                                         <button class="text-gray-400 hover:text-red-500 transition" title="Заблокировать"><i class="fas fa-ban"></i></button>
                                     </td>
                                 </tr>
