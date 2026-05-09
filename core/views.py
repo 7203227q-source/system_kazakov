@@ -1291,11 +1291,19 @@ def whiteboard_page(request, session_id):
     theme = session.student.preferred_theme or 'classic'
     task_html = session.task.get_content_for_theme(theme)
     solution_html = session.task.get_solution_for_theme(theme) if request.user.role in ['tutor', 'admin'] else ''
+    back_url = ''
+    if request.user.role == 'student':
+        back_url = reverse('student_solve_assignment', args=[session.assignment_id])
+    elif request.user.role == 'tutor':
+        back_url = reverse('tutor_assignment_view', args=[session.assignment_id])
+    elif request.user.role == 'admin':
+        back_url = reverse('tutor_assignment_view', args=[session.assignment_id])
 
     return render(request, 'core/board.html', {
         'session': session,
         'task_html': task_html,
         'solution_html': solution_html,
+        'back_url': back_url,
     })
 
 
