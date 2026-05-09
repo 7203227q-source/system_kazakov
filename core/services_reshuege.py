@@ -1,9 +1,6 @@
 import re
 from urllib.parse import urlparse
 
-import requests
-from bs4 import BeautifulSoup
-
 from .models import ExamFormat, Task, TaskType, TaskVariant, Topic
 from .task_html import normalize_task_html
 from .utils import download_and_replace_images
@@ -23,6 +20,14 @@ def normalize_sdamgia_text(value: str) -> str:
         .replace("\ufeff", "")
         .replace("\xa0", " ")
     )
+
+
+def html_to_text(html: str) -> str:
+    try:
+        from bs4 import BeautifulSoup
+    except Exception:
+        return normalize_sdamgia_text(re.sub(r"<[^>]+>", " ", html or "")).strip()
+    return normalize_sdamgia_text(BeautifulSoup(html or "", "html.parser").get_text(" ", strip=True))
 
 
 def resolve_sdamgia_base_url(exam_format: ExamFormat) -> str:
@@ -69,6 +74,8 @@ def extract_task_id(value: str) -> str | None:
 
 
 def fetch_task_page_html(base_url: str, task_id: str) -> str:
+    import requests
+
     url = f"{base_url.rstrip('/')}/problem?id={task_id}"
     headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "ru,en;q=0.8"}
     res = requests.get(url, headers=headers, timeout=20)
@@ -139,6 +146,8 @@ def extract_view_many_ids(html: str, *, limit: int | None = 300) -> list[str]:
 
 
 def fetch_view_many_ids(list_url: str, limit: int | None = 300) -> list[str]:
+    import requests
+
     headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "ru,en;q=0.8"}
     res = requests.get(list_url, headers=headers, timeout=30)
     try:
@@ -150,6 +159,8 @@ def fetch_view_many_ids(list_url: str, limit: int | None = 300) -> list[str]:
 
 
 def parse_task_page(html: str) -> tuple[str, str, str]:
+    from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(html or "", "html.parser")
 
     statement_node = soup.find("div", id=re.compile(r"^body\d+$"))
@@ -222,7 +233,7 @@ def parse_task_page(html: str) -> tuple[str, str, str]:
 
 
 def has_prototype_marker(html: str) -> bool:
-    page_text = normalize_sdamgia_text(BeautifulSoup(html or "", "html.parser").get_text(" ", strip=True)).lower()
+    page_text = html_to_text(html).lower()
     if "решение прототип" in page_text:
         return True
     if "приводим решение прототип" in page_text:
@@ -230,6 +241,15 @@ def has_prototype_marker(html: str) -> bool:
     if "это задание еще не решено" in page_text or "это задание ещё не решено" in page_text:
         return True
     return False
+
+
+def has_larin_source(html: str) -> bool:
+    page_text = normalize_sdamgia_text(re.sub(r"<[^>]+>", " ", html or "")).lower()
+    idx = page_text.find("источник")
+    if idx < 0:
+        return False
+    window = page_text[idx : idx + 250]
+    return "ларин" in window
 
 
 def prepare_candidate_ids(
@@ -309,6 +329,7 @@ def import_one_task_from_sdamgia(
     skip_prototype: bool,
     skip_no_solution: bool,
     skip_existing: bool,
+    exclude_larin: bool,
     theme: str = "classic",
 ) -> dict:
     exam_format = ExamFormat.objects.select_related("subject").get(id=exam_format_id)
@@ -324,6 +345,9 @@ def import_one_task_from_sdamgia(
 
     html = fetch_task_page_html(base_url, task_id)
 
+    if exclude_larin and has_larin_source(html):
+        return {"task_id": task_id, "status": "skipped", "detail": "larin_source"}
+
     if skip_prototype and has_prototype_marker(html):
         return {"task_id": task_id, "status": "skipped", "detail": "prototype solution"}
 
@@ -333,7 +357,7 @@ def import_one_task_from_sdamgia(
         return {"task_id": task_id, "status": "skipped", "detail": "no answer"}
 
     if skip_no_solution:
-        sol_text = normalize_sdamgia_text(BeautifulSoup(solution_html or "", "html.parser").get_text(" ", strip=True))
+        sol_text = html_to_text(solution_html or "")
         if not sol_text:
             return {"task_id": task_id, "status": "skipped", "detail": "no solution"}
 
@@ -371,6 +395,7 @@ def import_tasks_from_sdamgia_ids(
     skip_prototype: bool = True,
     skip_no_solution: bool = True,
     skip_existing: bool = True,
+    exclude_larin: bool = True,
     theme: str = "classic",
 ) -> dict:
     exam_format = ExamFormat.objects.select_related("subject").get(id=exam_format_id)
@@ -398,6 +423,7 @@ def import_tasks_from_sdamgia_ids(
         "skipped_no_answer": 0,
         "skipped_prototype": 0,
         "skipped_no_solution": 0,
+        "skipped_larin": 0,
         "skipped_invalid": prep["stats"]["skipped_invalid"],
         "errors": 0,
         "base_url": base_url,
@@ -418,6 +444,7 @@ def import_tasks_from_sdamgia_ids(
                 skip_prototype=skip_prototype,
                 skip_no_solution=skip_no_solution,
                 skip_existing=skip_existing,
+                exclude_larin=exclude_larin,
                 theme=theme,
             )
 
@@ -435,6 +462,8 @@ def import_tasks_from_sdamgia_ids(
                     stats["skipped_prototype"] += 1
                 elif item["detail"] == "no solution":
                     stats["skipped_no_solution"] += 1
+                elif item["detail"] == "larin_source":
+                    stats["skipped_larin"] += 1
 
             report_items.append(item)
         except Exception as e:

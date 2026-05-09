@@ -59,7 +59,7 @@
                 <button class="md:hidden text-gray-500 hover:text-gray-700 mr-4" onclick="toggleSidebar()">
                     <i class="fas fa-bars text-xl"></i>
                 </button>
-                <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">Импорт с РешуЕГЭ (до 25 задач)</h1>
+                <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">Импорт с РешуЕГЭ (до 10 000 задач)</h1>
             </div>
             <div class="flex items-center space-x-4">
                 <a href="{% url 'logout' %}" class="text-red-500 hover:text-red-700 flex items-center font-medium transition" title="Выйти">
@@ -83,7 +83,7 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <div class="font-bold text-gray-800">Параметры импорта</div>
-                        <div class="text-sm text-gray-500 mt-1">Можно вставить ID/ссылки на задачи или ссылку на список (/test?a=view_many...). Максимум 25 задач за запуск.</div>
+                        <div class="text-sm text-gray-500 mt-1">Можно вставить ID/ссылки на задачи или ссылку на список (/test?a=view_many...). Максимум 10 000 задач за запуск.</div>
                     </div>
                     <form method="POST" id="reshuege-import-form" class="p-6 space-y-5">
                         {% csrf_token %}
@@ -116,6 +116,10 @@
                             <label class="flex items-center gap-2 text-sm text-gray-700">
                                 <input type="checkbox" name="skip_existing" {% if form.skip_existing %}checked{% endif %} class="rounded border-gray-300 text-primary focus:ring-primary">
                                 Пропускать уже загруженные
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="exclude_larin" {% if form.exclude_larin %}checked{% endif %} class="rounded border-gray-300 text-primary focus:ring-primary">
+                                Исключать Ларина (по источнику)
                             </label>
                             <div class="md:col-span-4 text-xs text-gray-500">
                                 Чтобы переимпортировать и перезаписать уже загруженные задачи (починить картинки/HTML), снимите галочку «Пропускать уже загруженные».
@@ -449,6 +453,7 @@
                         if (formData.get('skip_no_answer')) stepData.set('skip_no_answer', 'on');
                         if (formData.get('skip_prototype')) stepData.set('skip_prototype', 'on');
                         if (formData.get('skip_no_solution')) stepData.set('skip_no_solution', 'on');
+                        if (formData.get('exclude_larin')) stepData.set('exclude_larin', 'on');
 
                         const stepRes = await fetch("{% url 'admin_reshuege_import_step' %}", {
                             method: 'POST',

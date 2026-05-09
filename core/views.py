@@ -119,6 +119,7 @@ def admin_reshuege_import(request):
         "skip_no_answer": True,
         "skip_prototype": True,
         "skip_no_solution": True,
+        "exclude_larin": True,
     }
 
     if request.method == 'POST':
@@ -131,6 +132,7 @@ def admin_reshuege_import(request):
         skip_prototype = request.POST.get('skip_prototype') == 'on'
         skip_no_solution = request.POST.get('skip_no_solution') == 'on'
         skip_existing = request.POST.get('skip_existing') == 'on'
+        exclude_larin = request.POST.get('exclude_larin') == 'on'
 
         form = {
             "exam_format": exam_format_id_raw,
@@ -141,6 +143,7 @@ def admin_reshuege_import(request):
             "skip_no_answer": skip_no_answer,
             "skip_prototype": skip_prototype,
             "skip_no_solution": skip_no_solution,
+            "exclude_larin": exclude_larin,
         }
 
         if not exam_format_id_raw:
@@ -169,6 +172,7 @@ def admin_reshuege_import(request):
                     skip_prototype=skip_prototype,
                     skip_no_solution=skip_no_solution,
                     skip_existing=skip_existing,
+                    exclude_larin=exclude_larin,
                     theme="classic",
                 )
 
@@ -178,7 +182,7 @@ def admin_reshuege_import(request):
                 messages.success(
                     request,
                     f"Импорт завершён. Новых: {stats.get('imported', 0)}, обновлено: {stats.get('updated', 0)}, "
-                    f"пропущено: {stats.get('skipped_existing', 0) + stats.get('skipped_no_answer', 0) + stats.get('skipped_prototype', 0) + stats.get('skipped_no_solution', 0) + stats.get('skipped_invalid', 0)}, "
+                    f"пропущено: {stats.get('skipped_existing', 0) + stats.get('skipped_no_answer', 0) + stats.get('skipped_prototype', 0) + stats.get('skipped_no_solution', 0) + stats.get('skipped_larin', 0) + stats.get('skipped_invalid', 0)}, "
                     f"ошибок: {stats.get('errors', 0)}.",
                 )
             except Exception as e:
@@ -253,6 +257,7 @@ def admin_reshuege_import_step(request):
     skip_prototype = request.POST.get('skip_prototype') == 'on'
     skip_no_solution = request.POST.get('skip_no_solution') == 'on'
     skip_existing = request.POST.get('skip_existing') == 'on'
+    exclude_larin = request.POST.get('exclude_larin') == 'on'
 
     if not exam_format_id_raw or not type_number_raw or not task_id_raw:
         return JsonResponse({'error': 'Missing required fields'}, status=400)
@@ -276,6 +281,7 @@ def admin_reshuege_import_step(request):
             skip_prototype=skip_prototype,
             skip_no_solution=skip_no_solution,
             skip_existing=skip_existing,
+            exclude_larin=exclude_larin,
             theme="classic",
         )
 
