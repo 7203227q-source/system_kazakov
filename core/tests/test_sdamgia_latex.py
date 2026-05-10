@@ -17,3 +17,13 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "целаячасть : 6, дробнаячасть : числитель : 1, знаменатель : 2"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex, r"\frac{13}{2}")
+
+    def test_decimal_fraction_tokens(self):
+        alt = "дробь : числитель : 4, 8 · 0, 4, знаменатель : 0, 6конецдроби"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"\frac{4,8\cdot0,4}{0,6}".replace(" ", ""))
+
+    def test_join_digits_in_denominator(self):
+        alt = "дробь: числитель: 1, знаменатель: 3 0 конец дроби"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex, r"\frac{1}{30}")

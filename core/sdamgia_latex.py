@@ -4,30 +4,36 @@ import re
 def normalize_sdamgia_alt(value: str) -> str:
     if value is None:
         return ""
-    return (
+    s = (
         str(value)
         .replace("\u00ad", "")
         .replace("\u200b", "")
         .replace("\ufeff", "")
         .replace("\xa0", " ")
-        .strip()
     )
+    s = re.sub(r"(?<=\d),\s+(?=\d)", ",", s)
+    s = re.sub(r"конец\s*дроби", "конец дроби", s, flags=re.IGNORECASE)
+    s = re.sub(r"конецдроби", "конец дроби", s, flags=re.IGNORECASE)
+    s = re.sub(r"(?<=\d)\s*(конец\s+дроби)", r" \1", s, flags=re.IGNORECASE)
+    return s.strip()
 
 
 _FRACTION_RE = re.compile(
-    r"дробь:\s*числитель:\s*(?P<num>[^,]+?),\s*знаменатель:\s*(?P<den>[^,]+?)\s*конец\s*дроби",
-    flags=re.IGNORECASE,
+    r"дробь\s*:\s*числитель\s*:\s*(?P<num>.*?)\s*,\s*знаменатель\s*:\s*(?P<den>.*?)\s*конец\s*дроби",
+    flags=re.IGNORECASE | re.DOTALL,
 )
 
 _MIXED_RE = re.compile(
-    r"(?:целая\s*часть|целаячасть)\s*[: ]\s*(?P<whole>[^,]+?)\s*,\s*(?:дробная\s*часть|дробнаячасть)\s*[: ]\s*(?:дробь\s*:?\s*)?числитель\s*[: ]\s*(?P<num>[^,]+?)\s*,\s*знаменатель\s*[: ]\s*(?P<den>[^,]+?)(?:\s*конец\s*дроби)?",
-    flags=re.IGNORECASE,
+    r"(?:целая\s*часть|целаячасть)\s*[: ]\s*(?P<whole>-?\d+(?:\s+\d+)*)\s*,\s*(?:дробная\s*часть|дробнаячасть)\s*[: ]\s*(?:дробь\s*:?\s*)?числитель\s*[: ]\s*(?P<num>-?\d+(?:\s+\d+)*)\s*,\s*знаменатель\s*[: ]\s*(?P<den>\d+(?:\s+\d+)*)(?=(?:\s*конец\s*дроби|\s*$|\s*[+\-*/=]))",
+    flags=re.IGNORECASE | re.DOTALL,
 )
 
 
 def _convert_plain_text(value: str) -> str:
     s = normalize_sdamgia_alt(value)
     s = s.replace("−", "-")
+    s = s.replace("·", r"\cdot ")
+    s = s.replace("⋅", r"\cdot ")
 
     replacements = [
         ("левая круглая скобка", r"\left("),
@@ -50,6 +56,7 @@ def _convert_plain_text(value: str) -> str:
 
     s = re.sub(r"\s+", " ", s).strip()
     s = s.strip(" .")
+    s = re.sub(r"(?<=\d)\s+(?=\d)", "", s)
     return s
 
 
