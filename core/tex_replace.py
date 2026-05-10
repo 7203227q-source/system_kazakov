@@ -1,3 +1,5 @@
+import re
+
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
 
@@ -32,15 +34,72 @@ def fix_latex_tokens_in_html(html: str) -> tuple[str, int]:
     soup = BeautifulSoup(html, "html.parser")
     fixed = 0
 
+    def convert_or_sanitize_math(expr: str) -> str:
+        lowered = expr.lower()
+        if any(
+            k in lowered
+            for k in [
+                "целаячасть",
+                "целая часть",
+                "дробнаячасть",
+                "дробная часть",
+                "числитель",
+                "знаменатель",
+                "больше",
+                "меньше",
+                "степени",
+                "в степени",
+                "встепени",
+                "кореньиз",
+                "корень из",
+                "началоаргумента",
+                "начало аргумента",
+                "конецаргумента",
+                "конец аргумента",
+            ]
+        ):
+            converted = latex_from_sdamgia_alt(expr)
+            if converted:
+                return converted
+        return sanitize_math_latex(expr)
+
+    def fix_delimited(text: str) -> tuple[str, int]:
+        local_fixed = 0
+
+        def repl_paren(m):
+            nonlocal local_fixed
+            inner = m.group(1)
+            out = convert_or_sanitize_math(inner)
+            if out != inner:
+                local_fixed += 1
+            return rf"\({out}\)"
+
+        def repl_brack(m):
+            nonlocal local_fixed
+            inner = m.group(1)
+            out = convert_or_sanitize_math(inner)
+            if out != inner:
+                local_fixed += 1
+            return rf"\[{out}\]"
+
+        text2 = re.sub(r"\\\((.*?)\\\)", repl_paren, text, flags=re.DOTALL)
+        text3 = re.sub(r"\\\[(.*?)\\\]", repl_brack, text2, flags=re.DOTALL)
+        return text3, local_fixed
+
     for node in list(soup.descendants):
         if not isinstance(node, NavigableString):
             continue
         text = str(node)
-        if "$" not in text:
+        if "$" not in text and "\\(" not in text and "\\[" not in text:
             continue
 
         out = []
         changed = False
+
+        text, fixed_here = fix_delimited(text)
+        if fixed_here:
+            fixed += fixed_here
+            changed = True
         parts = text.split("$")
         for i, part in enumerate(parts):
             if i % 2 == 1:
@@ -90,4 +149,5 @@ def fix_latex_tokens_in_html(html: str) -> tuple[str, int]:
         if changed:
             node.replace_with(NavigableString("$".join(out)))
 
+    return str(soup), fixed
     return str(soup), fixed

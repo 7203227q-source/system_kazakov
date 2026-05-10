@@ -21,3 +21,9 @@ class TexReplaceFixupTests(SimpleTestCase):
         out, fixed = fix_latex_tokens_in_html(html)
         self.assertEqual(fixed, 1)
         self.assertIn(r"$(3\cdot10)^{8}$", out.replace(" ", ""))
+
+    def test_fixes_inside_paren_delimiters(self):
+        html = "<p>\\\\(\\\\sqrt{\\\\frac{36a^{21}}}{a^{15}}}\\\\)</p>"
+        out, fixed = fix_latex_tokens_in_html(html)
+        self.assertGreaterEqual(fixed, 1)
+        self.assertIn(r"\\(\\sqrt{\\frac{36a^{21}}{a^{15}}}\\)", out.replace(" ", ""))
