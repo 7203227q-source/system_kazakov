@@ -52,7 +52,9 @@ def get_user_dialogs(user):
             'user': other_user,
             'last_message': last_msg,
             'unread_count': unread_count,
-            'sort_date': last_msg.created_at if last_msg else timezone.datetime.min.replace(tzinfo=timezone.utc)
+            # django.utils.timezone не содержит `utc` в Django 6+, поэтому используем безопасный "минимум"
+            # (важно, чтобы tz-aware, иначе сравнение дат в сортировке может падать).
+            'sort_date': last_msg.created_at if last_msg else timezone.datetime(1970, 1, 1, tzinfo=timezone.get_current_timezone())
         })
         
     # Сортируем по дате последнего сообщения (сначала новые)
