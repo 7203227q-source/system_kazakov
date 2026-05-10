@@ -73,6 +73,32 @@ def sanitize_math_latex(value: str) -> str:
     s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])\s*в\s*(?=\^)", "", s, flags=re.IGNORECASE)
     s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])в(?=\^)", "", s, flags=re.IGNORECASE)
 
+    def fix_broken_frac_extra_brace(text: str) -> str:
+        out = []
+        i = 0
+        n = len(text)
+        while i < n:
+            j = text.find(r"\frac{", i)
+            if j == -1:
+                out.append(text[i:])
+                break
+            out.append(text[i:j])
+            out.append(r"\frac{")
+            k = j + len(r"\frac{")
+            depth = 1
+            while k < n and depth > 0:
+                ch = text[k]
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                out.append(ch)
+                k += 1
+            if k + 1 < n and text[k] == "}" and text[k + 1] == "{":
+                k += 1
+            i = k
+        return "".join(out)
+
     def fix_tfrac(match: re.Match) -> str:
         digits = match.group(1)
         num = digits[:1]
@@ -81,6 +107,7 @@ def sanitize_math_latex(value: str) -> str:
             return match.group(0)
         return rf"\frac{{{num}}}{{{den}}}"
 
+    s = fix_broken_frac_extra_brace(s)
     s = _SPACED_TFRAC_RE.sub(lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}", s)
     s = _COMPACT_TFRAC_RE.sub(fix_tfrac, s)
 
@@ -92,6 +119,14 @@ def sanitize_math_latex(value: str) -> str:
     s = s.replace(r"\left\{", r"\{").replace(r"\right\}", r"\}")
     s = s.replace(r"\left.", "").replace(r"\right.", "")
     s = s.replace(r"\left", "").replace(r"\right", "")
+
+    if s.endswith(")") and "(" not in s:
+        s = s[:-1].rstrip()
+
+    open_braces = s.count("{")
+    close_braces = s.count("}")
+    if open_braces > close_braces:
+        s = s + ("}" * (open_braces - close_braces))
 
     return s
 

@@ -78,3 +78,13 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "4в^{-10}\\cdot (4^3)в^4"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), r"4^{-10}\cdot(4^3)^4".replace(" ", ""))
+
+    def test_fix_broken_frac_extra_brace(self):
+        alt = "\\sqrt{\\frac{36a^{21}}}{a^{15}}}"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"\sqrt{\frac{36a^{21}}{a^{15}}}".replace(" ", ""))
+
+    def test_balances_missing_braces(self):
+        alt = "\\sqrt{\\frac{36a^{21}}{a^{15}}"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"\sqrt{\frac{36a^{21}}{a^{15}}}".replace(" ", ""))
