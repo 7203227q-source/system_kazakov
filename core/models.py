@@ -215,9 +215,33 @@ class Assignment(models.Model):
     is_completed = models.BooleanField(default=False, verbose_name="Завершено")
     is_draft = models.BooleanField(default=False, verbose_name="Черновик (на стадии сборки)")
     is_verified = models.BooleanField(default=False, verbose_name="Контрольная работа (Verified Mode)")
+    due_date = models.DateField(null=True, blank=True, verbose_name="Срок (до конца дня)")
+    is_expired = models.BooleanField(default=False, verbose_name="Просрочено (автозакрыто)")
+    expired_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда просрочено")
 
     def __str__(self):
         return f"{self.title} для {self.student.username}"
+
+
+class AssignmentExtensionRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Ожидает'),
+        ('approved', 'Одобрено'),
+        ('rejected', 'Отклонено'),
+    ]
+
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='extension_requests')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='extension_requests_as_student')
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='extension_requests_as_tutor')
+    requested_days = models.PositiveIntegerField()
+    comment = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
 
 class Submission(models.Model):
     """
@@ -363,7 +387,7 @@ class WhiteboardSession(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['student', 'assignment', 'task', 'created_at']),
+            models.Index(fields=['student', 'assignment', 'task', 'created_at'], name='core_whitebo_student_ae52cb_idx'),
         ]
 
 
