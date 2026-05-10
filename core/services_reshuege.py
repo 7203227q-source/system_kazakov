@@ -166,8 +166,10 @@ def parse_task_page(html: str, *, task_id: str | None = None) -> tuple[str, str,
     soup = BeautifulSoup(html or "", "html.parser")
 
     statement_node = None
+    expanded_node = None
     if task_id:
-        statement_node = soup.find("div", id=f"text{task_id}") or soup.find("div", id=f"body{task_id}")
+        expanded_node = soup.find("div", id=f"text{task_id}")
+        statement_node = soup.find("div", id=f"body{task_id}")
     if statement_node is None:
         statement_node = soup.find("div", id=re.compile(r"^body\d+$"))
 
@@ -187,24 +189,45 @@ def parse_task_page(html: str, *, task_id: str | None = None) -> tuple[str, str,
         or soup.select_one("div#task")
     )
 
-    content_html = str(content_node) if content_node else ""
+    content_html = ""
+    if expanded_node is not None and statement_node is not None and expanded_node is not statement_node:
+        content_html = f"{str(expanded_node)}{str(statement_node)}"
+    elif expanded_node is not None:
+        content_html = str(expanded_node)
+    elif content_node:
+        content_html = str(content_node)
 
-    text = normalize_sdamgia_text(soup.get_text("\n", strip=True))
     answer = ""
-    matches = list(re.finditer(r"\bОтвет\s*:\s*([^\n\r]+)", text, flags=re.IGNORECASE))
-    if matches:
-        raw_answer = matches[-1].group(1).strip()
-        raw_answer = raw_answer.split("\n", 1)[0].strip()
-        raw_answer = raw_answer.rstrip(". ")
-        answer = raw_answer
+    if solution_node:
+        sol_text = normalize_sdamgia_text(solution_node.get_text("\n", strip=True))
+        sol_matches = list(re.finditer(r"\bОтвет\s*:\s*([^\n\r]+)", sol_text, flags=re.IGNORECASE))
+        if sol_matches:
+            raw_answer = sol_matches[-1].group(1).strip()
+            raw_answer = raw_answer.split("\n", 1)[0].strip()
+            raw_answer = raw_answer.rstrip(". ")
+            answer = raw_answer
+
+    if not answer:
+        text = normalize_sdamgia_text(soup.get_text("\n", strip=True))
+        matches = list(re.finditer(r"\bОтвет\s*:\s*([^\n\r]+)", text, flags=re.IGNORECASE))
+        if matches:
+            raw_answer = matches[-1].group(1).strip()
+            raw_answer = raw_answer.split("\n", 1)[0].strip()
+            raw_answer = raw_answer.rstrip(". ")
+            answer = raw_answer
 
     solution_html = str(solution_node) if solution_node else ""
 
-    if content_node and solution_node:
+    if solution_node:
         try:
             solution_html = str(solution_node)
             solution_node.decompose()
-            content_html = str(content_node)
+            if expanded_node is not None and statement_node is not None and expanded_node is not statement_node:
+                content_html = f"{str(expanded_node)}{str(statement_node)}"
+            elif expanded_node is not None:
+                content_html = str(expanded_node)
+            elif content_node:
+                content_html = str(content_node)
         except Exception:
             pass
 

@@ -20,6 +20,7 @@ class SdamgiaExpandTextBlockImportTests(TestCase):
             <p>Полный текст</p>
             <img src="/get_file?id=1">
           </div>
+          <div id="body408182"><p>Вопрос задачи</p></div>
           <div id="sol408182"><p>Решение. Ответ: 213.</p></div>
           Ответ: 213.
         </body></html>
@@ -44,6 +45,7 @@ class SdamgiaExpandTextBlockImportTests(TestCase):
         task = Task.objects.get(fipi_id="408182")
         v = task.variants.get(theme="classic")
         self.assertIn('id="text408182"', v.content)
+        self.assertIn('id="body408182"', v.content)
         self.assertIn("/get_file?id=1", v.content)
-        self.assertNotIn("Короткий текст", v.content)
-
+        self.assertIn("Вопрос задачи", v.content)
+        self.assertNotIn("Короткий текст без картинки", v.content)
