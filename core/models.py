@@ -387,7 +387,7 @@ class WhiteboardSession(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['student', 'assignment', 'task', 'created_at'], name='core_whitebo_student_ae52cb_idx'),
+            models.Index(fields=['student', 'assignment', 'task', 'created_at']),
         ]
 
 

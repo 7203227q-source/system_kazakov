@@ -86,8 +86,7 @@ class Migration(migrations.Migration):
             model_name="whiteboardsession",
             index=models.Index(
                 fields=["student", "assignment", "task", "created_at"],
-                name="core_whitebo_student_ae52cb_idx",
+                name="wb_session_student_task_idx",
             ),
         ),
     ]
-

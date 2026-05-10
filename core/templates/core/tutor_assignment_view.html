@@ -42,6 +42,28 @@
             </div>
         </div>
 
+        {% if pending_extension %}
+        <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <div class="text-xs font-bold text-yellow-700 uppercase tracking-wider">Запрос на продление</div>
+                <div class="text-sm font-bold text-gray-800 mt-1">+{{ pending_extension.requested_days }} дней</div>
+                {% if pending_extension.comment %}
+                <div class="text-sm text-gray-700 mt-1">{{ pending_extension.comment }}</div>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-2">
+                <form method="POST" action="{% url 'tutor_extension_approve' assignment.id pending_extension.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">Одобрить</button>
+                </form>
+                <form method="POST" action="{% url 'tutor_extension_reject' assignment.id pending_extension.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 transition">Отклонить</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="space-y-6">
             {% for item in tasks_view %}
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">

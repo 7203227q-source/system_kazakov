@@ -7,7 +7,9 @@ from django.contrib import messages
 from django.db import models
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent
+from django.utils import timezone
+from datetime import timedelta, date
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
@@ -548,6 +550,16 @@ def student_dashboard(request):
         
     active_profile = next((p for p in profiles if p.subject_id == active_subject_id), None)
     
+    overdue_qs = Assignment.objects.filter(
+        student=request.user,
+        is_completed=False,
+        is_draft=False,
+        due_date__isnull=False,
+        due_date__lt=timezone.now().date(),
+    )
+    for a in overdue_qs:
+        auto_expire_assignment_if_needed(a)
+
     # Filter assignments by subject
     pending_assignments = Assignment.objects.filter(
         student=request.user, 
@@ -751,12 +763,57 @@ def student_assignment_summary(request, assignment_id):
         'max_primary_possible': max_primary_possible,
         'secondary_score': secondary_score
     })
+
+
+def auto_expire_assignment_if_needed(assignment: Assignment):
+    if assignment.is_completed:
+        return False
+    if not assignment.due_date:
+        return False
+    today = timezone.now().date()
+    if assignment.due_date >= today:
+        return False
+
+    assignment.is_completed = True
+    assignment.is_expired = True
+    assignment.expired_at = timezone.now()
+    assignment.save(update_fields=['is_completed', 'is_expired', 'expired_at'])
+
+    tasks = assignment.tasks.all()
+    for t in tasks:
+        sub, created = Submission.objects.get_or_create(
+            student=assignment.student,
+            task=t,
+            assignment=assignment,
+            defaults={
+                'user_answer': '',
+                'is_correct': False,
+                'score': 0,
+                'primary_score': 0,
+            },
+        )
+        if not created:
+            if int(t.exam_points or 0) == 1:
+                sub.score = 1 if sub.is_correct else 0
+                sub.save(update_fields=['score'])
+            else:
+                sub.primary_score = int(sub.primary_score or 0)
+                sub.score = int(sub.primary_score or 0)
+                sub.save(update_fields=['score', 'primary_score'])
+
+        record_task_log(assignment.student, t, sub, assignment, 0)
+
+    return True
+
+
 @login_required
 def student_solve_assignment(request, assignment_id):
     if request.user.role != 'student':
         return redirect('student_dashboard')
         
     assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
+
+    auto_expire_assignment_if_needed(assignment)
     
     if assignment.is_completed:
         return redirect('student_assignment_summary', assignment_id=assignment.id)
@@ -909,6 +966,40 @@ def student_solve_assignment(request, assignment_id):
         'tasks': tasks_list,
     })
 
+
+@login_required
+@require_POST
+def student_extension_request(request, assignment_id):
+    if request.user.role != 'student':
+        return redirect('login')
+
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_draft=False)
+    days_raw = (request.POST.get('days') or '').strip()
+    comment = (request.POST.get('comment') or '').strip()
+
+    if not days_raw.isdigit():
+        messages.error(request, "Введите число дней (1–30).")
+        return redirect('student_solve_assignment', assignment_id=assignment.id)
+
+    days = int(days_raw)
+    if days <= 0 or days > 30:
+        messages.error(request, "Введите число дней (1–30).")
+        return redirect('student_solve_assignment', assignment_id=assignment.id)
+
+    AssignmentExtensionRequest.objects.update_or_create(
+        assignment=assignment,
+        status='pending',
+        defaults={
+            'student': assignment.student,
+            'tutor': assignment.tutor,
+            'requested_days': days,
+            'comment': comment,
+        },
+    )
+
+    messages.success(request, "Запрос на продление отправлен репетитору.")
+    return redirect('student_solve_assignment', assignment_id=assignment.id)
+
 @login_required
 def student_practice_submit(request, task_id):
     """Обработка ответа ученика"""
@@ -1052,6 +1143,7 @@ def tutor_dashboard(request):
         )
 
         for a in assignments:
+            auto_expire_assignment_if_needed(a)
             tasks = list(a.tasks.all())
             max_primary_possible = sum(int(t.exam_points or 0) for t in tasks)
             subs = Submission.objects.filter(assignment=a, student=selected_student).select_related('task')
@@ -1269,6 +1361,8 @@ def tutor_assignment_view(request, assignment_id):
     else:
         assignment = get_object_or_404(qs, id=assignment_id, is_draft=False)
 
+    auto_expire_assignment_if_needed(assignment)
+
     theme = getattr(request.user, 'preferred_theme', None) or 'classic'
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
     tasks_view = []
@@ -1278,17 +1372,59 @@ def tutor_assignment_view(request, assignment_id):
             'content_html': t.get_content_for_theme(theme),
             'solution_html': t.get_solution_for_theme(theme),
         })
+    pending_extension = AssignmentExtensionRequest.objects.filter(assignment=assignment, status='pending').first()
     return render(request, 'core/tutor_assignment_view.html', {
         'assignment': assignment,
         'student': assignment.student,
         'theme': theme,
         'tasks_view': tasks_view,
+        'pending_extension': pending_extension,
     })
+
+
+@login_required
+@require_POST
+def tutor_extension_approve(request, assignment_id, req_id):
+    if request.user.role != 'tutor':
+        return redirect('login')
+    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=False)
+    req = get_object_or_404(AssignmentExtensionRequest, id=req_id, assignment=assignment, status='pending')
+
+    today = timezone.now().date()
+    base = assignment.due_date or today
+    if base < today:
+        base = today
+    assignment.due_date = base + timedelta(days=int(req.requested_days))
+    assignment.is_completed = False
+    assignment.is_expired = False
+    assignment.expired_at = None
+    assignment.save(update_fields=['due_date', 'is_completed', 'is_expired', 'expired_at'])
+
+    req.status = 'approved'
+    req.resolved_at = timezone.now()
+    req.save(update_fields=['status', 'resolved_at'])
+
+    messages.success(request, "Продление одобрено, вариант переоткрыт.")
+    return redirect('tutor_assignment_view', assignment_id=assignment.id)
+
+
+@login_required
+@require_POST
+def tutor_extension_reject(request, assignment_id, req_id):
+    if request.user.role != 'tutor':
+        return redirect('login')
+    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=False)
+    req = get_object_or_404(AssignmentExtensionRequest, id=req_id, assignment=assignment, status='pending')
+    req.status = 'rejected'
+    req.resolved_at = timezone.now()
+    req.save(update_fields=['status', 'resolved_at'])
+    messages.success(request, "Запрос отклонён.")
+    return redirect('tutor_assignment_view', assignment_id=assignment.id)
+
 
 
 def _whiteboard_key(assignment_id: int, task_id: int):
     return f"{int(assignment_id)}:{int(task_id)}"
-
 
 def _student_whiteboard_unlocked(request, assignment_id: int, task_id: int):
     unlocked = request.session.get('whiteboard_unlocked', {}) or {}
@@ -1713,10 +1849,18 @@ def tutor_publish_assignment(request, assignment_id):
         assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
         
         is_verified = request.POST.get('is_verified') == 'on'
+        due_date_raw = (request.POST.get('due_date') or '').strip()
+        due_date_value = None
+        if due_date_raw:
+            try:
+                due_date_value = date.fromisoformat(due_date_raw)
+            except Exception:
+                due_date_value = None
         
         assignment.is_draft = False
         assignment.is_verified = is_verified
-        assignment.save()
+        assignment.due_date = due_date_value
+        assignment.save(update_fields=['is_draft', 'is_verified', 'due_date'])
         messages.success(request, f"Вариант '{assignment.title}' успешно опубликован для {assignment.student.get_full_name() or assignment.student.username}!")
     return redirect('tutor_dashboard')
 

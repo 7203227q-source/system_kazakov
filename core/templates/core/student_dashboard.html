@@ -198,7 +198,9 @@
                                     </span>
                                     {% endif %}
                                 </div>
-                                <p class="text-sm text-gray-500">От репетитора: {{ assignment.tutor.get_full_name|default:assignment.tutor.username }} • Задач: {{ assignment.tasks.count }}</p>
+                                <p class="text-sm text-gray-500">
+                                    От репетитора: {{ assignment.tutor.get_full_name|default:assignment.tutor.username }} • Задач: {{ assignment.tasks.count }}{% if assignment.due_date %} • Срок: {{ assignment.due_date|date:"d.m.Y" }}{% endif %}
+                                </p>
                             </div>
                             <div class="text-right ml-4">
                                 <a href="{% url 'student_solve_assignment' assignment.id %}" class="inline-block bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">

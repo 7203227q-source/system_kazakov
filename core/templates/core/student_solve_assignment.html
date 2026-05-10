@@ -35,6 +35,31 @@
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">{{ assignment.title }}</h1>
                 <p class="text-sm text-gray-500">От репетитора: {{ assignment.tutor.get_full_name|default:assignment.tutor.username }}</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    {% if assignment.due_date %}
+                    <span class="text-xs font-bold text-gray-500">Срок:</span>
+                    <span class="text-xs font-bold text-gray-800">{{ assignment.due_date|date:"d.m.Y" }}</span>
+                    {% endif %}
+                    <button type="button" class="text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-1 rounded-lg transition" onclick="toggleExtensionRequest()">
+                        Попросить продление
+                    </button>
+                </div>
+                <div id="extension-request-box" class="hidden mt-3 bg-white border border-gray-200 rounded-xl p-3">
+                    <form method="POST" action="{% url 'student_extension_request' assignment.id %}" class="flex flex-col sm:flex-row gap-2 sm:items-end">
+                        {% csrf_token %}
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">+ дней</label>
+                            <input type="number" name="days" min="1" max="30" class="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm w-28" required>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">Комментарий</label>
+                            <input type="text" name="comment" class="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm w-full" placeholder="Причина / просьба">
+                        </div>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">
+                            Отправить
+                        </button>
+                    </form>
+                </div>
             </div>
             <a href="{% url 'student_dashboard' %}" class="text-gray-500 hover:text-gray-700 transition flex items-center">
                 <i class="fas fa-arrow-left mr-2"></i> <span class="hidden sm:inline">Вернуться</span>
@@ -250,6 +275,12 @@
             const data = await createRes.json();
             if (data.session_id) window.location.href = `/board/${data.session_id}/`;
         } catch (e) {}
+    }
+
+    function toggleExtensionRequest() {
+        const box = document.getElementById('extension-request-box');
+        if (!box) return;
+        box.classList.toggle('hidden');
     }
 
     async function verifyWithAI(submissionId, taskId) {
