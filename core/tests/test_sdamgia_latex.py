@@ -27,3 +27,8 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "дробь: числитель: 1, знаменатель: 3 0 конец дроби"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex, r"\frac{1}{30}")
+
+    def test_compact_tfrac(self):
+        alt = "дробь: числитель: 1, знаменатель: \\tfrac130 плюс \\tfrac142 конец дроби"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"\frac{1}{\frac{1}{30}+\frac{1}{42}}".replace(" ", ""))

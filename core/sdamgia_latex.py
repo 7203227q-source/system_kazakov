@@ -28,6 +28,9 @@ _MIXED_RE = re.compile(
     flags=re.IGNORECASE | re.DOTALL,
 )
 
+_COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
+_SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
+
 
 def _convert_plain_text(value: str) -> str:
     s = normalize_sdamgia_alt(value)
@@ -64,6 +67,17 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
     s = normalize_sdamgia_alt(value)
     if not s:
         return None
+
+    def fix_tfrac(match: re.Match) -> str:
+        digits = match.group(1)
+        num = digits[:1]
+        den = digits[1:]
+        if not den:
+            return match.group(0)
+        return rf"\frac{{{num}}}{{{den}}}"
+
+    s = _SPACED_TFRAC_RE.sub(lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}", s)
+    s = _COMPACT_TFRAC_RE.sub(fix_tfrac, s)
 
     def replace_mixed(match: re.Match) -> str:
         whole_raw = match.group("whole").strip()

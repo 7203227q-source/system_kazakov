@@ -21,15 +21,11 @@
                 }
             },
             chtml: {
-                scale: 1.32
+                scale: 1.0
             }
         };
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <style>
-        :root { --tex-scale: 1; }
-        mjx-container { font-size: calc(var(--tex-scale, 1) * 1em); }
-    </style>
     {% include 'core/includes/_ui_theme_css.html' %}
     </head>
 <body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] flex overflow-hidden {% if user.role == 'tutor' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">

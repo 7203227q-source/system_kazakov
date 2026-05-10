@@ -44,6 +44,13 @@ def fix_latex_tokens_in_html(html: str) -> tuple[str, int]:
         parts = text.split("$")
         for i, part in enumerate(parts):
             if i % 2 == 1:
+                if "\\tfrac" in part:
+                    fixed_part = latex_from_sdamgia_alt(part)
+                    if fixed_part and fixed_part != part:
+                        out.append(fixed_part)
+                        fixed += 1
+                        changed = True
+                        continue
                 if any(k in part.lower() for k in ["целаячасть", "целая часть", "дробнаячасть", "дробная часть", "числитель", "знаменатель"]):
                     converted = latex_from_sdamgia_alt(part)
                     if converted:
