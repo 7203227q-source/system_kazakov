@@ -60,3 +60,16 @@ class SdamgiaLatexTests(SimpleTestCase):
             latex.replace(" ", ""),
             r"a^{8}\cdota^{17}:a^{20}\cdot4^{-10}".replace(" ", ""),
         )
+
+    def test_v_stepeni_and_sqrt_fallback(self):
+        alt = (
+            "дробь: числитель: корень из: начало аргумента: 25a в степени левая круглая скобка 9 конец аргумента "
+            "правая круглая скобка умножить на корень из: начало аргумента: 16b в степени левая круглая скобка 8 конец "
+            "аргумента правая круглая скобка , знаменатель: корень из: начало аргумента: a в степени левая круглая скобка "
+            "5 конец аргумента b в степени левая круглая скобка 8 правая круглая скобка правая круглая скобка конец дроби"
+        )
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertIsNotNone(latex)
+        self.assertIn(r"\sqrt{25a^{9}}", latex)
+        self.assertIn(r"\sqrt{16b^{8}}", latex)
+        self.assertIn(r"\sqrt{a^{5}b^{8}}", latex.replace(" ", ""))

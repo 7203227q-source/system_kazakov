@@ -40,6 +40,11 @@ _SQRT_RE = re.compile(
     flags=re.IGNORECASE | re.DOTALL,
 )
 
+_SQRT_FALLBACK_RE = re.compile(
+    r"(?:корень\s*из)\s*:\s*(?:начало\s*аргумента)\s*:\s*(?P<arg>.*?)(?=(?:\s+умножить\s+на|\s+плюс|\s+минус|\s+равно|,|конец\s+дроби|$))",
+    flags=re.IGNORECASE | re.DOTALL,
+)
+
 _COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
 _SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
 _POWER_PAREN_RE = re.compile(
@@ -51,12 +56,20 @@ _POWER_SIMPLE_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_POWER_RU_RE = re.compile(
+    r"(?P<base>[0-9a-zA-Zа-яА-Я]+)\s*в?\s*степени\s*(?:левая\s*круглая\s*скобка\s*)?\s*(?P<exp>-?\d+)\s*(?:конец\s*аргумента\s*)?(?:\s*правая\s*круглая\s*скобка)*",
+    flags=re.IGNORECASE,
+)
+
 
 def sanitize_math_latex(value: str) -> str:
     if not value:
         return value
 
     s = str(value)
+
+    s = re.sub(r"\bв\s*степени\b", "степени", s, flags=re.IGNORECASE)
+    s = re.sub(r"\bвстепени\b", "степени", s, flags=re.IGNORECASE)
 
     def fix_tfrac(match: re.Match) -> str:
         digits = match.group(1)
@@ -127,6 +140,11 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
         return None
     s = sanitize_math_latex(s)
 
+    depth = max_depth
+    while depth > 0 and _POWER_RU_RE.search(s):
+        s = _POWER_RU_RE.sub(lambda m: rf"{m.group('base')}^{{{m.group('exp')}}}", s)
+        depth -= 1
+
     def replace_sqrt(match: re.Match) -> str:
         arg_raw = match.group("arg").strip()
         arg = latex_from_sdamgia_alt(arg_raw, max_depth=max_depth - 1) or _convert_plain_text(arg_raw)
@@ -135,6 +153,11 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
     depth = max_depth
     while depth > 0 and _SQRT_RE.search(s):
         s = _SQRT_RE.sub(replace_sqrt, s)
+        depth -= 1
+
+    depth = max_depth
+    while depth > 0 and _SQRT_FALLBACK_RE.search(s):
+        s = _SQRT_FALLBACK_RE.sub(replace_sqrt, s)
         depth -= 1
 
     def replace_mixed(match: re.Match) -> str:
