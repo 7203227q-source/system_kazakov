@@ -1,6 +1,6 @@
 from core.models import ExamFormat, TaskVariant
 from core.task_html import normalize_task_html
-from core.tex_replace import replace_svg_images_with_latex
+from core.tex_replace import fix_latex_tokens_in_html, replace_svg_images_with_latex
 
 
 def convert_svg_to_latex_for_task_type(
@@ -28,8 +28,10 @@ def convert_svg_to_latex_for_task_type(
 
         new_content, replaced_content = replace_svg_images_with_latex(v.content or "")
         new_solution, replaced_solution = replace_svg_images_with_latex(v.solution or "")
-        replaced_count = replaced_content + replaced_solution
-        if replaced_count == 0:
+        new_content, fixed_content = fix_latex_tokens_in_html(new_content)
+        new_solution, fixed_solution = fix_latex_tokens_in_html(new_solution)
+        replaced_count = replaced_content + replaced_solution + fixed_content + fixed_solution
+        if replaced_count == 0 and new_content == (v.content or "") and new_solution == (v.solution or ""):
             continue
 
         new_content = normalize_task_html(new_content)
@@ -53,4 +55,3 @@ def convert_svg_to_latex_for_task_type(
         "changed": changed,
         "replaced": replaced_total,
     }
-

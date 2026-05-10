@@ -24,3 +24,36 @@ def replace_svg_images_with_latex(html: str) -> tuple[str, int]:
 
     return str(soup), replaced
 
+
+def fix_latex_tokens_in_html(html: str) -> tuple[str, int]:
+    if not html:
+        return html, 0
+
+    soup = BeautifulSoup(html, "html.parser")
+    fixed = 0
+
+    for node in list(soup.descendants):
+        if not isinstance(node, NavigableString):
+            continue
+        text = str(node)
+        if "$" not in text:
+            continue
+
+        out = []
+        changed = False
+        parts = text.split("$")
+        for i, part in enumerate(parts):
+            if i % 2 == 1:
+                if any(k in part.lower() for k in ["целаячасть", "целая часть", "дробнаячасть", "дробная часть", "числитель", "знаменатель"]):
+                    converted = latex_from_sdamgia_alt(part)
+                    if converted:
+                        out.append(converted)
+                        fixed += 1
+                        changed = True
+                        continue
+            out.append(part)
+
+        if changed:
+            node.replace_with(NavigableString("$".join(out)))
+
+    return str(soup), fixed

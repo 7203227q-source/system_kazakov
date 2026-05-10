@@ -19,6 +19,11 @@ _FRACTION_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_MIXED_RE = re.compile(
+    r"(?:целая\s*часть|целаячасть)\s*[: ]\s*(?P<whole>[^,]+?)\s*,\s*(?:дробная\s*часть|дробнаячасть)\s*[: ]\s*(?:дробь\s*:?\s*)?числитель\s*[: ]\s*(?P<num>[^,]+?)\s*,\s*знаменатель\s*[: ]\s*(?P<den>[^,]+?)(?:\s*конец\s*дроби)?",
+    flags=re.IGNORECASE,
+)
+
 
 def _convert_plain_text(value: str) -> str:
     s = normalize_sdamgia_alt(value)
@@ -53,12 +58,37 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
     if not s:
         return None
 
+    def replace_mixed(match: re.Match) -> str:
+        whole_raw = match.group("whole").strip()
+        num_raw = match.group("num").strip()
+        den_raw = match.group("den").strip()
+        whole = latex_from_sdamgia_alt(whole_raw, max_depth=max_depth - 1) or _convert_plain_text(whole_raw)
+        num = latex_from_sdamgia_alt(num_raw, max_depth=max_depth - 1) or _convert_plain_text(num_raw)
+        den = latex_from_sdamgia_alt(den_raw, max_depth=max_depth - 1) or _convert_plain_text(den_raw)
+
+        try:
+            w_int = int(re.sub(r"[^0-9\-]+", "", whole_raw))
+            n_int = int(re.sub(r"[^0-9\-]+", "", num_raw))
+            d_int = int(re.sub(r"[^0-9\-]+", "", den_raw))
+            if d_int:
+                top = w_int * d_int + n_int
+                return rf"\frac{{{top}}}{{{d_int}}}"
+        except Exception:
+            pass
+
+        return rf"{whole}+\frac{{{num}}}{{{den}}}"
+
     def replace_fraction(match: re.Match) -> str:
         num_raw = match.group("num").strip()
         den_raw = match.group("den").strip()
         num = latex_from_sdamgia_alt(num_raw, max_depth=max_depth - 1) or _convert_plain_text(num_raw)
         den = latex_from_sdamgia_alt(den_raw, max_depth=max_depth - 1) or _convert_plain_text(den_raw)
         return rf"\frac{{{num}}}{{{den}}}"
+
+    depth = max_depth
+    while depth > 0 and _MIXED_RE.search(s):
+        s = _MIXED_RE.sub(replace_mixed, s)
+        depth -= 1
 
     depth = max_depth
     while depth > 0 and _FRACTION_RE.search(s):
