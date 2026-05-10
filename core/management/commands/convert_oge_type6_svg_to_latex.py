@@ -1,8 +1,7 @@
 from django.core.management.base import BaseCommand
 
-from core.models import ExamFormat, Subject, TaskVariant, TaskType
-from core.task_html import normalize_task_html
-from core.tex_replace import replace_svg_images_with_latex
+from core.models import ExamFormat, Subject
+from core.services_svg_to_latex import convert_svg_to_latex_for_task_type
 
 
 class Command(BaseCommand):
@@ -28,42 +27,20 @@ class Command(BaseCommand):
             subject = Subject.objects.get(name="Математика")
             exam_format = ExamFormat.objects.get(subject=subject, name__icontains="ОГЭ")
 
-        task_type = TaskType.objects.get(exam_format=exam_format, number=type_number)
+        if not theme:
+            theme = "classic"
 
-        qs = (
-            TaskVariant.objects.select_related("task", "task__task_type")
-            .filter(task__task_type=task_type)
-            .order_by("id")
+        result = convert_svg_to_latex_for_task_type(
+            exam_format_id=exam_format.id,
+            type_number=type_number,
+            theme=theme,
+            dry_run=dry_run,
+            limit=limit,
         )
-        if theme:
-            qs = qs.filter(theme=theme)
-        if limit:
-            qs = qs[:limit]
-
-        scanned = 0
-        changed = 0
-        replaced_total = 0
-
-        for v in qs.iterator(chunk_size=200):
-            scanned += 1
-
-            new_content, replaced_content = replace_svg_images_with_latex(v.content or "")
-            new_solution, replaced_solution = replace_svg_images_with_latex(v.solution or "")
-            replaced_count = replaced_content + replaced_solution
-            if replaced_count == 0:
-                continue
-
-            new_content = normalize_task_html(new_content)
-            new_solution = normalize_task_html(new_solution) if new_solution else new_solution
-
-            if new_content != v.content or new_solution != v.solution:
-                changed += 1
-                replaced_total += replaced_count
-                if not dry_run:
-                    v.content = new_content
-                    v.solution = new_solution
-                    v.save(update_fields=["content", "solution"])
 
         mode = "DRY-RUN" if dry_run else "APPLIED"
-        self.stdout.write(self.style.SUCCESS(f"{mode}: scanned={scanned}, changed={changed}, replaced={replaced_total}"))
-
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{mode}: scanned={result['scanned']}, changed={result['changed']}, replaced={result['replaced']}"
+            )
+        )

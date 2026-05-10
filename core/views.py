@@ -211,6 +211,48 @@ def admin_reshuege_import(request):
 
 @login_required
 @require_POST
+def admin_svg_to_latex_convert(request):
+    if request.user.role != 'admin':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
+    type_number_raw = (request.POST.get('type_number') or '').strip()
+    dry_run = request.POST.get('dry_run') == 'on'
+
+    if not exam_format_id_raw or not type_number_raw:
+        messages.error(request, "Выберите формат экзамена и номер типа.")
+        return redirect('admin_reshuege_import')
+
+    try:
+        exam_format_id = int(exam_format_id_raw)
+        type_number = int(type_number_raw)
+    except Exception:
+        messages.error(request, "Некорректные параметры.")
+        return redirect('admin_reshuege_import')
+
+    try:
+        from .services_svg_to_latex import convert_svg_to_latex_for_task_type
+
+        result = convert_svg_to_latex_for_task_type(
+            exam_format_id=exam_format_id,
+            type_number=type_number,
+            theme="classic",
+            dry_run=dry_run,
+        )
+
+        mode = "DRY-RUN" if dry_run else "Готово"
+        messages.success(
+            request,
+            f"{mode}: scanned={result['scanned']}, changed={result['changed']}, replaced={result['replaced']}.",
+        )
+    except Exception as e:
+        messages.error(request, f"Ошибка конвертации: {str(e)[:200]}")
+
+    return redirect('admin_reshuege_import')
+
+
+@login_required
+@require_POST
 def admin_reshuege_import_start(request):
     if request.user.role != 'admin':
         return JsonResponse({'error': 'Forbidden'}, status=403)
