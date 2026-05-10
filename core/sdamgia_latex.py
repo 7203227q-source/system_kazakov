@@ -42,7 +42,14 @@ _SQRT_RE = re.compile(
 
 _COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
 _SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
-_POWER_RE = re.compile(r"(?P<base>[0-9a-zA-Zа-яА-Я\)\]\}]+)\s*степени\s*(?P<exp>[0-9]+)", flags=re.IGNORECASE)
+_POWER_PAREN_RE = re.compile(
+    r"\((?P<base>[^()]+)\)\s*степени\s*\(?\s*(?P<exp>-?\d+)\s*\)?",
+    flags=re.IGNORECASE,
+)
+_POWER_SIMPLE_RE = re.compile(
+    r"(?P<base>[0-9a-zA-Zа-яА-Я]+)\s*степени\s*\(?\s*(?P<exp>-?\d+)\s*\)?",
+    flags=re.IGNORECASE,
+)
 
 
 def sanitize_math_latex(value: str) -> str:
@@ -62,16 +69,14 @@ def sanitize_math_latex(value: str) -> str:
     s = _SPACED_TFRAC_RE.sub(lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}", s)
     s = _COMPACT_TFRAC_RE.sub(fix_tfrac, s)
 
-    s = _POWER_RE.sub(lambda m: rf"{m.group('base')}^{{{m.group('exp')}}}", s)
+    s = _POWER_PAREN_RE.sub(lambda m: rf"({m.group('base')})^{{{m.group('exp')}}}", s)
+    s = _POWER_SIMPLE_RE.sub(lambda m: rf"{m.group('base')}^{{{m.group('exp')}}}", s)
 
-    left_count = s.count(r"\left")
-    right_count = s.count(r"\right")
-    if left_count != right_count:
-        s = s.replace(r"\left(", "(").replace(r"\right)", ")")
-        s = s.replace(r"\left[", "[").replace(r"\right]", "]")
-        s = s.replace(r"\left\{", r"\{").replace(r"\right\}", r"\}")
-        s = s.replace(r"\left.", "").replace(r"\right.", "")
-        s = s.replace(r"\left", "").replace(r"\right", "")
+    s = s.replace(r"\left(", "(").replace(r"\right)", ")")
+    s = s.replace(r"\left[", "[").replace(r"\right]", "]")
+    s = s.replace(r"\left\{", r"\{").replace(r"\right\}", r"\}")
+    s = s.replace(r"\left.", "").replace(r"\right.", "")
+    s = s.replace(r"\left", "").replace(r"\right", "")
 
     return s
 

@@ -52,3 +52,11 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "\\left( 1 плюс 2"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), "(1+2")
+
+    def test_power_attached_and_negative(self):
+        alt = "aстепени (8) · aстепени (17): aстепени (20) · 4степени(-10)"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(
+            latex.replace(" ", ""),
+            r"a^{8}\cdota^{17}:a^{20}\cdot4^{-10}".replace(" ", ""),
+        )
