@@ -25,6 +25,9 @@ class WhiteboardAccessTests(TestCase):
 
     def test_student_can_open_own_board_page(self):
         self.client.force_login(self.student)
+        s = self.client.session
+        s['whiteboard_unlocked'] = {f"{self.assignment.id}:{self.task.id}": True}
+        s.save()
         r = self.client.get(reverse('whiteboard_page', args=[self.session.id]))
         self.assertEqual(r.status_code, 200)
 
@@ -47,4 +50,3 @@ class WhiteboardAccessTests(TestCase):
         self.client.force_login(self.student)
         r = self.client.get(reverse('whiteboard_list'), {'student_id': self.other_student.id, 'assignment_id': self.assignment.id, 'task_id': self.task.id})
         self.assertEqual(r.status_code, 403)
-

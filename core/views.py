@@ -9,11 +9,11 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from datetime import timedelta, date
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
-from .services import process_task_submission
+from .services import process_task_submission, get_due_tasks_for_student
 from .system_info import get_system_metrics, check_openrouter_api
 
 from django.core.management import call_command
@@ -459,6 +459,7 @@ def student_practice(request):
     """Страница тренажера (решение одной задачи)"""
     total_xp = StudentSubjectProfile.objects.filter(student=request.user).aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
+    mode = (request.POST.get('mode') or request.GET.get('mode') or '').strip()
 
     if request.method == 'POST':
         task_id = request.POST.get('task_id')
@@ -482,6 +483,13 @@ def student_practice(request):
         
         # Время решения в тренажере не замеряем строго, ставим заглушку 60с для избежания аномалии
         record_task_log(request.user, task, submission, None, 60)
+
+        # Если это SRS-режим, обновляем интервалы (SM-2)
+        if mode == 'srs':
+            try:
+                process_task_submission(request.user, task, grade)
+            except Exception:
+                pass
         
         # Даем XP за правильный ответ
         xp_gained = 0
@@ -508,11 +516,30 @@ def student_practice(request):
             'total_level': ((int(total_xp + xp_gained) // 100) + 1),
             'points_earned': points_earned,
             'points_max': points_max,
+            'mode': mode,
         })
     
-    # GET запрос: выбираем задачу с помощью алгоритма интервального повторения
-    task = get_adaptive_task_for_student(request.user)
-    return render(request, 'core/student_practice.html', {'task': task, 'total_xp': total_xp, 'total_level': total_level})
+    # GET запрос
+    if mode == 'srs':
+        due = get_due_tasks_for_student(request.user).select_related('task').first()
+        task = due.task if due else None
+    else:
+        # Обычный тренажёр (адаптивный)
+        task = get_adaptive_task_for_student(request.user)
+    return render(request, 'core/student_practice.html', {'task': task, 'total_xp': total_xp, 'total_level': total_level, 'mode': mode})
+
+
+@login_required
+@require_POST
+def student_srs_add(request, task_id):
+    if request.user.role != 'student':
+        return redirect('login')
+    task = get_object_or_404(Task, id=task_id)
+    rec, _ = SpacedRepetition.objects.get_or_create(student=request.user, task=task)
+    rec.next_review_date = timezone.now().date()
+    rec.save(update_fields=['next_review_date'])
+    messages.success(request, "Добавлено в интервальное повторение.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('student_practice')))
 
 @login_required
 def student_dashboard(request):
@@ -600,6 +627,11 @@ def student_dashboard(request):
         'predictions': chart_predictions
     })
 
+    due_srs_count = SpacedRepetition.objects.filter(
+        student=request.user,
+        next_review_date__lte=timezone.now().date(),
+    ).count()
+
     return render(request, 'core/student_dashboard.html', {
         'recent_submissions': recent_submissions,
         'pending_assignments': pending_assignments,
@@ -612,7 +644,8 @@ def student_dashboard(request):
         'next_level_xp': next_level_xp,
         'total_xp': total_xp,
         'total_level': total_level,
-        'chart_data': chart_data
+        'chart_data': chart_data,
+        'due_srs_count': due_srs_count,
     })
 
 from django.http import JsonResponse
@@ -654,6 +687,13 @@ def student_check_assignment_task(request, assignment_id, task_id):
         submission.is_correct = is_correct
         submission.score = task.exam_points if is_correct else 0
         submission.save()
+
+    # Автодобавление в интервальное повторение: только из вариантов и только неверные
+    if not is_correct:
+        try:
+            process_task_submission(request.user, task, 1)
+        except Exception:
+            pass
         
     # Если решили правильно, даем XP (только если еще не давали)
     xp_gained = max(1, int(task.difficulty / 5))
@@ -802,6 +842,13 @@ def auto_expire_assignment_if_needed(assignment: Assignment):
                 sub.save(update_fields=['score', 'primary_score'])
 
         record_task_log(assignment.student, t, sub, assignment, 0)
+
+        # Просроченные нерешённые задачи считаем "ошибкой" и добавляем в SRS
+        if int(sub.score or 0) == 0:
+            try:
+                process_task_submission(assignment.student, t, 1)
+            except Exception:
+                pass
 
     return True
 
@@ -2739,10 +2786,12 @@ def api_verify_with_ai(request, submission_id):
             else:
                 feedback = f"В решении есть небольшая вычислительная ошибка на промежуточном этапе. Оценено в {primary_score} из {max_points} баллов."
             
+    points_earned = int(primary_score or 0) if int(max_points or 0) > 1 else (1 if is_correct else 0)
     submission.primary_score = primary_score
     submission.is_correct = is_correct
+    submission.score = points_earned
     submission.ai_feedback = feedback
-    submission.save()
+    submission.save(update_fields=['primary_score', 'is_correct', 'score', 'ai_feedback'])
     
         # Award XP if correct
     xp_gained = 0
@@ -2756,6 +2805,13 @@ def api_verify_with_ai(request, submission_id):
         profile.xp += xp_gained
         profile.level = (profile.xp // 100) + 1
         profile.save()
+
+    # Автодобавление в интервальное повторение: только из вариантов и только при 0 баллов
+    if submission.assignment_id and points_earned == 0:
+        try:
+            process_task_submission(request.user, task, 1)
+        except Exception:
+            pass
         
     solution_html = ""
     variant = task.variants.filter(theme='classic').first()
