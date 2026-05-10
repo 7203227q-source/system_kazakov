@@ -44,7 +44,7 @@ class Command(BaseCommand):
         student1.parents.add(parent)
         
         # Предметы и темы
-        math, _ = Subject.objects.get_or_create(name='Математика (Профиль)')
+        math, _ = Subject.objects.get_or_create(name='Математика')
         topic_deriv, _ = Topic.objects.get_or_create(subject=math, name='Производная сложной функции')
         topic_stereo, _ = Topic.objects.get_or_create(subject=math, name='Стереометрия: Сечения')
         

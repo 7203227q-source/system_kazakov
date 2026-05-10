@@ -7,7 +7,7 @@ class Command(BaseCommand):
     help = 'Наполняет БД заданиями ЕГЭ Профиль (19 типов)'
 
     def handle(self, *args, **options):
-        subject, _ = Subject.objects.get_or_create(name='Математика (Профиль)')
+        subject, _ = Subject.objects.get_or_create(name='Математика')
         topic, _ = Topic.objects.get_or_create(subject=subject, name='Задания из Открытого Банка')
         
         exam_format, _ = ExamFormat.objects.get_or_create(

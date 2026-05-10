@@ -10,11 +10,11 @@ class Command(BaseCommand):
     help = 'Парсинг заданий с открытого банка ФИПИ (os.fipi.ru) и сохранение в БД с ИИ-классификацией'
 
     def add_arguments(self, parser):
-        parser.add_argument('--subject', type=str, help='Название предмета (например "Математика (Профиль)")')
+        parser.add_argument('--subject', type=str, help='Название предмета (например "Математика")')
         parser.add_argument('--limit', type=int, default=10, help='Количество заданий для загрузки')
 
     def handle(self, *args, **options):
-        subject_name = options['subject'] or 'Математика (Профиль)'
+        subject_name = options['subject'] or 'Математика'
         limit = options['limit']
 
         self.stdout.write(f'Начинаем парсинг {limit} заданий для предмета "{subject_name}"...')
