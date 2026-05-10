@@ -109,10 +109,19 @@ def admin_reshuege_import(request):
     if request.user.role != 'admin':
         return redirect('login')
 
+    subjects = Subject.objects.all().order_by('name')
+    subject_filter_raw = (request.POST.get('subject') or request.GET.get('subject') or '').strip()
     formats = ExamFormat.objects.all().select_related('subject').order_by('subject__name', '-is_active', '-year', 'name')
+    if subject_filter_raw:
+        try:
+            subject_filter_id = int(subject_filter_raw)
+            formats = formats.filter(subject_id=subject_filter_id)
+        except Exception:
+            subject_filter_raw = ''
 
     report = None
     form = {
+        "subject": subject_filter_raw,
         "exam_format": "",
         "type_number": "",
         "limit": "25",
@@ -125,6 +134,7 @@ def admin_reshuege_import(request):
     }
 
     if request.method == 'POST':
+        subject_filter_raw = (request.POST.get('subject') or '').strip()
         exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
         type_number_raw = (request.POST.get('type_number') or '').strip()
         ids_raw = (request.POST.get('task_ids') or '').strip()
@@ -137,6 +147,7 @@ def admin_reshuege_import(request):
         exclude_larin = request.POST.get('exclude_larin') == 'on'
 
         form = {
+            "subject": subject_filter_raw,
             "exam_format": exam_format_id_raw,
             "type_number": type_number_raw,
             "limit": limit_raw or "25",
@@ -191,6 +202,7 @@ def admin_reshuege_import(request):
                 messages.error(request, f"Ошибка импорта: {e}")
 
     return render(request, 'core/admin_reshuege_import.html', {
+        'subjects': subjects,
         'formats': formats,
         'report': report,
         'form': form,
