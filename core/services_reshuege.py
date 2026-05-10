@@ -160,13 +160,24 @@ def fetch_view_many_ids(list_url: str, limit: int | None = 300) -> list[str]:
     return extract_view_many_ids(res.text or "", limit=limit)
 
 
-def parse_task_page(html: str) -> tuple[str, str, str]:
+def parse_task_page(html: str, *, task_id: str | None = None) -> tuple[str, str, str]:
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html or "", "html.parser")
 
-    statement_node = soup.find("div", id=re.compile(r"^body\d+$"))
-    solution_node = soup.find("div", id=re.compile(r"^sol\d+$")) or soup.find("div", class_=re.compile(r"\bsolution\b", flags=re.IGNORECASE))
+    statement_node = None
+    if task_id:
+        statement_node = soup.find("div", id=f"text{task_id}") or soup.find("div", id=f"body{task_id}")
+    if statement_node is None:
+        statement_node = soup.find("div", id=re.compile(r"^body\d+$"))
+
+    solution_node = None
+    if task_id:
+        solution_node = soup.find("div", id=f"sol{task_id}")
+    if solution_node is None:
+        solution_node = soup.find("div", id=re.compile(r"^sol\d+$")) or soup.find(
+            "div", class_=re.compile(r"\bsolution\b", flags=re.IGNORECASE)
+        )
 
     content_node = statement_node or (
         soup.select_one("div.prob_maindiv")
@@ -386,7 +397,7 @@ def import_one_task_from_sdamgia(
     if skip_prototype and has_prototype_marker(html):
         return {"task_id": task_id, "status": "skipped", "detail": "prototype solution"}
 
-    content_html, answer, solution_html = parse_task_page(html)
+    content_html, answer, solution_html = parse_task_page(html, task_id=task_id)
 
     if skip_no_answer and not answer:
         return {"task_id": task_id, "status": "skipped", "detail": "no answer"}
