@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from core.models import Subject, Topic, Task, ExamFormat, TaskType
+from core.models import Subject, Topic, Task, TaskVariant, ExamFormat, TaskType
 import random
 import uuid
 
@@ -12,7 +12,7 @@ class Command(BaseCommand):
         
         exam_format, _ = ExamFormat.objects.get_or_create(
             subject=subject,
-            name='ЕГЭ Профиль',
+            name='ЕГЭ математика профиль',
             year=2024,
             defaults={'is_active': True}
         )
@@ -61,15 +61,15 @@ class Command(BaseCommand):
             nonlocal tasks_created
             for _ in range(count):
                 content, answer = self.generate_task_content(tt_number)
-                Task.objects.create(
+                task = Task.objects.create(
                     fipi_id=uuid.uuid4().hex[:8].upper(),
                     topic=topic,
                     task_type=tt,
-                    content=content,
                     correct_answer=answer,
                     difficulty=random.randint(30, 90),
                     exam_points=tt.max_points
                 )
+                TaskVariant.objects.create(task=task, theme='classic', content=content, solution='')
                 tasks_created += 1
 
         # Clear old tasks if needed? No, just add new ones.
@@ -171,4 +171,3 @@ class Command(BaseCommand):
             return f"<p>На доске написано {random.randint(20, 40)} различных натуральных чисел, каждое из которых не превосходит {random.randint(50, 100)}.<br>а) Может ли их сумма быть равной {random.randint(500, 1000)}?<br>б) Может ли их сумма быть равной {random.randint(200, 400)}?<br>в) Какое наибольшее количество чисел может быть кратно 3?</p>", "а) да; б) нет; в) 12"
         else:
             return "<p>Случайная задача</p>", "42"
-
