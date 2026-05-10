@@ -1800,9 +1800,11 @@ def tutor_create_assignment(request):
         return redirect('login')
 
     students = request.user.students.all()
+    exam_formats = ExamFormat.objects.select_related("subject").order_by("subject__name", "-is_active", "-year", "name")
 
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
+        exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
         
         # Генерация дефолтного названия
         import datetime
@@ -1818,6 +1820,21 @@ def tutor_create_assignment(request):
             return redirect('tutor_create_assignment')
             
         student = get_object_or_404(User, id=student_id, role='student')
+
+        exam_format = None
+        if exam_format_id_raw:
+            try:
+                exam_format = ExamFormat.objects.get(id=int(exam_format_id_raw))
+            except Exception:
+                exam_format = None
+        if exam_format is None:
+            profile = StudentSubjectProfile.objects.filter(student=student).select_related("subject").first()
+            if profile:
+                exam_format = ExamFormat.objects.filter(subject=profile.subject, is_active=True).order_by("-year", "name").first()
+        if exam_format is None:
+            messages.error(request, "Выберите формат экзамена.")
+            request.session['saved_assignment_form'] = dict(request.POST)
+            return redirect('tutor_create_assignment')
         
         # Collect tasks
         selected_tasks = []
@@ -1833,9 +1850,14 @@ def tutor_create_assignment(request):
                     allowed_subtypes_by_type.setdefault(int(t_type_id), []).append(subtype_tag)
 
         # Handle Type-level counts
-        task_types = list(TaskType.objects.all())
+        task_types = list(TaskType.objects.filter(exam_format=exam_format))
 
-        bundle_task_types = [t for t in task_types if 1 <= int(getattr(t, "number", 0) or 0) <= 5]
+        bundle_task_types = [
+            t
+            for t in task_types
+            if 1 <= int(getattr(t, "number", 0) or 0) <= 5
+            and Task.objects.filter(task_type=t).exclude(bundle_code__isnull=True).exclude(bundle_code__exact="").exists()
+        ]
         bundle_type_ids = {t.id for t in bundle_task_types}
         bundle_anchor = next((t for t in bundle_task_types if int(t.number) == 1), None)
         requested_bundle_count = 0
@@ -1925,7 +1947,18 @@ def tutor_create_assignment(request):
 
     # Формируем структуру: Типы -> Подтипы с их количеством
     grouped_data = []
-    task_types = TaskType.objects.all().order_by('number')
+    selected_exam_format_id = (request.GET.get("exam_format") or "").strip()
+    saved_form = request.session.pop('saved_assignment_form', {})
+    if not selected_exam_format_id and saved_form:
+        selected_exam_format_id = (saved_form.get("exam_format") or [""])[0]
+
+    selected_exam_format = None
+    if selected_exam_format_id and str(selected_exam_format_id).isdigit():
+        selected_exam_format = ExamFormat.objects.filter(id=int(selected_exam_format_id)).first()
+    if selected_exam_format is None and exam_formats.exists():
+        selected_exam_format = exam_formats.filter(is_active=True).first() or exam_formats.first()
+
+    task_types = TaskType.objects.filter(exam_format=selected_exam_format).order_by('number') if selected_exam_format else TaskType.objects.none()
     idx = 0
     for t_type in task_types:
         subtypes = Task.objects.filter(task_type=t_type).values('subtype_tag').annotate(count=models.Count('id')).order_by('subtype_tag')
@@ -1947,7 +1980,6 @@ def tutor_create_assignment(request):
             })
 
     # Retrieve saved form data if exists
-    saved_form = request.session.pop('saved_assignment_form', {})
     saved_type_counts = {}
     saved_subtype_counts = {}
     saved_subtype_checked = {}
@@ -1977,6 +2009,8 @@ def tutor_create_assignment(request):
 
     return render(request, 'core/tutor_create_assignment.html', {
         'students': students,
+        'exam_formats': exam_formats,
+        'selected_exam_format': selected_exam_format,
         'grouped_data': grouped_data,
         'saved_form': saved_form
     })

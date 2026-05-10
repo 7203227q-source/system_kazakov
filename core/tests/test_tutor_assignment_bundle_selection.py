@@ -36,6 +36,7 @@ class TutorAssignmentBundleSelectionTests(TestCase):
         t1 = task_types[1]
         post = {
             "student_id": str(student.id),
+            "exam_format": str(exam_format.id),
             f"type_count_{t1.id}": "1",
             "subtype_checked_1": "on",
             "subtype_name_1": "block",
@@ -48,4 +49,3 @@ class TutorAssignmentBundleSelectionTests(TestCase):
 
         assignment = Assignment.objects.latest("id")
         self.assertEqual(assignment.tasks.count(), 5)
-
