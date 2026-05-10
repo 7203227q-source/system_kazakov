@@ -662,6 +662,11 @@ def student_check_assignment_task(request, assignment_id, task_id):
     variant = task.variants.filter(theme='classic').first()
     if variant and variant.solution:
         solution_html = variant.solution
+
+    unlocked = request.session.get('whiteboard_unlocked', {}) or {}
+    unlocked[f"{int(assignment.id)}:{int(task.id)}"] = True
+    request.session['whiteboard_unlocked'] = unlocked
+    request.session.modified = True
         
     return JsonResponse({
         'is_correct': is_correct,
@@ -1251,12 +1256,44 @@ def tutor_assignment_view(request, assignment_id):
 
     theme = getattr(request.user, 'preferred_theme', None) or 'classic'
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+    tasks_view = []
+    for t in tasks:
+        tasks_view.append({
+            'task': t,
+            'content_html': t.get_content_for_theme(theme),
+            'solution_html': t.get_solution_for_theme(theme),
+        })
     return render(request, 'core/tutor_assignment_view.html', {
         'assignment': assignment,
         'student': assignment.student,
         'theme': theme,
-        'tasks': tasks,
+        'tasks_view': tasks_view,
     })
+
+
+def _whiteboard_key(assignment_id: int, task_id: int):
+    return f"{int(assignment_id)}:{int(task_id)}"
+
+
+def _student_whiteboard_unlocked(request, assignment_id: int, task_id: int):
+    unlocked = request.session.get('whiteboard_unlocked', {}) or {}
+    return bool(unlocked.get(_whiteboard_key(assignment_id, task_id)))
+
+
+def _student_whiteboard_current_session_id(request, assignment_id: int, task_id: int):
+    current = request.session.get('whiteboard_current', {}) or {}
+    sid = current.get(_whiteboard_key(assignment_id, task_id))
+    try:
+        return int(sid) if sid is not None else None
+    except Exception:
+        return None
+
+
+def _student_whiteboard_set_current_session_id(request, assignment_id: int, task_id: int, session_id: int):
+    current = request.session.get('whiteboard_current', {}) or {}
+    current[_whiteboard_key(assignment_id, task_id)] = int(session_id)
+    request.session['whiteboard_current'] = current
+    request.session.modified = True
 
 
 def _can_access_whiteboard_session(user: User, session: WhiteboardSession):
@@ -1287,6 +1324,11 @@ def whiteboard_page(request, session_id):
     )
     if not _can_access_whiteboard_session(request.user, session):
         return redirect('login')
+
+    if request.user.role == 'student' and not _student_whiteboard_unlocked(request, session.assignment_id, session.task_id):
+        current_id = _student_whiteboard_current_session_id(request, session.assignment_id, session.task_id)
+        if not current_id or current_id != session.id:
+            return HttpResponseForbidden("Board is locked")
 
     theme = session.student.preferred_theme or 'classic'
     task_html = session.task.get_content_for_theme(theme)
@@ -1323,10 +1365,14 @@ def whiteboard_list(request):
     if not _can_access_assignment_task(request.user, assignment, task, student):
         return JsonResponse({'error': 'forbidden'}, status=403)
 
-    sessions = (
-        WhiteboardSession.objects.filter(student=student, assignment=assignment, task=task)
-        .order_by('-created_at')[:50]
-    )
+    qs = WhiteboardSession.objects.filter(student=student, assignment=assignment, task=task).order_by('-created_at')
+    if request.user.role == 'student' and not _student_whiteboard_unlocked(request, assignment.id, task.id):
+        current_id = _student_whiteboard_current_session_id(request, assignment.id, task.id)
+        if current_id:
+            qs = qs.filter(id=current_id)
+        else:
+            qs = qs.none()
+    sessions = qs[:50]
     return JsonResponse({
         'sessions': [
             {
@@ -1349,6 +1395,11 @@ def whiteboard_create(request, assignment_id, task_id):
     if not _can_access_assignment_task(request.user, assignment, task, student):
         return JsonResponse({'error': 'forbidden'}, status=403)
 
+    if request.user.role == 'student' and not _student_whiteboard_unlocked(request, assignment.id, task.id):
+        current_id = _student_whiteboard_current_session_id(request, assignment.id, task.id)
+        if current_id:
+            return JsonResponse({'session_id': current_id})
+
     session = WhiteboardSession.objects.create(
         student=student,
         tutor=assignment.tutor,
@@ -1357,6 +1408,8 @@ def whiteboard_create(request, assignment_id, task_id):
         title=None,
         snapshot_json=None,
     )
+    if request.user.role == 'student':
+        _student_whiteboard_set_current_session_id(request, assignment.id, task.id, session.id)
     return JsonResponse({'session_id': session.id})
 
 
@@ -1365,6 +1418,11 @@ def whiteboard_events_pull(request, session_id):
     session = get_object_or_404(WhiteboardSession, id=session_id)
     if not _can_access_whiteboard_session(request.user, session):
         return JsonResponse({'error': 'forbidden'}, status=403)
+
+    if request.user.role == 'student' and not _student_whiteboard_unlocked(request, session.assignment_id, session.task_id):
+        current_id = _student_whiteboard_current_session_id(request, session.assignment_id, session.task_id)
+        if not current_id or current_id != session.id:
+            return JsonResponse({'error': 'forbidden'}, status=403)
 
     try:
         after = int(request.GET.get('after') or 0)
@@ -1395,6 +1453,11 @@ def whiteboard_events_append(request, session_id):
     if not _can_access_whiteboard_session(request.user, session):
         return JsonResponse({'error': 'forbidden'}, status=403)
 
+    if request.user.role == 'student' and not _student_whiteboard_unlocked(request, session.assignment_id, session.task_id):
+        current_id = _student_whiteboard_current_session_id(request, session.assignment_id, session.task_id)
+        if not current_id or current_id != session.id:
+            return JsonResponse({'error': 'forbidden'}, status=403)
+
     try:
         body = json.loads(request.body.decode('utf-8') or '{}')
     except Exception:
@@ -1422,6 +1485,11 @@ def whiteboard_save(request, session_id):
     session = get_object_or_404(WhiteboardSession, id=session_id)
     if not _can_access_whiteboard_session(request.user, session):
         return JsonResponse({'error': 'forbidden'}, status=403)
+
+    if request.user.role == 'student' and not _student_whiteboard_unlocked(request, session.assignment_id, session.task_id):
+        current_id = _student_whiteboard_current_session_id(request, session.assignment_id, session.task_id)
+        if not current_id or current_id != session.id:
+            return JsonResponse({'error': 'forbidden'}, status=403)
 
     try:
         body = json.loads(request.body.decode('utf-8') or '{}')
@@ -2381,6 +2449,11 @@ def api_verify_with_ai(request, submission_id):
 
     task = submission.task
     max_points = task.exam_points
+    if submission.assignment_id:
+        unlocked = request.session.get('whiteboard_unlocked', {}) or {}
+        unlocked[f"{int(submission.assignment_id)}:{int(task.id)}"] = True
+        request.session['whiteboard_unlocked'] = unlocked
+        request.session.modified = True
 
     model = ""
     try:
