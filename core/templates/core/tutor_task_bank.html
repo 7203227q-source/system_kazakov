@@ -98,7 +98,7 @@
                             <option value="">Все форматы</option>
                             {% for f in exam_formats %}
                             <option value="{{ f.id }}" {% if exam_format_filter == f.id|stringformat:"s" %}selected{% endif %}>
-                                {{ f.subject.name }} · {{ f.name }} {{ f.year }}
+                                {{ f.subject.name }} · {{ f.name }} {{ f.year }}{% if not f.is_active %} (не активен){% endif %}
                             </option>
                             {% endfor %}
                         </select>

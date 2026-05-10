@@ -109,7 +109,7 @@ def admin_reshuege_import(request):
     if request.user.role != 'admin':
         return redirect('login')
 
-    formats = ExamFormat.objects.filter(is_active=True).select_related('subject').order_by('subject__name', '-year', 'name')
+    formats = ExamFormat.objects.all().select_related('subject').order_by('subject__name', '-is_active', '-year', 'name')
 
     report = None
     form = {
@@ -2202,7 +2202,7 @@ def tutor_task_bank(request):
     exam_formats = []
     if request.user.role == 'admin':
         subjects = Subject.objects.all().order_by('name')
-        exam_formats_qs = ExamFormat.objects.filter(is_active=True).order_by('subject__name', '-year', 'name')
+        exam_formats_qs = ExamFormat.objects.all().select_related('subject').order_by('subject__name', '-is_active', '-year', 'name')
         if subject_filter:
             exam_formats_qs = exam_formats_qs.filter(subject_id=subject_filter)
         exam_formats = exam_formats_qs
@@ -2249,7 +2249,7 @@ def import_tasks_view(request):
             messages.error(request, f"Ошибка при импорте: {e}")
             return redirect('import_tasks')
 
-    formats = ExamFormat.objects.filter(is_active=True)
+    formats = ExamFormat.objects.all().select_related('subject').order_by('subject__name', '-is_active', '-year', 'name')
     return render(request, 'core/import_tasks.html', {'formats': formats})
 
 @login_required

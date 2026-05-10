@@ -44,7 +44,7 @@
                     <select name="exam_format" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                         <option value="">-- Выберите формат --</option>
                         {% for format in formats %}
-                            <option value="{{ format.id }}">{{ format.name }} ({{ format.year }})</option>
+                            <option value="{{ format.id }}">{{ format.subject.name }} · {{ format.name }} ({{ format.year }}){% if not format.is_active %} (не активен){% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
