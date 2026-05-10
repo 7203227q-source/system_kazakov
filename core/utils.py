@@ -1,8 +1,8 @@
 import os
 import uuid
 import requests
-import imghdr
 import gzip
+from io import BytesIO
 from urllib.parse import urlparse, quote
 from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
@@ -18,14 +18,22 @@ def get_extension_from_content(content):
     if b'<svg' in content[:1024]:
         return '.svg'
         
-    ext = imghdr.what(None, h=content)
-    if ext:
-        if ext == 'jpeg':
-            return '.jpg'
-        return f".{ext}"
+    try:
+        from PIL import Image
+
+        img = Image.open(BytesIO(content))
+        fmt = (img.format or "").lower()
+        if fmt:
+            if fmt == "jpeg":
+                return ".jpg"
+            if fmt == "tiff":
+                return ".tif"
+            return f".{fmt}"
+    except Exception:
+        pass
     return '.jpg'
 
-def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None):
+def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None, segment="content"):
     """
     Parses HTML content, finds all <img> tags, downloads the remote images,
     saves them locally, and updates the src attributes.
@@ -94,7 +102,7 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
                 ext = get_extension_from_content(raw)
                 
                 # Generate unique filename (we overwrite to avoid duplicating on re-imports)
-                filename = f"tasks/{task_fipi_id}_{theme}_{idx}{ext}"
+                filename = f"tasks/{task_fipi_id}_{theme}_{segment}_{idx}{ext}"
                 
                 # Check if file exists with this specific extension, if so delete it
                 if default_storage.exists(filename):
@@ -103,7 +111,7 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
                 # Also delete potential old versions with different extensions
                 for old_ext in ['.jpg', '.png', '.gif', '.svg']:
                     if old_ext != ext:
-                        old_filename = f"tasks/{task_fipi_id}_{theme}_{idx}{old_ext}"
+                        old_filename = f"tasks/{task_fipi_id}_{theme}_{segment}_{idx}{old_ext}"
                         if default_storage.exists(old_filename):
                             default_storage.delete(old_filename)
                 

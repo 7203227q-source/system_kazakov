@@ -363,8 +363,8 @@ def import_one_task_from_sdamgia(
         if not sol_text:
             return {"task_id": task_id, "status": "skipped", "detail": "no solution"}
 
-    processed_content = download_and_replace_images(content_html, task_id, theme, base_url=base_url)
-    processed_solution = download_and_replace_images(solution_html, task_id, theme, base_url=base_url)
+    processed_content = download_and_replace_images(content_html, task_id, theme, base_url=base_url, segment="content")
+    processed_solution = download_and_replace_images(solution_html, task_id, theme, base_url=base_url, segment="solution")
 
     task, created = Task.objects.update_or_create(
         fipi_id=task_id,

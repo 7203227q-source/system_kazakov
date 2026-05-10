@@ -57,8 +57,8 @@ def import_tasks_from_csv(file_obj, exam_format_id):
             updated_tasks += 1
 
         # Process images and HTML content
-        processed_content = download_and_replace_images(content, fipi_id, theme)
-        processed_solution = download_and_replace_images(solution, fipi_id, theme)
+        processed_content = download_and_replace_images(content, fipi_id, theme, segment="content")
+        processed_solution = download_and_replace_images(solution, fipi_id, theme, segment="solution")
         processed_content = normalize_task_html(processed_content)
         processed_solution = normalize_task_html(processed_solution)
 
