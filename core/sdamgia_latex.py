@@ -70,6 +70,8 @@ def sanitize_math_latex(value: str) -> str:
 
     s = re.sub(r"\bв\s*степени\b", "степени", s, flags=re.IGNORECASE)
     s = re.sub(r"\bвстепени\b", "степени", s, flags=re.IGNORECASE)
+    s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])\s*в\s*(?=\^)", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])в(?=\^)", "", s, flags=re.IGNORECASE)
 
     def fix_tfrac(match: re.Match) -> str:
         digits = match.group(1)

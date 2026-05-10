@@ -73,3 +73,8 @@ class SdamgiaLatexTests(SimpleTestCase):
         self.assertIn(r"\sqrt{25a^{9}}", latex)
         self.assertIn(r"\sqrt{16b^{8}}", latex)
         self.assertIn(r"\sqrt{a^{5}b^{8}}", latex.replace(" ", ""))
+
+    def test_removes_stray_v_before_power(self):
+        alt = "4в^{-10}\\cdot (4^3)в^4"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"4^{-10}\cdot(4^3)^4".replace(" ", ""))
