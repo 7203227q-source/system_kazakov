@@ -32,26 +32,28 @@ def html_to_text(html: str) -> str:
 
 def resolve_sdamgia_base_url(exam_format: ExamFormat) -> str:
     name = (exam_format.subject.name or "").strip().lower()
+    fmt_name = (exam_format.name or "").strip().lower()
+    is_oge = "огэ" in fmt_name
 
     mapping = [
-        (["матем"], "https://math-ege.sdamgia.ru"),
-        (["физ"], "https://phys-ege.sdamgia.ru"),
-        (["информ"], "https://inf-ege.sdamgia.ru"),
-        (["хим"], "https://chem-ege.sdamgia.ru"),
-        (["биолог"], "https://bio-ege.sdamgia.ru"),
-        (["рус"], "https://rus-ege.sdamgia.ru"),
-        (["англ"], "https://eng-ege.sdamgia.ru"),
-        (["истор"], "https://hist-ege.sdamgia.ru"),
-        (["геог"], "https://geo-ege.sdamgia.ru"),
-        (["общ"], "https://soc-ege.sdamgia.ru"),
-        (["лит"], "https://lit-ege.sdamgia.ru"),
+        (["матем"], ("https://math-ege.sdamgia.ru", "https://math-oge.sdamgia.ru")),
+        (["физ"], ("https://phys-ege.sdamgia.ru", "https://phys-oge.sdamgia.ru")),
+        (["информ"], ("https://inf-ege.sdamgia.ru", "https://inf-oge.sdamgia.ru")),
+        (["хим"], ("https://chem-ege.sdamgia.ru", "https://chem-oge.sdamgia.ru")),
+        (["биолог"], ("https://bio-ege.sdamgia.ru", "https://bio-oge.sdamgia.ru")),
+        (["рус"], ("https://rus-ege.sdamgia.ru", "https://rus-oge.sdamgia.ru")),
+        (["англ"], ("https://eng-ege.sdamgia.ru", "https://eng-oge.sdamgia.ru")),
+        (["истор"], ("https://hist-ege.sdamgia.ru", "https://hist-oge.sdamgia.ru")),
+        (["геог"], ("https://geo-ege.sdamgia.ru", "https://geo-oge.sdamgia.ru")),
+        (["общ"], ("https://soc-ege.sdamgia.ru", "https://soc-oge.sdamgia.ru")),
+        (["лит"], ("https://lit-ege.sdamgia.ru", "https://lit-oge.sdamgia.ru")),
     ]
 
-    for keys, base in mapping:
+    for keys, bases in mapping:
         if any(k in name for k in keys):
-            return base
+            return bases[1] if is_oge else bases[0]
 
-    return "https://ege.sdamgia.ru"
+    return "https://oge.sdamgia.ru" if is_oge else "https://ege.sdamgia.ru"
 
 
 def extract_task_id(value: str) -> str | None:

@@ -319,18 +319,30 @@ def proxy_image(request):
 
     host = p.netloc.lower()
     allowed_hosts = {
+        "oge.sdamgia.ru",
         "ege.sdamgia.ru",
+        "math-oge.sdamgia.ru",
         "math-ege.sdamgia.ru",
         "mathb-ege.sdamgia.ru",
+        "inf-oge.sdamgia.ru",
         "inf-ege.sdamgia.ru",
+        "phys-oge.sdamgia.ru",
         "phys-ege.sdamgia.ru",
+        "chem-oge.sdamgia.ru",
         "chem-ege.sdamgia.ru",
+        "bio-oge.sdamgia.ru",
         "bio-ege.sdamgia.ru",
+        "rus-oge.sdamgia.ru",
         "rus-ege.sdamgia.ru",
+        "eng-oge.sdamgia.ru",
         "eng-ege.sdamgia.ru",
+        "hist-oge.sdamgia.ru",
         "hist-ege.sdamgia.ru",
+        "geo-oge.sdamgia.ru",
         "geo-ege.sdamgia.ru",
+        "soc-oge.sdamgia.ru",
         "soc-ege.sdamgia.ru",
+        "lit-oge.sdamgia.ru",
         "lit-ege.sdamgia.ru",
     }
     if host not in allowed_hosts:
