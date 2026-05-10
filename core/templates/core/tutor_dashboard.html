@@ -127,15 +127,23 @@
                     <h3 class="text-sm font-bold text-yellow-600 mb-3 uppercase tracking-wider">Черновики (Ожидают публикации)</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {% for draft in drafts %}
-                        <a href="{% url 'tutor_preview_assignment' draft.id %}" class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center hover:bg-yellow-100 transition shadow-sm">
-                            <div class="w-10 h-10 bg-yellow-200 text-yellow-700 rounded-full flex items-center justify-center text-lg shrink-0">
-                                <i class="fas fa-edit"></i>
-                            </div>
-                            <div class="ml-3">
-                                <h4 class="font-bold text-gray-800 text-sm">{{ draft.title }}</h4>
-                                <p class="text-xs text-gray-500">Ученик: {{ draft.student.get_full_name|default:draft.student.username }}</p>
-                            </div>
-                        </a>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between gap-3 shadow-sm">
+                            <a href="{% url 'tutor_preview_assignment' draft.id %}" class="flex items-center min-w-0 hover:underline">
+                                <div class="w-10 h-10 bg-yellow-200 text-yellow-700 rounded-full flex items-center justify-center text-lg shrink-0">
+                                    <i class="fas fa-edit"></i>
+                                </div>
+                                <div class="ml-3 min-w-0">
+                                    <h4 class="font-bold text-gray-800 text-sm truncate">{{ draft.title }}</h4>
+                                    <p class="text-xs text-gray-500 truncate">Ученик: {{ draft.student.get_full_name|default:draft.student.username }}</p>
+                                </div>
+                            </a>
+                            <form method="POST" action="{% url 'tutor_delete_draft_assignment' draft.id %}" class="shrink-0" onsubmit="return confirm('Удалить черновик без возможности восстановления?');">
+                                {% csrf_token %}
+                                <button type="submit" class="bg-white border border-yellow-200 text-yellow-700 hover:bg-yellow-100 px-3 py-2 rounded-lg text-sm font-bold transition">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>
@@ -241,7 +249,7 @@
                         </div>
                         <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
                             {% for item in task_type_rates %}
-                            <div class="rounded-lg border border-gray-200 p-2 text-center bg-white task-type-tile" data-rate="{% if item.rate is None %}{% else %}{{ item.rate|floatformat:0 }}{% endif %}">
+                            <div class="rounded-lg border border-gray-200 p-2 text-center bg-white task-type-tile" data-rate="{% if item.rate is None %}{% else %}{{ item.rate|floatformat:0 }}{% endif %}" title="{{ item.name|default:'' }}">
                                 <div class="text-xs font-black text-gray-800">{{ item.number }}</div>
                                 <div class="text-[10px] text-gray-500 mt-1">
                                     {% if item.rate is None %}

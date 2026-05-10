@@ -40,6 +40,7 @@ urlpatterns = [
     path('tutor/assignment/<int:assignment_id>/summary/', views.tutor_assignment_summary, name='tutor_assignment_summary'),
     path('tutor/assignment/<int:assignment_id>/view/', views.tutor_assignment_view, name='tutor_assignment_view'),
     path('tutor/assignment/<int:assignment_id>/publish/', views.tutor_publish_assignment, name='tutor_publish_assignment'),
+    path('tutor/assignment/<int:assignment_id>/delete-draft/', views.tutor_delete_draft_assignment, name='tutor_delete_draft_assignment'),
     path('tutor/assignment/<int:assignment_id>/extension-request/<int:req_id>/approve/', views.tutor_extension_approve, name='tutor_extension_approve'),
     path('tutor/assignment/<int:assignment_id>/extension-request/<int:req_id>/reject/', views.tutor_extension_reject, name='tutor_extension_reject'),
     path('tutor/assignment/<int:assignment_id>/regenerate/<int:task_id>/', views.tutor_regenerate_task, name='tutor_regenerate_task'),

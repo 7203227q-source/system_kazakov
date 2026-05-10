@@ -1226,6 +1226,16 @@ def tutor_dashboard(request):
                 ensure_ascii=False,
             )
 
+        active_exam_format = None
+        task_type_name_map = {}
+        if profiles:
+            active_exam_format = ExamFormat.objects.filter(subject_id=chart_subject_id, is_active=True).order_by('-year').first()
+        if active_exam_format:
+            task_type_name_map = {
+                int(tt.number): tt.name
+                for tt in TaskType.objects.filter(exam_format=active_exam_format).only('number', 'name')
+            }
+
         rows = (
             Submission.objects.filter(student=selected_student)
             .exclude(task__task_type__number__isnull=True)
@@ -1243,18 +1253,19 @@ def tutor_dashboard(request):
         correct_total = int(totals.get('correct') or 0)
         student_correct_rate = (correct_total / student_total_submissions * 100.0) if student_total_submissions else None
         rate_map = {int(r['task__task_type__number']): r for r in rows if r.get('task__task_type__number') is not None}
-        for n in range(1, 20):
+        numbers = sorted(task_type_name_map.keys()) if task_type_name_map else list(range(1, 20))
+        for n in numbers:
             r = rate_map.get(n)
             if not r:
-                task_type_rates.append({'number': n, 'rate': None, 'total': 0, 'correct': 0})
+                task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': None, 'total': 0, 'correct': 0})
                 continue
             total = int(r.get('total') or 0)
             correct = int(r.get('correct') or 0)
             rate = (correct / total * 100.0) if total > 0 else None
-            task_type_rates.append({'number': n, 'rate': rate, 'total': total, 'correct': correct})
+            task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': rate, 'total': total, 'correct': correct})
     
     # Check if there are draft assignments we might want to resume or delete
-    drafts = Assignment.objects.filter(tutor=request.user, is_draft=True)
+    drafts = Assignment.objects.filter(tutor=request.user, is_draft=True).select_related('student').order_by('-created_at')
     
     context = {
         'students': students,
@@ -1271,6 +1282,20 @@ def tutor_dashboard(request):
         'student_correct_rate': student_correct_rate,
     }
     return render(request, 'core/tutor_dashboard.html', context)
+
+
+@login_required
+@require_POST
+def tutor_delete_draft_assignment(request, assignment_id):
+    if request.user.role != 'tutor':
+        return redirect('login')
+    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user)
+    if not assignment.is_draft:
+        messages.error(request, "Можно удалять только черновики (не опубликованные варианты).")
+        return redirect('tutor_dashboard')
+    assignment.delete()
+    messages.success(request, "Черновик удалён.")
+    return redirect('tutor_dashboard')
 
 
 @login_required
