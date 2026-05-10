@@ -32,3 +32,13 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "дробь: числитель: 1, знаменатель: \\tfrac130 плюс \\tfrac142 конец дроби"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), r"\frac{1}{\frac{1}{30}+\frac{1}{42}}".replace(" ", ""))
+
+    def test_inequality_words(self):
+        alt = "a плюс 4 больше 0"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), "a+4>0")
+
+    def test_sqrt_tokens(self):
+        alt = "корень из: начало аргумента: 42 конец аргумента"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex, r"\sqrt{42}")

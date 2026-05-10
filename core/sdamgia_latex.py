@@ -15,6 +15,13 @@ def normalize_sdamgia_alt(value: str) -> str:
     s = re.sub(r"конец\s*дроби", "конец дроби", s, flags=re.IGNORECASE)
     s = re.sub(r"конецдроби", "конец дроби", s, flags=re.IGNORECASE)
     s = re.sub(r"(?<=\d)\s*(конец\s+дроби)", r" \1", s, flags=re.IGNORECASE)
+    s = re.sub(r"корень\s*из", "корень из", s, flags=re.IGNORECASE)
+    s = re.sub(r"кореньиз", "корень из", s, flags=re.IGNORECASE)
+    s = re.sub(r"начало\s*аргумента", "начало аргумента", s, flags=re.IGNORECASE)
+    s = re.sub(r"началоаргумента", "начало аргумента", s, flags=re.IGNORECASE)
+    s = re.sub(r"конец\s*аргумента", "конец аргумента", s, flags=re.IGNORECASE)
+    s = re.sub(r"конецаргумента", "конец аргумента", s, flags=re.IGNORECASE)
+    s = re.sub(r"(?<=\d)\s*(конец\s+аргумента)", r" \1", s, flags=re.IGNORECASE)
     return s.strip()
 
 
@@ -25,6 +32,11 @@ _FRACTION_RE = re.compile(
 
 _MIXED_RE = re.compile(
     r"(?:целая\s*часть|целаячасть)\s*[: ]\s*(?P<whole>-?\d+(?:\s+\d+)*)\s*,\s*(?:дробная\s*часть|дробнаячасть)\s*[: ]\s*(?:дробь\s*:?\s*)?числитель\s*[: ]\s*(?P<num>-?\d+(?:\s+\d+)*)\s*,\s*знаменатель\s*[: ]\s*(?P<den>\d+(?:\s+\d+)*)(?=(?:\s*конец\s*дроби|\s*$|\s*[+\-*/=]))",
+    flags=re.IGNORECASE | re.DOTALL,
+)
+
+_SQRT_RE = re.compile(
+    r"(?:корень\s*из)\s*:\s*(?:начало\s*аргумента)\s*:\s*(?P<arg>.*?)\s*(?:конец\s*аргумента)",
     flags=re.IGNORECASE | re.DOTALL,
 )
 
@@ -39,6 +51,14 @@ def _convert_plain_text(value: str) -> str:
     s = s.replace("⋅", r"\cdot ")
 
     replacements = [
+        ("больше или равно", r"\ge"),
+        ("меньше или равно", r"\le"),
+        ("не меньше", r"\ge"),
+        ("не менее", r"\ge"),
+        ("не больше", r"\le"),
+        ("не более", r"\le"),
+        ("больше", ">"),
+        ("меньше", "<"),
         ("левая круглая скобка", r"\left("),
         ("правая круглая скобка", r"\right)"),
         ("левая квадратная скобка", r"\left["),
@@ -78,6 +98,16 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
 
     s = _SPACED_TFRAC_RE.sub(lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}", s)
     s = _COMPACT_TFRAC_RE.sub(fix_tfrac, s)
+
+    def replace_sqrt(match: re.Match) -> str:
+        arg_raw = match.group("arg").strip()
+        arg = latex_from_sdamgia_alt(arg_raw, max_depth=max_depth - 1) or _convert_plain_text(arg_raw)
+        return rf"\sqrt{{{arg}}}"
+
+    depth = max_depth
+    while depth > 0 and _SQRT_RE.search(s):
+        s = _SQRT_RE.sub(replace_sqrt, s)
+        depth -= 1
 
     def replace_mixed(match: re.Match) -> str:
         whole_raw = match.group("whole").strip()

@@ -51,7 +51,25 @@ def fix_latex_tokens_in_html(html: str) -> tuple[str, int]:
                         fixed += 1
                         changed = True
                         continue
-                if any(k in part.lower() for k in ["целаячасть", "целая часть", "дробнаячасть", "дробная часть", "числитель", "знаменатель"]):
+                if any(
+                    k in part.lower()
+                    for k in [
+                        "целаячасть",
+                        "целая часть",
+                        "дробнаячасть",
+                        "дробная часть",
+                        "числитель",
+                        "знаменатель",
+                        "больше",
+                        "меньше",
+                        "кореньиз",
+                        "корень из",
+                        "началоаргумента",
+                        "начало аргумента",
+                        "конецаргумента",
+                        "конец аргумента",
+                    ]
+                ):
                     converted = latex_from_sdamgia_alt(part)
                     if converted:
                         out.append(converted)
