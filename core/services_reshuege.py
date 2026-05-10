@@ -234,6 +234,28 @@ def parse_task_page(html: str) -> tuple[str, str, str]:
     return content_html, answer, solution_html
 
 
+def extract_bundle_1_5(html: str) -> dict[int, str]:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    block = soup.find("div", class_="expand", attrs={"data-open": re.compile(r"другие задания этого блока", re.IGNORECASE)})
+    if not block:
+        return {}
+
+    mapping: dict[int, str] = {}
+    for item in block.find_all("div", class_=re.compile(r"\bprob_maindiv\b", re.IGNORECASE)):
+        text = normalize_sdamgia_text(item.get_text(" ", strip=True))
+        m = re.search(r"Тип\s+(\d+)\s*№\s*(\d+)", text, flags=re.IGNORECASE)
+        if not m:
+            continue
+        tnum = int(m.group(1))
+        tid = m.group(2)
+        if 1 <= tnum <= 5:
+            mapping[tnum] = tid
+
+    return mapping
+
+
 def has_prototype_marker(html: str) -> bool:
     page_text = html_to_text(html).lower()
     if "решение прототип" in page_text:
@@ -333,6 +355,7 @@ def import_one_task_from_sdamgia(
     skip_existing: bool,
     exclude_larin: bool,
     theme: str = "classic",
+    allow_bundle: bool = True,
 ) -> dict:
     exam_format = ExamFormat.objects.select_related("subject").get(id=exam_format_id)
     topic = Topic.objects.get_or_create(subject=exam_format.subject, name="Задания из Открытого Банка")[0]
@@ -343,9 +366,19 @@ def import_one_task_from_sdamgia(
     )
 
     if skip_existing and Task.objects.filter(fipi_id=task_id).exists():
-        return {"task_id": task_id, "status": "skipped", "detail": "already exists"}
+        if not (allow_bundle and 1 <= type_number <= 5):
+            return {"task_id": task_id, "status": "skipped", "detail": "already exists"}
 
     html = fetch_task_page_html(base_url, task_id)
+
+    bundle_code = None
+    bundle_map: dict[int, str] = {}
+    if allow_bundle and 1 <= type_number <= 5:
+        bundle_map = extract_bundle_1_5(html)
+        bundle_map[type_number] = task_id
+        ids_in_order = [bundle_map.get(i) for i in range(1, 6)]
+        if all(ids_in_order):
+            bundle_code = f"sdamgia_bundle:{'-'.join(ids_in_order)}"
 
     if exclude_larin and has_larin_source(html):
         return {"task_id": task_id, "status": "skipped", "detail": "larin_source"}
@@ -372,6 +405,7 @@ def import_one_task_from_sdamgia(
             "topic": topic,
             "task_type": task_type,
             "subtype_tag": "",
+            "bundle_code": bundle_code,
             "difficulty": 50,
             "correct_answer": answer,
             "exam_points": task_type.max_points,
@@ -384,7 +418,26 @@ def import_one_task_from_sdamgia(
         defaults={"content": processed_content, "solution": processed_solution},
     )
 
-    return {"task_id": task_id, "status": "ok", "detail": "imported" if created else "updated"}
+    if bundle_code and allow_bundle:
+        for tnum, tid in sorted(bundle_map.items()):
+            if tnum == type_number:
+                continue
+            import_one_task_from_sdamgia(
+                exam_format_id=exam_format_id,
+                type_number=tnum,
+                task_id=tid,
+                base_url=base_url,
+                skip_no_answer=skip_no_answer,
+                skip_prototype=skip_prototype,
+                skip_no_solution=skip_no_solution,
+                skip_existing=False,
+                exclude_larin=exclude_larin,
+                theme=theme,
+                allow_bundle=False,
+            )
+        Task.objects.filter(fipi_id__in=list(bundle_map.values())).update(bundle_code=bundle_code)
+
+    return {"task_id": task_id, "status": "ok", "detail": "imported" if created else "updated", "bundle_code": bundle_code or ""}
 
 
 def import_tasks_from_sdamgia_ids(

@@ -1833,10 +1833,41 @@ def tutor_create_assignment(request):
                     allowed_subtypes_by_type.setdefault(int(t_type_id), []).append(subtype_tag)
 
         # Handle Type-level counts
-        task_types = TaskType.objects.all()
+        task_types = list(TaskType.objects.all())
+
+        bundle_task_types = [t for t in task_types if 1 <= int(getattr(t, "number", 0) or 0) <= 5]
+        bundle_type_ids = {t.id for t in bundle_task_types}
+        bundle_anchor = next((t for t in bundle_task_types if int(t.number) == 1), None)
+        requested_bundle_count = 0
+        for t in bundle_task_types:
+            raw = request.POST.get(f"type_count_{t.id}", "0")
+            if raw.isdigit():
+                requested_bundle_count = max(requested_bundle_count, int(raw))
+
+        if bundle_anchor and requested_bundle_count > 0:
+            allowed_subtypes = allowed_subtypes_by_type.get(bundle_anchor.id, [])
+            if allowed_subtypes:
+                anchor_tasks = (
+                    Task.objects.filter(task_type=bundle_anchor, subtype_tag__in=allowed_subtypes)
+                    .exclude(bundle_code__isnull=True)
+                    .exclude(bundle_code__exact="")
+                    .order_by("?")[: requested_bundle_count * 4]
+                )
+                bundle_codes: list[str] = []
+                for t in anchor_tasks:
+                    if t.bundle_code and t.bundle_code not in bundle_codes:
+                        bundle_codes.append(t.bundle_code)
+                    if len(bundle_codes) >= requested_bundle_count:
+                        break
+                if bundle_codes:
+                    bundled = Task.objects.filter(bundle_code__in=bundle_codes, task_type__number__in=[1, 2, 3, 4, 5])
+                    selected_tasks.extend(list(bundled))
+
         for t_type in task_types:
             type_count_str = request.POST.get(f'type_count_{t_type.id}', '0')
             if type_count_str.isdigit() and int(type_count_str) > 0:
+                if t_type.id in bundle_type_ids:
+                    continue
                 count = int(type_count_str)
                 allowed_subtypes = allowed_subtypes_by_type.get(t_type.id, [])
                 
@@ -1858,6 +1889,8 @@ def tutor_create_assignment(request):
                 t_type_id = request.POST.get(f'subtype_type_{idx}')
                 
                 if t_type_id:
+                    if int(t_type_id) in bundle_type_ids:
+                        continue
                     tasks_of_subtype = list(Task.objects.filter(
                         task_type_id=t_type_id, 
                         subtype_tag=subtype_tag
@@ -1873,13 +1906,20 @@ def tutor_create_assignment(request):
         if 'saved_assignment_form' in request.session:
             del request.session['saved_assignment_form']
             
+        unique_tasks = []
+        seen_ids = set()
+        for t in selected_tasks:
+            if t.id not in seen_ids:
+                seen_ids.add(t.id)
+                unique_tasks.append(t)
+
         assignment = Assignment.objects.create(
             tutor=request.user,
             student=student,
             title=title,
             is_draft=True
         )
-        assignment.tasks.add(*selected_tasks)
+        assignment.tasks.add(*unique_tasks)
         
         return redirect('tutor_preview_assignment', assignment_id=assignment.id)
 

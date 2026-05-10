@@ -136,6 +136,7 @@ class Task(models.Model):
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='tasks')
     task_type = models.ForeignKey(TaskType, on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks', verbose_name="Тип задания (КИМ)")
     subtype_tag = models.CharField(max_length=200, null=True, blank=True, verbose_name="Подтип/Тег математической логики")
+    bundle_code = models.CharField(max_length=200, null=True, blank=True, db_index=True, verbose_name="Код связки (групповой блок)")
 
     correct_answer = models.TextField(verbose_name="Правильный ответ/решение")
     difficulty = models.IntegerField(default=50, verbose_name="Сложность (1-100)")
