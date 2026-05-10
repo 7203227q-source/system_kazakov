@@ -42,6 +42,38 @@ _SQRT_RE = re.compile(
 
 _COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
 _SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
+_POWER_RE = re.compile(r"(?P<base>[0-9a-zA-Zа-яА-Я\)\]\}]+)\s*степени\s*(?P<exp>[0-9]+)", flags=re.IGNORECASE)
+
+
+def sanitize_math_latex(value: str) -> str:
+    if not value:
+        return value
+
+    s = str(value)
+
+    def fix_tfrac(match: re.Match) -> str:
+        digits = match.group(1)
+        num = digits[:1]
+        den = digits[1:]
+        if not den:
+            return match.group(0)
+        return rf"\frac{{{num}}}{{{den}}}"
+
+    s = _SPACED_TFRAC_RE.sub(lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}", s)
+    s = _COMPACT_TFRAC_RE.sub(fix_tfrac, s)
+
+    s = _POWER_RE.sub(lambda m: rf"{m.group('base')}^{{{m.group('exp')}}}", s)
+
+    left_count = s.count(r"\left")
+    right_count = s.count(r"\right")
+    if left_count != right_count:
+        s = s.replace(r"\left(", "(").replace(r"\right)", ")")
+        s = s.replace(r"\left[", "[").replace(r"\right]", "]")
+        s = s.replace(r"\left\{", r"\{").replace(r"\right\}", r"\}")
+        s = s.replace(r"\left.", "").replace(r"\right.", "")
+        s = s.replace(r"\left", "").replace(r"\right", "")
+
+    return s
 
 
 def _convert_plain_text(value: str) -> str:
@@ -59,10 +91,10 @@ def _convert_plain_text(value: str) -> str:
         ("не более", r"\le"),
         ("больше", ">"),
         ("меньше", "<"),
-        ("левая круглая скобка", r"\left("),
-        ("правая круглая скобка", r"\right)"),
-        ("левая квадратная скобка", r"\left["),
-        ("правая квадратная скобка", r"\right]"),
+        ("левая круглая скобка", "("),
+        ("правая круглая скобка", ")"),
+        ("левая квадратная скобка", "["),
+        ("правая квадратная скобка", "]"),
         ("умножить на", r"\cdot "),
         ("плюс", "+"),
         ("минус", "-"),
@@ -80,6 +112,7 @@ def _convert_plain_text(value: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     s = s.strip(" .")
     s = re.sub(r"(?<=\d)\s+(?=\d)", "", s)
+    s = sanitize_math_latex(s)
     return s
 
 
@@ -87,17 +120,7 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
     s = normalize_sdamgia_alt(value)
     if not s:
         return None
-
-    def fix_tfrac(match: re.Match) -> str:
-        digits = match.group(1)
-        num = digits[:1]
-        den = digits[1:]
-        if not den:
-            return match.group(0)
-        return rf"\frac{{{num}}}{{{den}}}"
-
-    s = _SPACED_TFRAC_RE.sub(lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}", s)
-    s = _COMPACT_TFRAC_RE.sub(fix_tfrac, s)
+    s = sanitize_math_latex(s)
 
     def replace_sqrt(match: re.Match) -> str:
         arg_raw = match.group("arg").strip()
@@ -153,4 +176,4 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
     s = re.sub(r"\s*([+\-=])\s*", r"\1", s)
     s = re.sub(r"\s*\\cdot\s*", r"\\cdot ", s)
     s = re.sub(r"\s+", " ", s).strip()
-    return s
+    return sanitize_math_latex(s)

@@ -15,3 +15,9 @@ class TexReplaceFixupTests(SimpleTestCase):
         out, fixed = fix_latex_tokens_in_html(html)
         self.assertEqual(fixed, 1)
         self.assertIn(r"$\frac{1}{30}+\frac{1}{42}$", out.replace(" ", ""))
+
+    def test_fixes_power_words_inside_math(self):
+        html = "<p>$(3\\cdot10)степени8$</p>"
+        out, fixed = fix_latex_tokens_in_html(html)
+        self.assertEqual(fixed, 1)
+        self.assertIn(r"$(3\cdot10)^{8}$", out.replace(" ", ""))

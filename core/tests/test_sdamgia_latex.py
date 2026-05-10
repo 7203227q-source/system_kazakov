@@ -11,7 +11,7 @@ class SdamgiaLatexTests(SimpleTestCase):
         )
         latex = latex_from_sdamgia_alt(alt)
         self.assertIsNotNone(latex)
-        self.assertEqual(latex.replace(" ", ""), r"18\cdot\left(\frac{1}{9}\right)^2-20\cdot\frac{1}{9}".replace(" ", ""))
+        self.assertEqual(latex.replace(" ", ""), r"18\cdot(\frac{1}{9})^2-20\cdot\frac{1}{9}".replace(" ", ""))
 
     def test_mixed_number(self):
         alt = "целаячасть : 6, дробнаячасть : числитель : 1, знаменатель : 2"
@@ -42,3 +42,13 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "корень из: начало аргумента: 42 конец аргумента"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex, r"\sqrt{42}")
+
+    def test_power_words(self):
+        alt = "(3 \\cdot 10) степени 8"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"(3\cdot10)^{8}".replace(" ", ""))
+
+    def test_sanitize_left_right_mismatch(self):
+        alt = "\\left( 1 плюс 2"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), "(1+2")

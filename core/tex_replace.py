@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
 
-from core.sdamgia_latex import latex_from_sdamgia_alt
+from core.sdamgia_latex import latex_from_sdamgia_alt, sanitize_math_latex
 
 
 def replace_svg_images_with_latex(html: str) -> tuple[str, int]:
@@ -44,6 +44,12 @@ def fix_latex_tokens_in_html(html: str) -> tuple[str, int]:
         parts = text.split("$")
         for i, part in enumerate(parts):
             if i % 2 == 1:
+                sanitized = sanitize_math_latex(part)
+                if sanitized != part:
+                    out.append(sanitized)
+                    fixed += 1
+                    changed = True
+                    continue
                 if "\\tfrac" in part:
                     fixed_part = latex_from_sdamgia_alt(part)
                     if fixed_part and fixed_part != part:
@@ -62,6 +68,7 @@ def fix_latex_tokens_in_html(html: str) -> tuple[str, int]:
                         "знаменатель",
                         "больше",
                         "меньше",
+                        "степени",
                         "кореньиз",
                         "корень из",
                         "началоаргумента",
