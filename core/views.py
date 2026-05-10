@@ -774,6 +774,7 @@ def student_solve_assignment(request, assignment_id):
             time_spent_per_task = total_time // max(1, tasks.count())
         
         correct_count = 0
+        subs_by_task_id = {}
         for task in tasks:
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
             
@@ -800,6 +801,8 @@ def student_solve_assignment(request, assignment_id):
                 sub.is_correct = is_correct
                 sub.score = task.exam_points if is_correct else 0
                 sub.save()
+
+            subs_by_task_id[task.id] = sub
             
             if is_correct:
                 correct_count += 1
@@ -813,20 +816,32 @@ def student_solve_assignment(request, assignment_id):
                     profile.level = (profile.xp // 100) + 1
                     profile.save()
             
+        # Если ученик пытается завершить вариант, но по заданиям 2-й части нет загруженного фото — блокируем завершение.
+        if action == 'finish':
+            missing_part2 = []
+            for t in tasks:
+                if int(t.exam_points or 0) > 1:
+                    sub = subs_by_task_id.get(t.id)
+                    if not sub or not sub.image_url:
+                        missing_part2.append(t)
+            if missing_part2:
+                messages.warning(request, "Вы не решили задания 2-й части: загрузите фото решений по всем заданиям второй части, затем завершите вариант.")
+                return redirect('student_solve_assignment', assignment_id=assignment.id)
+
             # Если завершаем, записываем лог в аналитику
-            if action == 'finish':
-                record_task_log(request.user, task, sub, assignment, time_spent_per_task)
+            for t in tasks:
+                record_task_log(request.user, t, subs_by_task_id.get(t.id), assignment, time_spent_per_task)
         # We need to know the total primary score possible for this assignment and the student's primary score
         total_primary = sum(t.exam_points for t in tasks)
         student_primary = 0
         for t in tasks:
-            sub = Submission.objects.filter(assignment=assignment, task=t, student=request.user).first()
+            sub = subs_by_task_id.get(t.id) or Submission.objects.filter(assignment=assignment, task=t, student=request.user).first()
             if sub:
                 # If part 1 (1 point), score is based on is_correct. If part 2, it's based on primary_score field
                 if t.exam_points == 1:
                     student_primary += 1 if sub.is_correct else 0
                 else:
-                    student_primary += sub.primary_score
+                    student_primary += int(sub.primary_score or 0)
 
         request.user.save()
         

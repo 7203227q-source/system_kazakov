@@ -117,6 +117,8 @@
     let state = { version: 1, objects: [] };
     let drawing = null;
     let previewId = null;
+    let erasing = false;
+    let lastEraseAt = 0;
 
     function uid(prefix) {
         return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
@@ -285,6 +287,7 @@
     }
 
     function startPen(evt) {
+        if (!isPointerDownIntent(evt)) return;
         const [x, y] = canvasPoint(evt);
         drawing = { id: uid('pen'), type: 'pen', points: [[x, y]], color, width };
         upsertObj(drawing);
@@ -294,6 +297,7 @@
 
     function movePen(evt) {
         if (!drawing) return;
+        if (!isPointerMoveDrawing(evt)) return;
         const [x, y] = canvasPoint(evt);
         drawing.points.push([x, y]);
         upsertObj(drawing);
@@ -343,13 +347,98 @@
         previewId = null;
     }
 
-    function eraser(evt) {
-        const t = evt.target;
-        const id = t && t.getAttribute ? t.getAttribute('data-obj-id') : null;
-        if (!id) return;
-        removeObj(id);
-        queue('delete_object', { id });
-        render();
+    function distToSeg(px, py, x1, y1, x2, y2) {
+        const vx = x2 - x1, vy = y2 - y1;
+        const wx = px - x1, wy = py - y1;
+        const c1 = vx * wx + vy * wy;
+        if (c1 <= 0) return Math.hypot(px - x1, py - y1);
+        const c2 = vx * vx + vy * vy;
+        if (c2 <= c1) return Math.hypot(px - x2, py - y2);
+        const t = c1 / c2;
+        const bx = x1 + t * vx, by = y1 + t * vy;
+        return Math.hypot(px - bx, py - by);
+    }
+
+    function hitTestObject(obj, px, py) {
+        const base = 10;
+        const th = Math.max(base, (obj.width || 2) + 6);
+        if (obj.type === 'task_card') return false;
+
+        if (obj.type === 'pen' && obj.points && obj.points.length >= 2) {
+            for (let i = 1; i < obj.points.length; i++) {
+                const [x1, y1] = obj.points[i - 1];
+                const [x2, y2] = obj.points[i];
+                if (distToSeg(px, py, x1, y1, x2, y2) <= th) return true;
+            }
+        }
+        if (obj.type === 'line') {
+            return distToSeg(px, py, obj.x1, obj.y1, obj.x2, obj.y2) <= th;
+        }
+        if (obj.type === 'rect') {
+            const x = obj.x, y = obj.y, w = obj.w, h = obj.h;
+            return (
+                distToSeg(px, py, x, y, x + w, y) <= th ||
+                distToSeg(px, py, x + w, y, x + w, y + h) <= th ||
+                distToSeg(px, py, x + w, y + h, x, y + h) <= th ||
+                distToSeg(px, py, x, y + h, x, y) <= th
+            );
+        }
+        if (obj.type === 'triangle' && obj.a && obj.b && obj.c) {
+            return (
+                distToSeg(px, py, obj.a[0], obj.a[1], obj.b[0], obj.b[1]) <= th ||
+                distToSeg(px, py, obj.b[0], obj.b[1], obj.c[0], obj.c[1]) <= th ||
+                distToSeg(px, py, obj.c[0], obj.c[1], obj.a[0], obj.a[1]) <= th
+            );
+        }
+        if (obj.type === 'table') {
+            // Стираем таблицу при попадании по любой линии сетки (упрощённо: по границам и внутренним линиям)
+            const w = obj.cols * obj.cellW;
+            const h = obj.rows * obj.cellH;
+            const x0 = obj.x, y0 = obj.y;
+            if (
+                distToSeg(px, py, x0, y0, x0 + w, y0) <= th ||
+                distToSeg(px, py, x0 + w, y0, x0 + w, y0 + h) <= th ||
+                distToSeg(px, py, x0 + w, y0 + h, x0, y0 + h) <= th ||
+                distToSeg(px, py, x0, y0 + h, x0, y0) <= th
+            ) return true;
+            for (let c = 1; c < obj.cols; c++) {
+                const x = x0 + c * obj.cellW;
+                if (distToSeg(px, py, x, y0, x, y0 + h) <= th) return true;
+            }
+            for (let r = 1; r < obj.rows; r++) {
+                const y = y0 + r * obj.cellH;
+                if (distToSeg(px, py, x0, y, x0 + w, y) <= th) return true;
+            }
+        }
+        return false;
+    }
+
+    function eraseAtPoint(evt) {
+        const now = Date.now();
+        if (now - lastEraseAt < 16) return; // ~60fps
+        lastEraseAt = now;
+
+        const [x, y] = canvasPoint(evt);
+        for (let i = state.objects.length - 1; i >= 0; i--) {
+            const obj = state.objects[i];
+            if (hitTestObject(obj, x, y)) {
+                removeObj(obj.id);
+                queue('delete_object', { id: obj.id });
+                render();
+                return;
+            }
+        }
+    }
+
+    function isPointerDownIntent(evt) {
+        // Для пера "hover" часто даёт pointermove/pressure=0. Мы начинаем рисовать только при реальном нажатии.
+        if (evt.pointerType === 'pen') return (evt.pressure || 0) > 0.1;
+        return (evt.buttons & 1) === 1;
+    }
+
+    function isPointerMoveDrawing(evt) {
+        if (evt.pointerType === 'pen') return (evt.pressure || 0) > 0.05;
+        return (evt.buttons & 1) === 1;
     }
 
     function addTable(evt) {
@@ -443,19 +532,25 @@
         const svg = document.getElementById('wb-canvas');
         svg.addEventListener('pointerdown', (evt) => {
             svg.setPointerCapture(evt.pointerId);
-            if (tool === 'eraser') return eraser(evt);
+            if (tool === 'eraser') {
+                erasing = true;
+                return eraseAtPoint(evt);
+            }
             if (tool === 'table') return addTable(evt);
             if (tool === 'pen') return startPen(evt);
             if (tool === 'line' || tool === 'rect' || tool === 'triangle') return startShape(evt);
         });
         svg.addEventListener('pointermove', (evt) => {
+            if (tool === 'eraser' && erasing) return eraseAtPoint(evt);
             if (tool === 'pen') return movePen(evt);
             if (tool === 'line' || tool === 'rect' || tool === 'triangle') return moveShape(evt);
         });
         svg.addEventListener('pointerup', () => {
+            erasing = false;
             if (tool === 'pen') return endPen();
             if (tool === 'line' || tool === 'rect' || tool === 'triangle') return endShape();
         });
+        svg.addEventListener('pointercancel', () => { erasing = false; drawing = null; previewId = null; });
     }
 
     function initState() {
