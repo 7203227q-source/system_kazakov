@@ -2041,7 +2041,13 @@ def tutor_create_assignment(request):
             allowed_subject_ids = list(
                 StudentSubjectProfile.objects.filter(student=student).values_list("subject_id", flat=True).distinct()
             )
-            if allowed_subject_ids and exam_format.subject_id not in allowed_subject_ids:
+            allowed_exam_format_ids = list(
+                StudentSubjectProfile.objects.filter(student=student)
+                .exclude(exam_format__isnull=True)
+                .values_list("exam_format_id", flat=True)
+                .distinct()
+            )
+            if allowed_subject_ids and exam_format.subject_id not in allowed_subject_ids and exam_format.id not in allowed_exam_format_ids:
                 exam_format = None
         if exam_format is None:
             messages.error(request, "Выберите формат экзамена.")
@@ -2170,7 +2176,13 @@ def tutor_create_assignment(request):
         subject_ids = list(
             StudentSubjectProfile.objects.filter(student=selected_student).values_list("subject_id", flat=True).distinct()
         )
-        exam_formats = base_exam_formats.filter(subject_id__in=subject_ids)
+        explicit_exam_format_ids = list(
+            StudentSubjectProfile.objects.filter(student=selected_student)
+            .exclude(exam_format__isnull=True)
+            .values_list("exam_format_id", flat=True)
+            .distinct()
+        )
+        exam_formats = base_exam_formats.filter(Q(subject_id__in=subject_ids) | Q(id__in=explicit_exam_format_ids))
     else:
         exam_formats = base_exam_formats
 
