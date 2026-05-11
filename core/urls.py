@@ -53,6 +53,7 @@ urlpatterns = [
 
     path('parent/', views.parent_dashboard, name='parent_dashboard'),
     path('platform-admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('platform-admin/exam-structure/', views.admin_exam_structure, name='admin_exam_structure'),
     path('platform-admin/users/<int:user_id>/delete/', views.admin_delete_user, name='admin_delete_user'),
     path('platform-admin/reshuege-import/', views.admin_reshuege_import, name='admin_reshuege_import'),
     path('platform-admin/reshuege-import/start/', views.admin_reshuege_import_start, name='admin_reshuege_import_start'),

@@ -2996,6 +2996,51 @@ def admin_dashboard(request):
 
 
 @login_required
+def admin_exam_structure(request):
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    exam_formats = ExamFormat.objects.select_related("subject").order_by("subject__name", "-is_active", "-year", "name")
+    selected_id = (request.GET.get("exam_format") or "").strip()
+    if request.method == "POST":
+        selected_id = (request.POST.get("exam_format_id") or "").strip()
+
+    selected_exam_format = None
+    if selected_id and str(selected_id).isdigit():
+        selected_exam_format = exam_formats.filter(id=int(selected_id)).first()
+    if selected_exam_format is None:
+        selected_exam_format = exam_formats.filter(is_active=True).first() or exam_formats.first()
+
+    if request.method == "POST":
+        if selected_exam_format is None:
+            messages.error(request, "Не выбран формат экзамена.")
+            return redirect("admin_exam_structure")
+
+        task_types = list(TaskType.objects.filter(exam_format=selected_exam_format).order_by("number"))
+        changed = 0
+        for tt in task_types:
+            raw = request.POST.get(f"name_{tt.id}")
+            if raw is None:
+                continue
+            name = raw.strip()
+            if not name:
+                continue
+            if name != tt.name:
+                tt.name = name
+                tt.save(update_fields=["name"])
+                changed += 1
+        messages.success(request, f"Сохранено изменений: {changed}")
+        return redirect(f"{reverse('admin_exam_structure')}?exam_format={selected_exam_format.id}")
+
+    task_types = TaskType.objects.filter(exam_format=selected_exam_format).order_by("number") if selected_exam_format else TaskType.objects.none()
+    return render(request, "core/admin_exam_structure.html", {
+        "exam_formats": exam_formats,
+        "selected_exam_format": selected_exam_format,
+        "task_types": task_types,
+    })
+
+
+@login_required
 @require_POST
 def admin_delete_user(request, user_id):
     if request.user.role != 'admin':
