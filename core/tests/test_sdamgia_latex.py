@@ -119,3 +119,9 @@ class SdamgiaLatexTests(SimpleTestCase):
         latex = latex_from_sdamgia_alt(alt)
         self.assertIn("градусах", latex.lower())
         self.assertNotIn("гра-", latex.lower())
+
+    def test_degrees_word_hyphenation_cleanup_grad_u_dash(self):
+        alt = "Ответ дайте в граду- сах."
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertIn("градусах", latex.lower())
+        self.assertNotIn("граду-", latex.lower())

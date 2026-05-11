@@ -12,6 +12,7 @@ def normalize_sdamgia_alt(value: str) -> str:
         .replace("\xa0", " ")
     )
     s = re.sub(r"гра-\s*дус(?P<suffix>ах|ов|а)?", lambda m: "градус" + (m.group("suffix") or ""), s, flags=re.IGNORECASE)
+    s = re.sub(r"граду-\s*с(?P<suffix>ах|ов|а)?", lambda m: "градус" + (m.group("suffix") or ""), s, flags=re.IGNORECASE)
     s = re.sub(r"(?<=\d),\s+(?=\d)", ",", s)
     s = re.sub(r"конец\s*дроби", "конец дроби", s, flags=re.IGNORECASE)
     s = re.sub(r"конецдроби", "конец дроби", s, flags=re.IGNORECASE)
