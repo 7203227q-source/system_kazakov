@@ -10,27 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Execute deployment commands via SSH
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            # Переходим в папку с проектом
+            set -e
             cd /var/www/system_kazakov
-            
-            # Подтягиваем свежий код из GitHub
-            git pull origin main
-            
-            # Активируем виртуальное окружение
+
+            git config --global --add safe.directory /var/www/system_kazakov || true
+            git fetch origin main
+            git reset --hard origin/main
+
             source venv/bin/activate
-            
-            # Устанавливаем новые зависимости
-            pip install -r requirements.txt
-            
-            # Применяем миграции БД и собираем статику
+
+            python -m pip install -r requirements.txt
             python manage.py migrate
             python manage.py collectstatic --noinput
-            
-            # Перезапускаем сервис Gunicorn
-            sudo systemctl restart examprep
+
+            sudo -n systemctl restart examprep
