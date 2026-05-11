@@ -2003,7 +2003,7 @@ def tutor_create_assignment(request):
         return redirect('login')
 
     students = request.user.students.all()
-    exam_formats = ExamFormat.objects.select_related("subject").order_by("subject__name", "-is_active", "-year", "name")
+    base_exam_formats = ExamFormat.objects.select_related("subject").order_by("subject__name", "-is_active", "-year", "name")
 
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
@@ -2037,6 +2037,12 @@ def tutor_create_assignment(request):
                     exam_format = profile.exam_format
                 else:
                     exam_format = ExamFormat.objects.filter(subject=profile.subject, is_active=True).order_by("-year", "name").first()
+        if exam_format is not None:
+            allowed_subject_ids = list(
+                StudentSubjectProfile.objects.filter(student=student).values_list("subject_id", flat=True).distinct()
+            )
+            if allowed_subject_ids and exam_format.subject_id not in allowed_subject_ids:
+                exam_format = None
         if exam_format is None:
             messages.error(request, "Выберите формат экзамена.")
             request.session['saved_assignment_form'] = dict(request.POST)
@@ -2152,16 +2158,38 @@ def tutor_create_assignment(request):
         
         return redirect('tutor_preview_assignment', assignment_id=assignment.id)
 
+    saved_form = request.session.pop('saved_assignment_form', {})
+    selected_student = None
+    selected_student_id = (request.GET.get("student_id") or "").strip()
+    if not selected_student_id and saved_form:
+        selected_student_id = (saved_form.get("student_id") or [""])[0]
+    if selected_student_id and str(selected_student_id).isdigit():
+        selected_student = students.filter(id=int(selected_student_id)).first()
+
+    if selected_student:
+        subject_ids = list(
+            StudentSubjectProfile.objects.filter(student=selected_student).values_list("subject_id", flat=True).distinct()
+        )
+        exam_formats = base_exam_formats.filter(subject_id__in=subject_ids)
+    else:
+        exam_formats = base_exam_formats
+
     # Формируем структуру: Типы -> Подтипы с их количеством
     grouped_data = []
     selected_exam_format_id = (request.GET.get("exam_format") or "").strip()
-    saved_form = request.session.pop('saved_assignment_form', {})
     if not selected_exam_format_id and saved_form:
         selected_exam_format_id = (saved_form.get("exam_format") or [""])[0]
 
     selected_exam_format = None
     if selected_exam_format_id and str(selected_exam_format_id).isdigit():
-        selected_exam_format = ExamFormat.objects.filter(id=int(selected_exam_format_id)).first()
+        selected_exam_format = exam_formats.filter(id=int(selected_exam_format_id)).first()
+    if selected_exam_format is None and selected_student:
+        profile = StudentSubjectProfile.objects.filter(student=selected_student).select_related("exam_format", "subject").first()
+        if profile:
+            if profile.exam_format_id and exam_formats.filter(id=profile.exam_format_id).exists():
+                selected_exam_format = profile.exam_format
+            else:
+                selected_exam_format = exam_formats.filter(subject=profile.subject, is_active=True).first() or exam_formats.filter(subject=profile.subject).first()
     if selected_exam_format is None and exam_formats.exists():
         selected_exam_format = exam_formats.filter(is_active=True).first() or exam_formats.first()
 
