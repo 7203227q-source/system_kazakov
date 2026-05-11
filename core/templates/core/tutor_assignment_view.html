@@ -10,6 +10,16 @@
         tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#10B981', } } } }
     </script>
     {% include 'core/includes/_ui_theme_css.html' %}
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["$", "$"], ["\\(", "\\)"]],
+                displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+                processEscapes: true
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 min-h-[100dvh] {% if user.role == 'tutor' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">
 <div class="min-h-[100dvh] p-4 sm:p-8">
@@ -35,6 +45,9 @@
             <div class="flex items-center gap-2">
                 <a href="{% url 'tutor_assignment_summary' assignment.id %}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
                     <i class="fas fa-chart-pie mr-2"></i> Сводка
+                </a>
+                <a href="{% url 'tutor_student_history' student.id %}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                    <i class="fas fa-history mr-2"></i> Журнал
                 </a>
                 <a href="{% url 'tutor_dashboard' %}?student_id={{ student.id }}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
                     <i class="fas fa-arrow-left mr-2"></i> Назад
@@ -100,6 +113,61 @@
                         </div>
                         <div class="mt-3 text-xs text-gray-500">Ответ: <span class="font-mono font-bold text-gray-800">{{ item.task.correct_answer }}</span></div>
                     </div>
+
+                    <div class="mt-6 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Ответ ученика</div>
+                        {% if item.submission %}
+                            <div class="text-sm">
+                                <span class="text-gray-500 mr-2">Ответ:</span>
+                                <span class="font-mono font-bold text-gray-800">{{ item.submission.user_answer|default:"(нет)" }}</span>
+                            </div>
+                            <div class="mt-2 text-sm">
+                                <span class="text-gray-500 mr-2">Статус:</span>
+                                {% if item.submission.is_correct %}
+                                    <span class="font-bold text-green-600">верно</span>
+                                {% elif item.submission.is_correct == False %}
+                                    <span class="font-bold text-red-600">ошибка</span>
+                                {% else %}
+                                    <span class="font-bold text-gray-600">не проверено</span>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="text-sm text-gray-600">Нет попыток решения.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-6 bg-white border border-gray-200 rounded-xl p-4">
+                        <div class="text-sm font-bold text-gray-800 mb-3">Вопросы по задаче</div>
+
+                        {% if item.submission %}
+                            {% if item.submission.comments.count %}
+                            <div class="space-y-2 mb-4">
+                                {% for c in item.submission.comments.all %}
+                                <div class="text-sm">
+                                    <div class="flex justify-between items-center text-xs text-gray-500">
+                                        <span class="font-bold {% if c.author_role == 'tutor' %}text-indigo-700{% else %}text-gray-700{% endif %}">
+                                            {% if c.author_role == 'tutor' %}Репетитор{% else %}Ученик{% endif %}
+                                        </span>
+                                        <span>{{ c.created_at|date:"d.m H:i" }}</span>
+                                    </div>
+                                    <div class="mt-1 text-gray-800 whitespace-pre-wrap">{{ c.text }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-xs text-gray-500 mb-4">Сообщений пока нет.</div>
+                            {% endif %}
+
+                            <textarea id="tutor_comment_text_{{ item.submission.id }}" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ответ репетитора..."></textarea>
+                            <div class="mt-2 flex justify-end">
+                                <button type="button" onclick="tutorPostComment({{ item.submission.id }})" class="bg-primary text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition">
+                                    <i class="fas fa-paper-plane mr-2"></i> Ответить
+                                </button>
+                            </div>
+                        {% else %}
+                        <div class="text-xs text-gray-500">У ученика ещё нет решения/попытки по этой задаче, поэтому ветка пока недоступна.</div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -162,6 +230,7 @@
             const box = document.getElementById(`task-solution-${id}`);
             if (!box) return;
             box.classList.toggle('hidden');
+            if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
         });
     });
 
@@ -201,6 +270,37 @@
     document.querySelectorAll('.open-board-btn').forEach((btn) => {
         btn.addEventListener('click', () => openBoard(btn.getAttribute('data-task-id')));
     });
+
+    async function tutorPostComment(submissionId) {
+        const csrfToken = getCookie('csrftoken');
+        const input = document.getElementById(`tutor_comment_text_${submissionId}`);
+        const text = (input?.value || '').trim();
+        if (!text) return;
+
+        const formData = new FormData();
+        formData.append('text', text);
+
+        try {
+            const response = await fetch(`/tutor/submission/${submissionId}/comment/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData
+            });
+            if (!response.ok) {
+                alert('Не удалось отправить ответ');
+                return;
+            }
+            input.value = '';
+            location.reload();
+        } catch (e) {
+            console.error(e);
+            alert('Ошибка соединения с сервером');
+        }
+    }
 </script>
+
+{% include "core/image_modal.html" %}
 </body>
 </html>
+

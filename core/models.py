@@ -273,6 +273,24 @@ class Submission(models.Model):
     
     tutor_comment = models.TextField(blank=True, null=True, verbose_name="Комментарий репетитора")
 
+
+class SubmissionComment(models.Model):
+    ROLE_CHOICES = [
+        ("student", "Ученик"),
+        ("tutor", "Репетитор"),
+    ]
+
+    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name="comments")
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="submission_comments")
+    author_role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["submission", "created_at"]),
+        ]
+
 class DailySnapshot(models.Model):
     """Ежедневный срез аналитики ученика по предмету"""
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_snapshots')

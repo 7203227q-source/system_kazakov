@@ -18,6 +18,7 @@ urlpatterns = [
     path('student/assignment/<int:assignment_id>/', views.student_solve_assignment, name='student_solve_assignment'),
     path('student/assignment/<int:assignment_id>/check/<int:task_id>/', views.student_check_assignment_task, name='student_check_assignment_task'),
     path('student/assignment/<int:assignment_id>/extension-request/', views.student_extension_request, name='student_extension_request'),
+    path('student/assignment/<int:assignment_id>/task/<int:task_id>/comment/', views.student_add_submission_comment, name='student_add_submission_comment'),
     path('student/update-theme/', views.update_theme_view, name='update_theme'),
     path('update-ui-theme/', views.update_ui_theme_view, name='update_ui_theme'),
 
@@ -31,6 +32,7 @@ urlpatterns = [
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/contacts/', views.tutor_update_student_contacts, name='tutor_update_student_contacts'),
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
+    path('tutor/submission/<int:submission_id>/comment/', views.tutor_add_submission_comment, name='tutor_add_submission_comment'),
     path('tutor/tasks/', views.tutor_task_bank, name='tutor_task_bank'),
     path('tutor/tasks/uniqualize/', views.tutor_bulk_uniqualize, name='tutor_bulk_uniqualize'),
     path('tutor/tasks/purge/', views.tutor_task_purge, name='tutor_task_purge'),

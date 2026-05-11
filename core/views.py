@@ -9,7 +9,7 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from datetime import timedelta, date
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
@@ -790,7 +790,10 @@ def student_check_assignment_task(request, assignment_id, task_id):
         'is_correct': is_correct,
         'correct_answer': task.correct_answer,
         'solution_html': solution_html,
-        'xp_gained': xp_gained if is_correct and created else 0
+        'xp_gained': xp_gained if is_correct and created else 0,
+        'comments_count': submission.comments.count(),
+        'can_view_comments': submission.is_correct is not None,
+        'submission_id': submission.id,
     })
 
 @login_required
@@ -1033,7 +1036,12 @@ def student_solve_assignment(request, assignment_id):
     # GET: Устанавливаем время начала
     if f'assignment_{assignment.id}_start' not in request.session:
         request.session[f'assignment_{assignment.id}_start'] = time.time()
-    saved_submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
+    saved_submissions = {
+        sub.task_id: sub
+        for sub in Submission.objects.filter(assignment=assignment, student=request.user).prefetch_related(
+            "comments", "comments__author"
+        )
+    }
     
     tasks_list = list(tasks)
     domain = request.build_absolute_uri('/')[:-1]
@@ -1113,6 +1121,26 @@ def student_extension_request(request, assignment_id):
     messages.success(request, "Запрос на продление отправлен репетитору.")
     return redirect('student_solve_assignment', assignment_id=assignment.id)
 
+
+@login_required
+@require_POST
+def student_add_submission_comment(request, assignment_id, task_id):
+    if request.user.role != "student":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    assignment = Assignment.objects.filter(id=assignment_id, student=request.user).first()
+    if assignment is None:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    task = get_object_or_404(Task, id=task_id)
+    text = (request.POST.get("text") or "").strip()
+    if not text:
+        return JsonResponse({"error": "empty"}, status=400)
+
+    submission, _ = Submission.objects.get_or_create(student=request.user, assignment=assignment, task=task)
+    SubmissionComment.objects.create(submission=submission, author=request.user, author_role="student", text=text)
+    return JsonResponse({"ok": True, "comments_count": submission.comments.count(), "submission_id": submission.id})
+
 @login_required
 def student_practice_submit(request, task_id):
     """Обработка ответа ученика"""
@@ -1132,7 +1160,12 @@ def student_practice_submit(request, task_id):
 @login_required
 def student_history(request):
     """История решений (Журнал) ученика"""
-    submissions = Submission.objects.filter(student=request.user).select_related('task').order_by('-created_at')
+    submissions = (
+        Submission.objects.filter(student=request.user)
+        .select_related('task', 'assignment')
+        .prefetch_related('comments', 'comments__author')
+        .order_by('-created_at')
+    )
     total_xp = StudentSubjectProfile.objects.filter(student=request.user).aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
     return render(request, 'core/student_history.html', {'submissions': submissions, 'total_xp': total_xp, 'total_level': total_level})
@@ -1503,12 +1536,20 @@ def tutor_assignment_view(request, assignment_id):
 
     theme = getattr(request.user, 'preferred_theme', None) or 'classic'
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+    subs = (
+        Submission.objects.filter(assignment=assignment, student=assignment.student, task__in=tasks)
+        .select_related('task')
+        .prefetch_related('comments', 'comments__author')
+    )
+    subs_by_task_id = {s.task_id: s for s in subs}
+
     tasks_view = []
     for t in tasks:
         tasks_view.append({
             'task': t,
             'content_html': t.get_content_for_theme(theme),
             'solution_html': t.get_solution_for_theme(theme),
+            'submission': subs_by_task_id.get(t.id),
         })
     pending_extension = AssignmentExtensionRequest.objects.filter(assignment=assignment, status='pending').first()
     return render(request, 'core/tutor_assignment_view.html', {
@@ -2458,7 +2499,12 @@ def tutor_student_history(request, student_id):
     student = get_object_or_404(User, id=student_id, role='student')
     
     # Get all submissions ordered by date
-    submissions = Submission.objects.filter(student=student).select_related('task', 'task__task_type', 'assignment').order_by('-created_at')
+    submissions = (
+        Submission.objects.filter(student=student)
+        .select_related('task', 'task__task_type', 'assignment')
+        .prefetch_related('comments', 'comments__author')
+        .order_by('-created_at')
+    )
     
     days_data = {}
     
@@ -2514,6 +2560,25 @@ def tutor_student_history(request, student_id):
         'student': student,
         'history_days': history_days
     })
+
+
+@login_required
+@require_POST
+def tutor_add_submission_comment(request, submission_id):
+    if request.user.role != "tutor":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    submission = get_object_or_404(Submission.objects.select_related("assignment"), id=submission_id)
+    if not submission.assignment_id or submission.assignment.tutor_id != request.user.id:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    text = (request.POST.get("text") or "").strip()
+    if not text:
+        return JsonResponse({"error": "empty"}, status=400)
+
+    SubmissionComment.objects.create(submission=submission, author=request.user, author_role="tutor", text=text)
+    return JsonResponse({"ok": True, "comments_count": submission.comments.count(), "submission_id": submission.id})
+
 
 @login_required
 def parent_dashboard(request):

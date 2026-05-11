@@ -60,7 +60,7 @@
 
                 <div class="divide-y divide-gray-100">
                     {% for sub in submissions %}
-                    <div class="p-6 hover:bg-gray-50 transition cursor-pointer">
+                    <div class="p-6 hover:bg-gray-50 transition">
                         <div class="flex justify-between items-start mb-3">
                             <div class="flex items-center">
                                 {% if sub.is_correct %}
@@ -109,6 +109,27 @@
                             </span>
                             {% endif %}
                         </div>
+
+                        {% if sub.comments.count %}
+                        <div class="mt-4">
+                            <button type="button" onclick="toggleComments('sub_{{ sub.id }}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
+                                Вопросы и ответы ({{ sub.comments.count }})
+                            </button>
+                            <div id="comments_sub_{{ sub.id }}" class="hidden mt-3 bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+                                {% for c in sub.comments.all %}
+                                <div class="text-sm">
+                                    <div class="flex justify-between items-center text-xs text-gray-500">
+                                        <span class="font-bold {% if c.author_role == 'tutor' %}text-indigo-700{% else %}text-gray-700{% endif %}">
+                                            {% if c.author_role == 'tutor' %}Репетитор{% else %}Вы{% endif %}
+                                        </span>
+                                        <span>{{ c.created_at|date:"d.m H:i" }}</span>
+                                    </div>
+                                    <div class="mt-1 text-gray-800 whitespace-pre-wrap">{{ c.text }}</div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     {% empty %}
                     <div class="p-12 text-center text-gray-500">
@@ -122,6 +143,13 @@
 
         </div>
     </main>
+
+<script>
+    function toggleComments(id) {
+        const el = document.getElementById(`comments_${id}`);
+        if (el) el.classList.toggle('hidden');
+    }
+</script>
 
 {% include "core/image_modal.html" %}
 </body>

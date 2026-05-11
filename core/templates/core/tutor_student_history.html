@@ -123,6 +123,33 @@
                                 <div id="task_{{ sub.id }}" class="hidden px-4 py-3 bg-white border border-gray-200 border-t-0 rounded-b-lg -mt-3 mb-3 text-sm text-gray-800 prose max-w-none">
                                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Условие задачи:</p>
                                     {{ sub.task.get_content_for_theme|safe }}
+                                    <div class="not-prose mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                        <div class="text-sm font-bold text-gray-800 mb-3">Вопросы по задаче</div>
+                                        {% if sub.comments.count %}
+                                        <div class="space-y-2 mb-4">
+                                            {% for c in sub.comments.all %}
+                                            <div class="text-sm">
+                                                <div class="flex justify-between items-center text-xs text-gray-500">
+                                                    <span class="font-bold {% if c.author_role == 'tutor' %}text-indigo-700{% else %}text-gray-700{% endif %}">
+                                                        {% if c.author_role == 'tutor' %}Репетитор{% else %}Ученик{% endif %}
+                                                    </span>
+                                                    <span>{{ c.created_at|date:"d.m H:i" }}</span>
+                                                </div>
+                                                <div class="mt-1 text-gray-800 whitespace-pre-wrap">{{ c.text }}</div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="text-xs text-gray-500 mb-4">Сообщений пока нет.</div>
+                                        {% endif %}
+
+                                        <textarea id="tutor_comment_text_{{ sub.id }}" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ответ репетитора..."></textarea>
+                                        <div class="mt-2 flex justify-end">
+                                            <button type="button" onclick="tutorPostComment({{ sub.id }})" class="bg-primary text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition">
+                                                <i class="fas fa-paper-plane mr-2"></i> Ответить
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -173,6 +200,33 @@
                                 <div id="prac_task_{{ sub.id }}" class="hidden px-4 py-3 bg-white border border-gray-200 border-t-0 rounded-b-lg -mt-3 mb-3 text-sm text-gray-800 prose max-w-none shadow-inner">
                                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Условие задачи:</p>
                                     {{ sub.task.get_content_for_theme|safe }}
+                                    <div class="not-prose mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                        <div class="text-sm font-bold text-gray-800 mb-3">Вопросы по задаче</div>
+                                        {% if sub.comments.count %}
+                                        <div class="space-y-2 mb-4">
+                                            {% for c in sub.comments.all %}
+                                            <div class="text-sm">
+                                                <div class="flex justify-between items-center text-xs text-gray-500">
+                                                    <span class="font-bold {% if c.author_role == 'tutor' %}text-indigo-700{% else %}text-gray-700{% endif %}">
+                                                        {% if c.author_role == 'tutor' %}Репетитор{% else %}Ученик{% endif %}
+                                                    </span>
+                                                    <span>{{ c.created_at|date:"d.m H:i" }}</span>
+                                                </div>
+                                                <div class="mt-1 text-gray-800 whitespace-pre-wrap">{{ c.text }}</div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="text-xs text-gray-500 mb-4">Сообщений пока нет.</div>
+                                        {% endif %}
+
+                                        <textarea id="tutor_comment_text_{{ sub.id }}" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ответ репетитора..."></textarea>
+                                        <div class="mt-2 flex justify-end">
+                                            <button type="button" onclick="tutorPostComment({{ sub.id }})" class="bg-primary text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition">
+                                                <i class="fas fa-paper-plane mr-2"></i> Ответить
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -213,6 +267,32 @@
         const el = document.getElementById(id);
         if (el) {
             el.classList.toggle('hidden');
+        }
+    }
+
+    async function tutorPostComment(submissionId) {
+        const input = document.getElementById(`tutor_comment_text_${submissionId}`);
+        const text = (input?.value || '').trim();
+        if (!text) return;
+
+        const formData = new FormData();
+        formData.append('text', text);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        try {
+            const response = await fetch(`/tutor/submission/${submissionId}/comment/`, {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) {
+                alert('Не удалось отправить ответ');
+                return;
+            }
+            input.value = '';
+            location.reload();
+        } catch (e) {
+            console.error(e);
+            alert('Ошибка соединения с сервером');
         }
     }
 </script>
