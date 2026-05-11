@@ -664,12 +664,15 @@ def student_dashboard(request):
     profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related('subject', 'exam_format')
     total_xp = profiles.aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
-    active_subject_id = request.GET.get('subject_id')
+    active_subject_id = (request.GET.get('subject_id') or '').strip()
     
     if not active_subject_id and profiles.exists():
         active_subject_id = profiles.first().subject_id
     elif active_subject_id:
-        active_subject_id = int(active_subject_id)
+        if active_subject_id.isdigit():
+            active_subject_id = int(active_subject_id)
+        else:
+            active_subject_id = None
         
     active_profile = next((p for p in profiles if p.subject_id == active_subject_id), None)
     exam_formats_for_subject = ExamFormat.objects.filter(subject_id=active_subject_id).order_by("-is_active", "-year", "name") if active_subject_id else ExamFormat.objects.none()
