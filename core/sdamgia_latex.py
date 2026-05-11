@@ -45,6 +45,16 @@ _SQRT_FALLBACK_RE = re.compile(
     flags=re.IGNORECASE | re.DOTALL,
 )
 
+_SQRT_SIMPLE_RE = re.compile(
+    r"(?:корень\s*из)\s*(?P<arg>-?\d+(?:[.,]\d+)?|[0-9a-zA-Zа-яА-Я]+)",
+    flags=re.IGNORECASE,
+)
+
+_DEGREE_WORD_RE = re.compile(
+    r"(?P<num>-?\d+(?:[.,]\d+)?)\s*(?:градус(?:ов|а)?|градусов|градуса)",
+    flags=re.IGNORECASE,
+)
+
 _COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
 _SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
 _POWER_PAREN_RE = re.compile(
@@ -164,6 +174,8 @@ def _convert_plain_text(value: str) -> str:
             s = re.sub(re.escape(needle), lambda _m, r=repl: r, s, flags=re.IGNORECASE)
             lower = s.lower()
 
+    s = _DEGREE_WORD_RE.sub(lambda m: rf"{m.group('num')}^{{\circ}}", s)
+
     s = re.sub(r"\s+", " ", s).strip()
     s = s.strip(" .")
     s = re.sub(r"(?<=\d)\s+(?=\d)", "", s)
@@ -195,6 +207,11 @@ def latex_from_sdamgia_alt(value: str, *, max_depth: int = 6) -> str | None:
     depth = max_depth
     while depth > 0 and _SQRT_FALLBACK_RE.search(s):
         s = _SQRT_FALLBACK_RE.sub(replace_sqrt, s)
+        depth -= 1
+
+    depth = max_depth
+    while depth > 0 and _SQRT_SIMPLE_RE.search(s):
+        s = _SQRT_SIMPLE_RE.sub(replace_sqrt, s)
         depth -= 1
 
     def replace_mixed(match: re.Match) -> str:

@@ -88,3 +88,18 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "\\sqrt{\\frac{36a^{21}}{a^{15}}"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), r"\sqrt{\frac{36a^{21}}{a^{15}}}".replace(" ", ""))
+
+    def test_degrees_word_converts_to_circ(self):
+        alt = "26градусов"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"26^{\circ}".replace(" ", ""))
+
+    def test_sqrt_plain_wording_converts(self):
+        alt = "кореньиз3"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"\sqrt{3}".replace(" ", ""))
+
+    def test_sqrt_plain_in_expression(self):
+        alt = "12кореньиз3"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"12\sqrt{3}".replace(" ", ""))
