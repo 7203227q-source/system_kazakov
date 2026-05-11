@@ -79,6 +79,12 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
 
         original = text
 
+        text = (
+            text.replace("\u00ad", "")
+            .replace("\u200b", "")
+            .replace("\ufeff", "")
+            .replace("\xa0", " ")
+        )
         text = _DEG_HYPHENATION_RE.sub(lambda m: "градус" + (m.group("suffix") or ""), text)
         text = _DEG_HYPHENATION_RE2.sub(lambda m: "градус" + (m.group("suffix") or ""), text)
 

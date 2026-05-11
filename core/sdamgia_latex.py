@@ -88,7 +88,13 @@ def sanitize_math_latex(value: str) -> str:
     if not value:
         return value
 
-    s = str(value)
+    s = (
+        str(value)
+        .replace("\u00ad", "")
+        .replace("\u200b", "")
+        .replace("\ufeff", "")
+        .replace("\xa0", " ")
+    )
 
     s = s.replace("°", r"^{\circ}")
 
