@@ -262,7 +262,8 @@ def admin_svg_to_latex_convert(request):
         mode = "DRY-RUN" if dry_run else "Готово"
         messages.success(
             request,
-            f"{mode}: scanned={result['scanned']}, changed={result['changed']}, replaced={result['replaced']}.",
+            f"{mode}: engine={result.get('engine','')}, scanned={result['scanned']}, changed={result['changed']}, replaced={result['replaced']}, "
+            f"deg_candidates={result.get('deg_candidates',0)}, formula_img_candidates={result.get('formula_img_candidates',0)}.",
         )
     except Exception as e:
         messages.error(request, f"Ошибка конвертации: {str(e)[:200]}")

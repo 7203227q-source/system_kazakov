@@ -11,6 +11,15 @@ def convert_svg_to_latex_for_task_type(
     dry_run: bool = False,
     limit: int = 0,
 ) -> dict:
+    def strip_invisibles(text: str) -> str:
+        return (
+            (text or "")
+            .replace("\u00ad", "")
+            .replace("\u200b", "")
+            .replace("\ufeff", "")
+            .replace("\xa0", " ")
+        )
+
     qs = (
         TaskVariant.objects.select_related("task", "task__task_type")
         .filter(task__task_type__exam_format_id=exam_format_id, task__task_type__number=type_number, theme=theme)
@@ -22,9 +31,19 @@ def convert_svg_to_latex_for_task_type(
     scanned = 0
     changed = 0
     replaced_total = 0
+    deg_candidates = 0
+    formula_img_candidates = 0
+    sample_task_ids = []
 
     for v in qs.iterator(chunk_size=200):
         scanned += 1
+        raw = strip_invisibles(v.content or "") + " " + strip_invisibles(v.solution or "")
+        if "градус" in raw.lower() or "гра-" in raw.lower() or "граду-" in raw.lower():
+            deg_candidates += 1
+            if len(sample_task_ids) < 5:
+                sample_task_ids.append(v.task_id)
+        if "<img" in (v.content or "").lower() and (".svg" in (v.content or "").lower() or "/formula/" in (v.content or "").lower()):
+            formula_img_candidates += 1
 
         new_content, replaced_content = replace_svg_images_with_latex(v.content or "")
         new_solution, replaced_solution = replace_svg_images_with_latex(v.solution or "")
@@ -56,6 +75,7 @@ def convert_svg_to_latex_for_task_type(
                 v.save(update_fields=["content", "solution"])
 
     return {
+        "engine": "svg-to-latex:v4",
         "exam_format": ExamFormat.objects.get(id=exam_format_id),
         "type_number": type_number,
         "theme": theme,
@@ -64,4 +84,7 @@ def convert_svg_to_latex_for_task_type(
         "scanned": scanned,
         "changed": changed,
         "replaced": replaced_total,
+        "deg_candidates": deg_candidates,
+        "formula_img_candidates": formula_img_candidates,
+        "sample_task_ids": sample_task_ids,
     }
