@@ -133,7 +133,7 @@ def replace_svg_images_with_latex(html: str) -> tuple[str, int]:
 
     for img in soup.find_all("img"):
         src = (img.get("src") or "").strip()
-        if ".svg" not in src:
+        if ".svg" not in src and "formula/svg" not in src:
             continue
         alt = img.get("alt") or ""
         latex = latex_from_sdamgia_alt(alt)
