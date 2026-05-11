@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.contrib import messages
-from django.db import models
+from django.db import models, IntegrityError
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -3270,19 +3270,24 @@ def register_view(request):
         if User.objects.filter(username=email).exists():
             return render(request, 'core/register.html', {'error': 'Пользователь с таким email уже существует'})
 
-        # Создаем пользователя без роли
-        user = User.objects.create_user(
-            username=email,
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            role='unassigned'
-        )
-        
-        # Сразу авторизуем
+        try:
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                role='unassigned'
+            )
+        except IntegrityError:
+            return render(request, 'core/register.html', {'error': 'Пользователь с таким email уже существует'})
+
         backend = 'django.contrib.auth.backends.ModelBackend'
-        login(request, user, backend=backend)
+        try:
+            login(request, user, backend=backend)
+        except Exception:
+            messages.warning(request, "Аккаунт создан. Войдите в него на странице входа.")
+            return redirect('login')
         return redirect('select_role')
 
     return render(request, 'core/register.html')
