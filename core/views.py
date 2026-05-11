@@ -1545,6 +1545,16 @@ def tutor_dashboard(request):
             correct = int(r.get('correct') or 0)
             rate = (correct / total * 100.0) if total > 0 else None
             task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': rate, 'total': total, 'correct': correct})
+
+        from core.models import TutorReward
+
+        recent_rewards = (
+            TutorReward.objects.filter(tutor=request.user, student=selected_student)
+            .select_related('subject')
+            .order_by('-created_at')[:10]
+        )
+    else:
+        recent_rewards = []
     
     # Check if there are draft assignments we might want to resume or delete
     drafts = Assignment.objects.filter(tutor=request.user, is_draft=True).select_related('student').order_by('-created_at')
@@ -1562,6 +1572,7 @@ def tutor_dashboard(request):
         'task_type_rates': task_type_rates,
         'student_total_submissions': student_total_submissions,
         'student_correct_rate': student_correct_rate,
+        'recent_rewards': recent_rewards,
     }
     return render(request, 'core/tutor_dashboard.html', context)
 
@@ -2717,6 +2728,51 @@ def tutor_student_history(request, student_id):
         'student': student,
         'history_days': history_days
     })
+
+
+@login_required
+@require_POST
+def tutor_award_xp(request):
+    if request.user.role != "tutor":
+        return HttpResponse(status=403)
+
+    student_id_raw = (request.POST.get("student_id") or "").strip()
+    subject_id_raw = (request.POST.get("subject_id") or "").strip()
+    xp_raw = (request.POST.get("xp_amount") or "").strip()
+    reason = (request.POST.get("reason") or "").strip()
+
+    if not (student_id_raw.isdigit() and subject_id_raw.isdigit() and xp_raw.isdigit()):
+        return HttpResponse(status=400)
+
+    xp = int(xp_raw)
+    if xp < 1 or xp > 500:
+        return HttpResponse(status=400)
+
+    student_id = int(student_id_raw)
+    subject_id = int(subject_id_raw)
+
+    if not request.user.students.filter(id=student_id).exists():
+        return HttpResponse(status=403)
+
+    profile = StudentSubjectProfile.objects.filter(student_id=student_id, subject_id=subject_id).first()
+    if profile is None:
+        return HttpResponse(status=400)
+
+    from core.models import TutorReward
+
+    TutorReward.objects.create(
+        tutor=request.user,
+        student_id=student_id,
+        subject_id=subject_id,
+        xp_amount=xp,
+        reason=reason[:500],
+    )
+
+    profile.xp = int(profile.xp or 0) + xp
+    profile.level = (int(profile.xp) // 100) + 1
+    profile.save(update_fields=["xp", "level"])
+
+    return redirect(f"{reverse('tutor_dashboard')}?student_id={student_id}")
 
 
 @login_required

@@ -176,10 +176,56 @@
                         <a href="{% url 'tutor_student_history' selected_student.id %}" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm flex items-center">
                             <i class="fas fa-history mr-2 text-indigo-500"></i> Журнал решений
                         </a>
-                        <button class="px-4 py-2 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg text-sm font-bold hover:bg-yellow-200 shadow-sm flex items-center">
-                            <i class="fas fa-star mr-2"></i> Дать +50 XP
+                        <button type="button" onclick="document.getElementById('award-xp-form').classList.toggle('hidden')" class="px-4 py-2 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg text-sm font-bold hover:bg-yellow-200 shadow-sm flex items-center">
+                            <i class="fas fa-star mr-2"></i> Награда XP
                         </button>
                     </div>
+                </div>
+
+                <div id="award-xp-form" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+                    <div class="text-sm font-bold text-gray-800 mb-4">Наградить XP</div>
+                    <form method="POST" action="{% url 'tutor_award_xp' %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        {% csrf_token %}
+                        <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Предмет</label>
+                            <select name="subject_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                                {% for p in selected_student.subject_profiles.all %}
+                                <option value="{{ p.subject.id }}" {% if chart_subject_id == p.subject.id %}selected{% endif %}>{{ p.subject.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">XP</label>
+                            <input name="xp_amount" inputmode="numeric" value="50" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Причина</label>
+                            <input name="reason" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Например: отличное решение / прогресс / дисциплина">
+                        </div>
+                        <div class="md:col-span-4 flex justify-end">
+                            <button type="submit" class="bg-primary text-white px-5 py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition">
+                                Начислить
+                            </button>
+                        </div>
+                    </form>
+
+                    {% if recent_rewards %}
+                    <div class="mt-6">
+                        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Последние награды</div>
+                        <div class="space-y-2">
+                            {% for r in recent_rewards %}
+                            <div class="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm">
+                                <div class="min-w-0">
+                                    <div class="font-bold text-gray-800">+{{ r.xp_amount }} XP · {{ r.subject.name }}</div>
+                                    {% if r.reason %}<div class="text-xs text-gray-500 truncate">{{ r.reason }}</div>{% endif %}
+                                </div>
+                                <div class="text-xs text-gray-400 shrink-0 ml-3">{{ r.created_at|date:"d.m H:i" }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Прогноз и Аналитика -->

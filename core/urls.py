@@ -48,6 +48,7 @@ urlpatterns = [
     path('tutor/assignment/<int:assignment_id>/extension-request/<int:req_id>/approve/', views.tutor_extension_approve, name='tutor_extension_approve'),
     path('tutor/assignment/<int:assignment_id>/extension-request/<int:req_id>/reject/', views.tutor_extension_reject, name='tutor_extension_reject'),
     path('tutor/assignment/<int:assignment_id>/regenerate/<int:task_id>/', views.tutor_regenerate_task, name='tutor_regenerate_task'),
+    path('tutor/award-xp/', views.tutor_award_xp, name='tutor_award_xp'),
     path('tutor/tasks/import/', views.import_tasks_view, name='import_tasks'),
 
     path('parent/', views.parent_dashboard, name='parent_dashboard'),

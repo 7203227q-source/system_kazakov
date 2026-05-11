@@ -347,6 +347,15 @@ class TaskGenerationLog(models.Model):
     error_message = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+class TutorReward(models.Model):
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name="given_rewards")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_rewards")
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="rewards")
+    xp_amount = models.PositiveIntegerField()
+    reason = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
 class OpenRouterModel(models.Model):
     code = models.CharField(max_length=200, unique=True)
     label = models.CharField(max_length=255, blank=True, null=True)
