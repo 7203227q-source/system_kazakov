@@ -2496,12 +2496,32 @@ def tutor_task_bank(request):
     exam_format_filter = request.GET.get('exam_format', '')
     type_filter = request.GET.get('type', '')
     subtype_filter = request.GET.get('subtype', '')
+    student_id_filter = request.GET.get('student_id', '')
 
-    if request.user.role == 'admin':
-        if subject_filter:
-            tasks = tasks.filter(task_type__exam_format__subject_id=subject_filter)
-        if exam_format_filter:
-            tasks = tasks.filter(task_type__exam_format_id=exam_format_filter)
+    allowed_subject_ids = None
+    allowed_exam_format_ids = None
+    if request.user.role == 'tutor':
+        students_qs = request.user.students.all()
+        if student_id_filter and str(student_id_filter).isdigit():
+            if students_qs.filter(id=int(student_id_filter)).exists():
+                students_qs = students_qs.filter(id=int(student_id_filter))
+            else:
+                students_qs = students_qs.none()
+
+        profiles_qs = StudentSubjectProfile.objects.filter(student__in=students_qs)
+        allowed_subject_ids = list(profiles_qs.values_list('subject_id', flat=True).distinct())
+        allowed_exam_format_ids = list(
+            profiles_qs.exclude(exam_format__isnull=True).values_list('exam_format_id', flat=True).distinct()
+        )
+        if allowed_subject_ids:
+            tasks = tasks.filter(task_type__exam_format__subject_id__in=allowed_subject_ids)
+        if allowed_exam_format_ids:
+            tasks = tasks.filter(task_type__exam_format_id__in=allowed_exam_format_ids)
+
+    if subject_filter:
+        tasks = tasks.filter(task_type__exam_format__subject_id=subject_filter)
+    if exam_format_filter:
+        tasks = tasks.filter(task_type__exam_format_id=exam_format_filter)
 
     if search_query:
         tasks = tasks.filter(subtype_tag__icontains=search_query) | tasks.filter(fipi_id__icontains=search_query)
@@ -2521,20 +2541,28 @@ def tutor_task_bank(request):
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
     task_types_qs = TaskType.objects.all()
-    if request.user.role == 'admin':
-        if subject_filter:
-            task_types_qs = task_types_qs.filter(exam_format__subject_id=subject_filter)
-        if exam_format_filter:
-            task_types_qs = task_types_qs.filter(exam_format_id=exam_format_filter)
+    if request.user.role == 'tutor':
+        if allowed_subject_ids:
+            task_types_qs = task_types_qs.filter(exam_format__subject_id__in=allowed_subject_ids)
+        if allowed_exam_format_ids:
+            task_types_qs = task_types_qs.filter(exam_format_id__in=allowed_exam_format_ids)
+    if subject_filter:
+        task_types_qs = task_types_qs.filter(exam_format__subject_id=subject_filter)
+    if exam_format_filter:
+        task_types_qs = task_types_qs.filter(exam_format_id=exam_format_filter)
     task_types = task_types_qs.annotate(task_count=models.Count('tasks')).order_by('number')
     
     # Get unique subtype_tags for the selected type, or all if no type selected
     subtypes_query = Task.objects.exclude(subtype_tag__isnull=True).exclude(subtype_tag__exact='')
-    if request.user.role == 'admin':
-        if subject_filter:
-            subtypes_query = subtypes_query.filter(task_type__exam_format__subject_id=subject_filter)
-        if exam_format_filter:
-            subtypes_query = subtypes_query.filter(task_type__exam_format_id=exam_format_filter)
+    if request.user.role == 'tutor':
+        if allowed_subject_ids:
+            subtypes_query = subtypes_query.filter(task_type__exam_format__subject_id__in=allowed_subject_ids)
+        if allowed_exam_format_ids:
+            subtypes_query = subtypes_query.filter(task_type__exam_format_id__in=allowed_exam_format_ids)
+    if subject_filter:
+        subtypes_query = subtypes_query.filter(task_type__exam_format__subject_id=subject_filter)
+    if exam_format_filter:
+        subtypes_query = subtypes_query.filter(task_type__exam_format_id=exam_format_filter)
     if type_filter:
         subtypes_query = subtypes_query.filter(task_type__id=type_filter)
     subtypes = subtypes_query.values('subtype_tag').annotate(task_count=models.Count('id')).order_by('subtype_tag')
@@ -2550,6 +2578,16 @@ def tutor_task_bank(request):
     if request.user.role == 'admin':
         subjects = Subject.objects.all().order_by('name')
         exam_formats_qs = ExamFormat.objects.all().select_related('subject').order_by('subject__name', '-is_active', '-year', 'name')
+        if subject_filter:
+            exam_formats_qs = exam_formats_qs.filter(subject_id=subject_filter)
+        exam_formats = exam_formats_qs
+    elif request.user.role == 'tutor':
+        subjects = Subject.objects.filter(id__in=allowed_subject_ids or []).order_by('name')
+        exam_formats_qs = (
+            ExamFormat.objects.filter(id__in=allowed_exam_format_ids or [])
+            .select_related('subject')
+            .order_by('subject__name', '-is_active', '-year', 'name')
+        )
         if subject_filter:
             exam_formats_qs = exam_formats_qs.filter(subject_id=subject_filter)
         exam_formats = exam_formats_qs
