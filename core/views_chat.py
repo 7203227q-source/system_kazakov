@@ -98,6 +98,21 @@ def chat_dialog(request, user_id):
             
     if not can_chat and request.user.role != 'admin':
         return redirect('chat_index')
+
+    if dialogs:
+        idx = next((i for i, d in enumerate(dialogs) if d.get("user") and d["user"].id == active_user.id), None)
+        if idx is not None and idx > 0:
+            entry = dialogs.pop(idx)
+            dialogs.insert(0, entry)
+    elif request.user.role == "admin":
+        dialogs = [
+            {
+                "user": active_user,
+                "last_message": None,
+                "unread_count": 0,
+                "sort_date": timezone.datetime(1970, 1, 1, tzinfo=timezone.get_current_timezone()),
+            }
+        ]
         
     # Помечаем сообщения как прочитанные
     Message.objects.filter(sender=active_user, receiver=request.user, is_read=False).update(is_read=True)
