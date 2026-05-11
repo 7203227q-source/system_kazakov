@@ -88,10 +88,14 @@ def sanitize_math_latex(value: str) -> str:
 
     s = str(value)
 
+    s = s.replace("°", r"^{\circ}")
+
     s = re.sub(r"\bв\s*степени\b", "степени", s, flags=re.IGNORECASE)
     s = re.sub(r"\bвстепени\b", "степени", s, flags=re.IGNORECASE)
     s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])\s*в\s*(?=\^)", "", s, flags=re.IGNORECASE)
     s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])в(?=\^)", "", s, flags=re.IGNORECASE)
+
+    s = _DEGREE_WORD_RE.sub(lambda m: rf"{m.group('num')}^{{\circ}}", s)
 
     def fix_broken_frac_extra_brace(text: str) -> str:
         out = []

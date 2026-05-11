@@ -151,40 +151,45 @@ class Task(models.Model):
     def get_content_for_theme(self, theme='classic'):
         variant = self.variants.filter(theme=theme).first()
         if variant:
-            from core.tex_replace import fix_math_words_in_html
+            from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
 
-            fixed, _ = fix_math_words_in_html(variant.content)
-            return fixed
+            fixed, _ = fix_latex_tokens_in_html(variant.content)
+            fixed2, _ = fix_math_words_in_html(fixed)
+            return fixed2
         # Fallback to classic if preferred theme not found
         classic = self.variants.filter(theme='classic').first()
         if classic:
-            from core.tex_replace import fix_math_words_in_html
+            from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
 
-            fixed, _ = fix_math_words_in_html(classic.content)
-            return fixed
+            fixed, _ = fix_latex_tokens_in_html(classic.content)
+            fixed2, _ = fix_math_words_in_html(fixed)
+            return fixed2
         # Try to get the first available variant if neither theme nor classic is found
         any_variant = self.variants.first()
         if any_variant:
-            from core.tex_replace import fix_math_words_in_html
+            from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
 
-            fixed, _ = fix_math_words_in_html(any_variant.content)
-            return fixed
+            fixed, _ = fix_latex_tokens_in_html(any_variant.content)
+            fixed2, _ = fix_math_words_in_html(fixed)
+            return fixed2
         # Ultimate fallback (should not happen if db is consistent)
         return "Условие задачи отсутствует."
 
     def get_solution_for_theme(self, theme='classic'):
         variant = self.variants.filter(theme=theme).first()
         if variant and variant.solution:
-            from core.tex_replace import fix_math_words_in_html
+            from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
 
-            fixed, _ = fix_math_words_in_html(variant.solution)
-            return fixed
+            fixed, _ = fix_latex_tokens_in_html(variant.solution)
+            fixed2, _ = fix_math_words_in_html(fixed)
+            return fixed2
         classic = self.variants.filter(theme='classic').first()
         if classic and classic.solution:
-            from core.tex_replace import fix_math_words_in_html
+            from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
 
-            fixed, _ = fix_math_words_in_html(classic.solution)
-            return fixed
+            fixed, _ = fix_latex_tokens_in_html(classic.solution)
+            fixed2, _ = fix_math_words_in_html(fixed)
+            return fixed2
         return ""
 
     def __str__(self):
