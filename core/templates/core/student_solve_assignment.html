@@ -188,50 +188,6 @@
                         </div>
                         {% endif %}
                         
-                        <div class="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <div class="flex items-center justify-between gap-3">
-                                <div class="text-sm font-bold text-gray-800">Вопрос репетитору</div>
-                                <div class="text-xs text-gray-500">
-                                    {% if task.saved_submission.is_correct is not None %}Ветка доступна{% else %}Ветка появится после «Проверить»{% endif %}
-                                </div>
-                            </div>
-                            <div class="mt-3">
-                                <textarea id="comment_text_{{ task.id }}" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Напишите вопрос по этой задаче..."></textarea>
-                                <div class="mt-2 flex justify-end">
-                                    <button type="button" onclick="postStudentComment({{ assignment.id }}, {{ task.id }})" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg text-sm font-bold transition">
-                                        <i class="fas fa-paper-plane mr-2"></i> Отправить
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div id="comments_wrap_{{ task.id }}" class="mt-3 {% if task.saved_submission.is_correct is None %}hidden{% endif %}">
-                                {% if task.saved_submission %}
-                                    {% if task.saved_submission.comments.count %}
-                                    <button type="button" onclick="toggleTaskComments({{ task.id }})" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
-                                        Вопросы и ответы ({{ task.saved_submission.comments.count }})
-                                    </button>
-                                    <div id="comments_list_{{ task.id }}" class="hidden mt-3 bg-white border border-gray-200 rounded-lg p-3 space-y-2">
-                                        {% for c in task.saved_submission.comments.all %}
-                                        <div class="text-sm">
-                                            <div class="flex justify-between items-center text-xs text-gray-500">
-                                                <span class="font-bold {% if c.author_role == 'tutor' %}text-indigo-700{% else %}text-gray-700{% endif %}">
-                                                    {% if c.author_role == 'tutor' %}Репетитор{% else %}Вы{% endif %}
-                                                </span>
-                                                <span>{{ c.created_at|date:"d.m H:i" }}</span>
-                                            </div>
-                                            <div class="mt-1 text-gray-800 whitespace-pre-wrap">{{ c.text }}</div>
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                    {% else %}
-                                    <div class="text-xs text-gray-500">Сообщений пока нет.</div>
-                                    {% endif %}
-                                {% else %}
-                                <div class="text-xs text-gray-500">Сообщений пока нет.</div>
-                                {% endif %}
-                            </div>
-                        </div>
-
                         <!-- Result and Solution Block -->
                         <div id="result_{{ task.id }}" class="mt-4 hidden rounded-lg p-4 border text-sm">
                             <div class="flex items-center font-bold mb-2 result-title"></div>
@@ -270,6 +226,55 @@
                             });
                         </script>
                         {% endif %}
+
+                        <div id="chat_hint_{{ task.id }}" class="{% if task.saved_submission and task.saved_submission.is_correct is not None %}hidden{% endif %}mt-4 text-xs text-gray-500">
+                            Комментарии доступны после «Проверить».
+                        </div>
+                        <div id="chat_block_{{ task.id }}" class="{% if not task.saved_submission or task.saved_submission.is_correct is None %}hidden {% endif %}mt-4 bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                            <button type="button" onclick="toggleTaskChat({{ task.id }})" class="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
+                                <div class="text-sm font-bold text-gray-800">Комментарии</div>
+                                <div class="flex items-center gap-2 text-xs font-bold text-gray-600">
+                                    {% if task.saved_submission %}
+                                    <span id="chat_count_{{ task.id }}">{{ task.saved_submission.comments.count }}</span>
+                                    {% else %}
+                                    <span id="chat_count_{{ task.id }}">0</span>
+                                    {% endif %}
+                                    <i id="chat_chev_{{ task.id }}" class="fas fa-chevron-down text-gray-400"></i>
+                                </div>
+                            </button>
+                            <div id="chat_body_{{ task.id }}" class="hidden px-4 py-4 border-t border-gray-200">
+                                <textarea id="comment_text_{{ task.id }}" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Напишите вопрос по этой задаче..."></textarea>
+                                <div class="mt-2 flex justify-end">
+                                    <button type="button" onclick="postStudentComment({{ assignment.id }}, {{ task.id }})" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg text-sm font-bold transition">
+                                        <i class="fas fa-paper-plane mr-2"></i> Отправить
+                                    </button>
+                                </div>
+
+                                <div class="mt-4">
+                                    {% if task.saved_submission %}
+                                        {% if task.saved_submission.comments.count %}
+                                        <div class="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+                                            {% for c in task.saved_submission.comments.all %}
+                                            <div class="text-sm">
+                                                <div class="flex justify-between items-center text-xs text-gray-500">
+                                                    <span class="font-bold {% if c.author_role == 'tutor' %}text-indigo-700{% else %}text-gray-700{% endif %}">
+                                                        {% if c.author_role == 'tutor' %}Репетитор{% else %}Вы{% endif %}
+                                                    </span>
+                                                    <span>{{ c.created_at|date:"d.m H:i" }}</span>
+                                                </div>
+                                                <div class="mt-1 text-gray-800 whitespace-pre-wrap">{{ c.text }}</div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="text-xs text-gray-500">Сообщений пока нет.</div>
+                                        {% endif %}
+                                    {% else %}
+                                    <div class="text-xs text-gray-500">Сообщений пока нет.</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -324,9 +329,21 @@
         box.classList.toggle('hidden');
     }
 
-    function toggleTaskComments(taskId) {
-        const el = document.getElementById(`comments_list_${taskId}`);
-        if (el) el.classList.toggle('hidden');
+    function toggleTaskChat(taskId) {
+        const body = document.getElementById(`chat_body_${taskId}`);
+        const chev = document.getElementById(`chat_chev_${taskId}`);
+        if (!body) return;
+        body.classList.toggle('hidden');
+        if (chev) chev.classList.toggle('rotate-180');
+    }
+
+    function unlockTaskChat(taskId, commentsCount) {
+        const hint = document.getElementById(`chat_hint_${taskId}`);
+        const block = document.getElementById(`chat_block_${taskId}`);
+        const count = document.getElementById(`chat_count_${taskId}`);
+        if (hint) hint.classList.add('hidden');
+        if (block) block.classList.remove('hidden');
+        if (count && typeof commentsCount === 'number') count.textContent = String(commentsCount);
     }
 
     async function postStudentComment(assignmentId, taskId) {
@@ -400,6 +417,7 @@
             } else {
                 solutionDiv.innerHTML = '<p class="text-gray-500 italic">Решение для этой задачи пока не добавлено в базу.</p>';
             }
+            unlockTaskChat(taskId, null);
 
         } catch (e) {
             console.error(e);
@@ -475,10 +493,7 @@
                     solutionDiv.innerHTML = '<p class="text-gray-500 italic">Решение для этой задачи пока не добавлено в базу.</p>';
                 }
 
-                if (data.can_view_comments) {
-                    const wrap = document.getElementById(`comments_wrap_${taskId}`);
-                    if (wrap) wrap.classList.remove('hidden');
-                }
+                if (data.can_view_comments) unlockTaskChat(taskId, data.comments_count || 0);
 
             } else {
                 alert(data.error || 'Произошла ошибка при проверке');
