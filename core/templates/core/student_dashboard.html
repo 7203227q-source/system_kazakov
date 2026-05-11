@@ -197,6 +197,11 @@
                                         Контрольная
                                     </span>
                                     {% endif %}
+                                    {% if assignment.unread_tutor_replies_count %}
+                                    <a href="{% url 'student_history' %}" class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">
+                                        Ответы: {{ assignment.unread_tutor_replies_count }}
+                                    </a>
+                                    {% endif %}
                                 </div>
                                 <p class="text-sm text-gray-500">
                                     От репетитора: {{ assignment.tutor.get_full_name|default:assignment.tutor.username }} • Задач: {{ assignment.tasks.count }}{% if assignment.due_date %} • Срок: {{ assignment.due_date|date:"d.m.Y" }}{% endif %}

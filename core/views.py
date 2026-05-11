@@ -29,6 +29,25 @@ def run_migrations(request):
     except Exception as e:
         return HttpResponse(f"Error applying migrations: {e}")
 
+
+def _mark_student_replies_seen(student, submissions_qs):
+    now = timezone.now()
+    SubmissionComment.objects.filter(
+        submission__in=submissions_qs,
+        author_role="tutor",
+        seen_by_student_at__isnull=True,
+    ).update(seen_by_student_at=now)
+
+
+def _mark_tutor_questions_seen(tutor, submissions_qs):
+    now = timezone.now()
+    SubmissionComment.objects.filter(
+        submission__in=submissions_qs,
+        author_role="student",
+        seen_by_tutor_at__isnull=True,
+        submission__assignment__tutor=tutor,
+    ).update(seen_by_tutor_at=now)
+
 @login_required
 def admin_system_status(request):
     """Страница мониторинга системы и API ключей для Администратора"""
@@ -698,6 +717,27 @@ def student_dashboard(request):
         next_review_date__lte=timezone.now().date(),
     ).count()
 
+    unread_tutor_replies_total = SubmissionComment.objects.filter(
+        submission__student=request.user,
+        author_role="tutor",
+        seen_by_student_at__isnull=True,
+    ).count()
+
+    pending_assignment_ids = list(pending_assignments.values_list("id", flat=True))
+    unread_by_assignment = {
+        row["submission__assignment_id"]: row["c"]
+        for row in SubmissionComment.objects.filter(
+            submission__student=request.user,
+            author_role="tutor",
+            seen_by_student_at__isnull=True,
+            submission__assignment_id__in=pending_assignment_ids,
+        )
+        .values("submission__assignment_id")
+        .annotate(c=models.Count("id"))
+    }
+    for a in pending_assignments:
+        a.unread_tutor_replies_count = int(unread_by_assignment.get(a.id, 0) or 0)
+
     return render(request, 'core/student_dashboard.html', {
         'recent_submissions': recent_submissions,
         'pending_assignments': pending_assignments,
@@ -712,6 +752,7 @@ def student_dashboard(request):
         'total_level': total_level,
         'chart_data': chart_data,
         'due_srs_count': due_srs_count,
+        'unread_tutor_replies_total': unread_tutor_replies_total,
     })
 
 from django.http import JsonResponse
@@ -1042,6 +1083,16 @@ def student_solve_assignment(request, assignment_id):
             "comments", "comments__author"
         )
     }
+
+    visible_submissions = [s for s in saved_submissions.values() if s.is_correct is not None]
+    if visible_submissions:
+        _mark_student_replies_seen(request.user, visible_submissions)
+
+    unread_tutor_replies_total = SubmissionComment.objects.filter(
+        submission__student=request.user,
+        author_role="tutor",
+        seen_by_student_at__isnull=True,
+    ).count()
     
     tasks_list = list(tasks)
     domain = request.build_absolute_uri('/')[:-1]
@@ -1085,6 +1136,7 @@ def student_solve_assignment(request, assignment_id):
     return render(request, 'core/student_solve_assignment.html', {
         'assignment': assignment, 
         'tasks': tasks_list,
+        'unread_tutor_replies_total': unread_tutor_replies_total,
     })
 
 
@@ -1138,7 +1190,13 @@ def student_add_submission_comment(request, assignment_id, task_id):
         return JsonResponse({"error": "empty"}, status=400)
 
     submission, _ = Submission.objects.get_or_create(student=request.user, assignment=assignment, task=task)
-    SubmissionComment.objects.create(submission=submission, author=request.user, author_role="student", text=text)
+    SubmissionComment.objects.create(
+        submission=submission,
+        author=request.user,
+        author_role="student",
+        text=text,
+        seen_by_student_at=timezone.now(),
+    )
     return JsonResponse({"ok": True, "comments_count": submission.comments.count(), "submission_id": submission.id})
 
 @login_required
@@ -1166,9 +1224,15 @@ def student_history(request):
         .prefetch_related('comments', 'comments__author')
         .order_by('-created_at')
     )
+    _mark_student_replies_seen(request.user, submissions)
+    unread_tutor_replies_total = SubmissionComment.objects.filter(
+        submission__student=request.user,
+        author_role="tutor",
+        seen_by_student_at__isnull=True,
+    ).count()
     total_xp = StudentSubjectProfile.objects.filter(student=request.user).aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
-    return render(request, 'core/student_history.html', {'submissions': submissions, 'total_xp': total_xp, 'total_level': total_level})
+    return render(request, 'core/student_history.html', {'submissions': submissions, 'total_xp': total_xp, 'total_level': total_level, 'unread_tutor_replies_total': unread_tutor_replies_total})
 
 @login_required
 def update_theme_view(request):
@@ -1232,8 +1296,23 @@ def tutor_dashboard(request):
         request.user.invite_code = generate_invite_code()
         request.user.save(update_fields=['invite_code'])
 
+    from django.db.models import Q
+
     # Get students with their profiles
-    students = request.user.students.all().prefetch_related('subject_profiles', 'subject_profiles__subject')
+    students = (
+        request.user.students.all()
+        .prefetch_related('subject_profiles', 'subject_profiles__subject')
+        .annotate(
+            unread_student_questions=models.Count(
+                'submissions__comments',
+                filter=Q(
+                    submissions__comments__author_role='student',
+                    submissions__comments__seen_by_tutor_at__isnull=True,
+                    submissions__assignment__tutor=request.user,
+                ),
+            )
+        )
+    )
     selected_student_id = request.GET.get('student_id')
     chart_range_raw = (request.GET.get('range') or '30').strip()
     chart_subject_id_raw = (request.GET.get('subject_id') or '').strip()
@@ -1542,14 +1621,29 @@ def tutor_assignment_view(request, assignment_id):
         .prefetch_related('comments', 'comments__author')
     )
     subs_by_task_id = {s.task_id: s for s in subs}
+    submission_ids = [s.id for s in subs]
+    unread_by_submission = {
+        row["submission_id"]: row["c"]
+        for row in SubmissionComment.objects.filter(
+            submission_id__in=submission_ids,
+            author_role="student",
+            seen_by_tutor_at__isnull=True,
+        )
+        .values("submission_id")
+        .annotate(c=models.Count("id"))
+    }
+    if request.user.role == 'tutor' and submission_ids:
+        _mark_tutor_questions_seen(request.user, subs)
 
     tasks_view = []
     for t in tasks:
+        sub = subs_by_task_id.get(t.id)
         tasks_view.append({
             'task': t,
             'content_html': t.get_content_for_theme(theme),
             'solution_html': t.get_solution_for_theme(theme),
-            'submission': subs_by_task_id.get(t.id),
+            'submission': sub,
+            'unread_student_questions': int(unread_by_submission.get(sub.id, 0) or 0) if sub else 0,
         })
     pending_extension = AssignmentExtensionRequest.objects.filter(assignment=assignment, status='pending').first()
     return render(request, 'core/tutor_assignment_view.html', {
@@ -2505,6 +2599,8 @@ def tutor_student_history(request, student_id):
         .prefetch_related('comments', 'comments__author')
         .order_by('-created_at')
     )
+    if request.user.role == 'tutor':
+        _mark_tutor_questions_seen(request.user, submissions.filter(assignment__tutor=request.user))
     
     days_data = {}
     
@@ -2576,7 +2672,13 @@ def tutor_add_submission_comment(request, submission_id):
     if not text:
         return JsonResponse({"error": "empty"}, status=400)
 
-    SubmissionComment.objects.create(submission=submission, author=request.user, author_role="tutor", text=text)
+    SubmissionComment.objects.create(
+        submission=submission,
+        author=request.user,
+        author_role="tutor",
+        text=text,
+        seen_by_tutor_at=timezone.now(),
+    )
     return JsonResponse({"ok": True, "comments_count": submission.comments.count(), "submission_id": submission.id})
 
 

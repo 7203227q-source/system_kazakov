@@ -285,6 +285,8 @@ class SubmissionComment(models.Model):
     author_role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    seen_by_tutor_at = models.DateTimeField(null=True, blank=True)
+    seen_by_student_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [

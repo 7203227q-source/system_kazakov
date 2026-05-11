@@ -20,6 +20,9 @@
         </a>
         <a href="{% url 'student_history' %}" class="flex items-center px-4 py-3 {% if active_page == 'history' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
             <i class="fas fa-history w-6"></i> Журнал решений
+            {% if unread_tutor_replies_total|default:0 %}
+            <span class="ml-auto bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">{{ unread_tutor_replies_total }}</span>
+            {% endif %}
         </a>
         <a href="{% url 'chat_index' %}" class="flex items-center px-4 py-3 {% if active_page == 'chat' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition" id="sidebar-chat-link">
             <i class="fas fa-comments w-6"></i> Сообщения
