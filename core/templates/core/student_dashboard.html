@@ -35,7 +35,7 @@
             </div>
             <div class="flex items-center space-x-3 md:space-x-6">
                 <div class="hidden sm:flex items-center text-secondary font-bold">
-                    <i class="fas fa-fire mr-2"></i> {{ user.current_streak }} дней в ударе
+                    <i class="fas fa-fire mr-2"></i> {{ active_profile.current_streak|default:0 }} дней в ударе
                 </div>
                 <div class="flex items-center bg-yellow-100 px-2 md:px-3 py-1 rounded-full text-yellow-700 font-bold text-xs md:text-sm">
                     <i class="fas fa-star mr-1"></i> Уровень {{ total_level|default:1 }} ({{ total_xp|default:0 }} XP)

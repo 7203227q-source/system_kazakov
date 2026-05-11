@@ -6,6 +6,40 @@ import random
 
 ALPHA = 0.25  # Коэффициент экспоненциального сглаживания (EMA)
 
+def touch_subject_streak(student, subject, *, today=None):
+    """
+    Обновляет стрик по предмету (StudentSubjectProfile) 1 раз в день.
+    Правило: любая попытка решить задачу по предмету засчитывает день.
+    """
+    today = today or timezone.now().date()
+    profile, _ = StudentSubjectProfile.objects.get_or_create(student=student, subject=subject)
+    last = profile.last_streak_date
+
+    if last == today:
+        return profile
+
+    if last == (today - datetime.timedelta(days=1)):
+        profile.current_streak = int(profile.current_streak or 0) + 1
+    else:
+        profile.current_streak = 1
+
+    profile.last_streak_date = today
+    profile.save(update_fields=["current_streak", "last_streak_date"])
+
+    # Поддерживаем legacy-поле на User: глобальный стрик = max по предметам
+    mx = (
+        StudentSubjectProfile.objects.filter(student=student)
+        .aggregate(m=Max("current_streak"))
+        .get("m")
+        or 0
+    )
+    if int(student.current_streak or 0) != int(mx):
+        student.current_streak = int(mx)
+        student.save(update_fields=["current_streak"])
+
+    return profile
+
+
 def calculate_time_anomaly(task, time_spent, is_verified):
     """
     Определяет, является ли время решения аномальным.
@@ -62,6 +96,9 @@ def record_task_log(student, task, submission, assignment, time_spent):
         verifier_role=verifier_role,
         is_anomaly=is_anomaly
     )
+
+    # Стрик по предмету засчитывается при любой попытке (через запись лога)
+    touch_subject_streak(student, task.topic.subject)
     
     # После записи лога обновляем профиль
     update_student_analytics(student, task.topic.subject)

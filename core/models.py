@@ -83,6 +83,8 @@ class StudentSubjectProfile(models.Model):
     last_verified_date = models.DateField(null=True, blank=True, verbose_name="Дата последней верификации")
     learning_velocity = models.FloatField(default=1.0, verbose_name="Коэффициент обучаемости (Темп)")
     exam_format = models.ForeignKey("ExamFormat", on_delete=models.SET_NULL, null=True, blank=True, related_name="student_profiles")
+    last_streak_date = models.DateField(null=True, blank=True, verbose_name="Дата последнего дня стрика")
+
 
     class Meta:
         unique_together = ('student', 'subject')

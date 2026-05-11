@@ -781,6 +781,13 @@ def student_check_assignment_task(request, assignment_id, task_id):
     
     if assignment.is_completed:
         return JsonResponse({'error': 'Вариант уже завершен'}, status=400)
+
+    # Стрик по предмету засчитывается при любой попытке, без необходимости "Завершить вариант"
+    try:
+        from core.analytics import touch_subject_streak
+        touch_subject_streak(request.user, task.topic.subject)
+    except Exception:
+        pass
         
     user_answer = request.POST.get('answer', '').strip()
     
