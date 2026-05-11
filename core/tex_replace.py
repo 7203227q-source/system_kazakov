@@ -6,6 +6,82 @@ from bs4.element import NavigableString
 from core.sdamgia_latex import latex_from_sdamgia_alt, sanitize_math_latex
 
 
+_RU_TRIG_RE = re.compile(
+    r"\b(?P<fn>синус|синуса|косинус|косинуса|тангенс|тангенса|котангенс|котангенса)\s*(?P<arg>[A-Za-zА-Яа-я])\b",
+    flags=re.IGNORECASE,
+)
+
+_LAT_TRIG_RE = re.compile(
+    r"\b(?P<fn>sin|cos|tan|tg|ctg|cot)\s*(?P<arg>[A-Za-z])\b",
+    flags=re.IGNORECASE,
+)
+
+_DEG_WORD_HTML_RE = re.compile(
+    r"(?P<num>-?\d+(?:[.,]\d+)?)\s*градус(?:ов|а)?",
+    flags=re.IGNORECASE,
+)
+
+
+def fix_math_words_in_html(html: str) -> tuple[str, int]:
+    if not html:
+        return html, 0
+    lower = html.lower()
+    if not any(k in lower for k in ["градус", "синус", "косинус", "тангенс", "котангенс", " sin", " cos", " tg", "ctg", " tan"]):
+        return html, 0
+
+    soup = BeautifulSoup(html, "html.parser")
+    changed = 0
+
+    excluded = {"script", "style", "math", "svg"}
+    for node in list(soup.descendants):
+        if not isinstance(node, NavigableString):
+            continue
+        parent = getattr(node, "parent", None)
+        if parent is not None and getattr(parent, "name", None) in excluded:
+            continue
+        text = str(node)
+        if not text.strip():
+            continue
+        if "$" in text or "\\(" in text or "\\[" in text:
+            continue
+
+        original = text
+
+        def trig_ru(m: re.Match) -> str:
+            fn = m.group("fn").lower()
+            if fn.startswith("синус"):
+                cmd = r"\sin"
+            elif fn.startswith("косинус"):
+                cmd = r"\cos"
+            elif fn.startswith("тангенс"):
+                cmd = r"\tan"
+            else:
+                cmd = r"\cot"
+            return rf"${cmd} {m.group('arg')}$"
+
+        def trig_lat(m: re.Match) -> str:
+            fn = m.group("fn").lower()
+            if fn in {"sin"}:
+                cmd = r"\sin"
+            elif fn in {"cos"}:
+                cmd = r"\cos"
+            elif fn in {"tan", "tg"}:
+                cmd = r"\tan"
+            else:
+                cmd = r"\cot"
+            return rf"${cmd} {m.group('arg')}$"
+
+        text = _RU_TRIG_RE.sub(trig_ru, text)
+        text = _LAT_TRIG_RE.sub(trig_lat, text)
+        text = _DEG_WORD_HTML_RE.sub(lambda m: rf"${m.group('num')}^{{\circ}}$", text)
+
+        if text != original:
+            node.replace_with(NavigableString(text))
+            changed += 1
+
+    return str(soup), changed
+
+
 def replace_svg_images_with_latex(html: str) -> tuple[str, int]:
     if not html:
         return html, 0

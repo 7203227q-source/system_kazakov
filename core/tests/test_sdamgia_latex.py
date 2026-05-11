@@ -103,3 +103,8 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "12кореньиз3"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), r"12\sqrt{3}".replace(" ", ""))
+
+    def test_trig_words_converts(self):
+        alt = "синусA=0,4"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"\sin A=0,4".replace(" ", ""))

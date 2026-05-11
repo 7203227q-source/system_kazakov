@@ -150,25 +150,40 @@ class Task(models.Model):
     def get_content_for_theme(self, theme='classic'):
         variant = self.variants.filter(theme=theme).first()
         if variant:
-            return variant.content
+            from core.tex_replace import fix_math_words_in_html
+
+            fixed, _ = fix_math_words_in_html(variant.content)
+            return fixed
         # Fallback to classic if preferred theme not found
         classic = self.variants.filter(theme='classic').first()
         if classic:
-            return classic.content
+            from core.tex_replace import fix_math_words_in_html
+
+            fixed, _ = fix_math_words_in_html(classic.content)
+            return fixed
         # Try to get the first available variant if neither theme nor classic is found
         any_variant = self.variants.first()
         if any_variant:
-            return any_variant.content
+            from core.tex_replace import fix_math_words_in_html
+
+            fixed, _ = fix_math_words_in_html(any_variant.content)
+            return fixed
         # Ultimate fallback (should not happen if db is consistent)
         return "Условие задачи отсутствует."
 
     def get_solution_for_theme(self, theme='classic'):
         variant = self.variants.filter(theme=theme).first()
         if variant and variant.solution:
-            return variant.solution
+            from core.tex_replace import fix_math_words_in_html
+
+            fixed, _ = fix_math_words_in_html(variant.solution)
+            return fixed
         classic = self.variants.filter(theme='classic').first()
         if classic and classic.solution:
-            return classic.solution
+            from core.tex_replace import fix_math_words_in_html
+
+            fixed, _ = fix_math_words_in_html(classic.solution)
+            return fixed
         return ""
 
     def __str__(self):

@@ -55,6 +55,11 @@ _DEGREE_WORD_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_TRIG_WORD_RE = re.compile(
+    r"\b(?P<fn>синус|синуса|косинус|косинуса|тангенс|тангенса|котангенс|котангенса|sin|cos|tan|tg|ctg|cot)\s*(?P<arg>[A-Za-zА-Яа-я])\b",
+    flags=re.IGNORECASE,
+)
+
 _COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
 _SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
 _POWER_PAREN_RE = re.compile(
@@ -175,6 +180,19 @@ def _convert_plain_text(value: str) -> str:
             lower = s.lower()
 
     s = _DEGREE_WORD_RE.sub(lambda m: rf"{m.group('num')}^{{\circ}}", s)
+    def _trig(m: re.Match) -> str:
+        fn = m.group("fn").lower()
+        if fn.startswith("синус") or fn == "sin":
+            cmd = r"\sin"
+        elif fn.startswith("косинус") or fn == "cos":
+            cmd = r"\cos"
+        elif fn.startswith("тангенс") or fn in {"tan", "tg"}:
+            cmd = r"\tan"
+        else:
+            cmd = r"\cot"
+        return rf"{cmd} {m.group('arg')}"
+
+    s = _TRIG_WORD_RE.sub(_trig, s)
 
     s = re.sub(r"\s+", " ", s).strip()
     s = s.strip(" .")
