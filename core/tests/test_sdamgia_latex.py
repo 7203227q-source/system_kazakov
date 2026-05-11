@@ -108,3 +108,8 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "синусA=0,4"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), r"\sin A=0,4".replace(" ", ""))
+
+    def test_infinity_word_converts(self):
+        alt = "(-3; +бесконечность)"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"(-3;\infty)".replace(" ", ""))

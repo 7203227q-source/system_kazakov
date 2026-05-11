@@ -60,6 +60,11 @@ _TRIG_WORD_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_INFINITY_WORD_RE = re.compile(
+    r"(?P<sign>[+\-−])?\s*бесконечност[ьи]\b",
+    flags=re.IGNORECASE,
+)
+
 _COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
 _SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
 _POWER_PAREN_RE = re.compile(
@@ -193,6 +198,7 @@ def _convert_plain_text(value: str) -> str:
         return rf"{cmd} {m.group('arg')}"
 
     s = _TRIG_WORD_RE.sub(_trig, s)
+    s = _INFINITY_WORD_RE.sub(lambda m: (r"-\infty" if (m.group("sign") or "").strip() in {"-", "−"} else r"\infty"), s)
 
     s = re.sub(r"\s+", " ", s).strip()
     s = s.strip(" .")

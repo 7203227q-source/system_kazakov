@@ -18,3 +18,11 @@ class TexReplaceMathWordsTests(SimpleTestCase):
         self.assertGreater(changed, 0)
         self.assertIn(r"$48^{\circ}$", out)
 
+    def test_converts_infinity_word_in_plain_html(self):
+        from core.tex_replace import fix_math_words_in_html
+
+        html = "<p>(-3; +бесконечность)</p><p>(-бесконечность; -3)</p>"
+        out, changed = fix_math_words_in_html(html)
+        self.assertGreater(changed, 0)
+        self.assertIn(r"$\infty$", out)
+        self.assertIn(r"$-\infty$", out)

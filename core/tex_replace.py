@@ -21,12 +21,20 @@ _DEG_WORD_HTML_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_INF_WORD_HTML_RE = re.compile(
+    r"(?P<sign>[+\-−])?\s*бесконечност[ьи]\b",
+    flags=re.IGNORECASE,
+)
+
 
 def fix_math_words_in_html(html: str) -> tuple[str, int]:
     if not html:
         return html, 0
     lower = html.lower()
-    if not any(k in lower for k in ["градус", "синус", "косинус", "тангенс", "котангенс", " sin", " cos", " tg", "ctg", " tan"]):
+    if not any(
+        k in lower
+        for k in ["градус", "бесконечност", "синус", "косинус", "тангенс", "котангенс", " sin", " cos", " tg", "ctg", " tan"]
+    ):
         return html, 0
 
     soup = BeautifulSoup(html, "html.parser")
@@ -71,9 +79,16 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
                 cmd = r"\cot"
             return rf"${cmd} {m.group('arg')}$"
 
+        def inf(m: re.Match) -> str:
+            sign = (m.group("sign") or "").strip()
+            if sign in {"-", "−"}:
+                return r"$-\infty$"
+            return r"$\infty$"
+
         text = _RU_TRIG_RE.sub(trig_ru, text)
         text = _LAT_TRIG_RE.sub(trig_lat, text)
         text = _DEG_WORD_HTML_RE.sub(lambda m: rf"${m.group('num')}^{{\circ}}$", text)
+        text = _INF_WORD_HTML_RE.sub(inf, text)
 
         if text != original:
             node.replace_with(NavigableString(text))
