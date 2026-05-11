@@ -15,18 +15,26 @@ def get_user_dialogs(user):
     
     if user.role == 'student':
         # Ученик видит своих репетиторов
+        tutors = set()
         for link in user.linked_tutors.all():
-            dialogs.append(link.tutor)
+            tutors.add(link.tutor)
+        for t in user.tutors.all():
+            tutors.add(t)
+        dialogs.extend(list(tutors))
     elif user.role == 'parent':
         # Родитель видит репетиторов своих детей
         tutors = set()
         for child in user.children.all():
             for link in child.linked_tutors.all():
                 tutors.add(link.tutor)
+            for t in child.tutors.all():
+                tutors.add(t)
         dialogs.extend(list(tutors))
     elif user.role == 'tutor':
         # Репетитор видит своих учеников и их родителей
-        students = user.students.all()
+        students = set(user.students.all())
+        for link in user.linked_students.all():
+            students.add(link.student)
         dialogs.extend(list(students))
         for student in students:
             parents = student.parents.all()
