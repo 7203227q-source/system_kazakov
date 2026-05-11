@@ -118,6 +118,19 @@
                         <i class="fas fa-flag-checkered mr-1"></i> Моя цель: {{ active_profile.target_score|default:"Не указана" }}
                     </div>
 
+                    <div class="absolute top-0 left-0 bg-white/70 text-gray-700 text-xs font-bold px-3 py-1 rounded-br-lg flex items-center border-b border-r border-gray-100">
+                        <form method="POST" action="{% url 'student_update_exam_format' %}" class="flex items-center gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="subject_id" value="{{ active_profile.subject.id }}">
+                            <span class="text-gray-500">Формат:</span>
+                            <select name="exam_format_id" onchange="this.form.submit()" class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary">
+                                {% for f in exam_formats_for_subject %}
+                                <option value="{{ f.id }}" {% if active_profile.exam_format_id == f.id %}selected{% endif %}>{{ f.name }} {{ f.year }}</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </div>
+
                     <div class="flex justify-between items-start mt-2">
                         <div>
                             <p class="text-sm text-gray-500 mb-1">Прогноз ИИ на экзамен</p>

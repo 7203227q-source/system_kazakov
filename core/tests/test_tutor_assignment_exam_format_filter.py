@@ -38,7 +38,7 @@ class TutorAssignmentExamFormatFilterTests(TestCase):
         from core.models import Assignment
 
         assignment = Assignment.objects.latest("id")
+        self.assertEqual(assignment.exam_format_id, ef_ege.id)
         tasks = list(assignment.tasks.select_related("task_type").all())
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].task_type.exam_format_id, ef_ege.id)
-

@@ -22,6 +22,23 @@ def normalize_sdamgia_text(value: str) -> str:
     )
 
 
+def normalize_sdamgia_html(html: str) -> str:
+    if not html:
+        return html
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    for node in soup.find_all(string=True):
+        s = normalize_sdamgia_text(str(node))
+        if s != str(node):
+            node.replace_with(s)
+    for img in soup.find_all("img"):
+        alt = img.get("alt")
+        if alt is not None:
+            img["alt"] = normalize_sdamgia_text(alt)
+    return str(soup)
+
+
 def html_to_text(html: str) -> str:
     try:
         from bs4 import BeautifulSoup
@@ -110,40 +127,20 @@ def base_url_from_any_url(value: str) -> str | None:
 
 
 def extract_view_many_ids(html: str, *, limit: int | None = 300) -> list[str]:
+    from bs4 import BeautifulSoup
+
     ids: list[str] = []
-
-    strict_pattern = re.compile(
-        r'class\s*=\s*"prob_nums"[^>]*>[^<]*?тип[^<]*?№[^<]*?<a\s+href="(?:https?://[^/]+)?/problem\?id=(\d+)"[^>]*>\s*\1\s*</a>',
-        flags=re.IGNORECASE,
-    )
-    for m in strict_pattern.finditer(html or ""):
-        tid = m.group(1)
-        if tid not in ids:
-            ids.append(tid)
-        if limit is not None and len(ids) >= limit:
-            return ids
-
-    if ids:
-        return ids
-
-    fallback = re.compile(
-        r'<a[^>]+href="(?:https?://[^/]+)?/problem\?id=(\d+)"[^>]*>\s*\1\s*</a>',
-        flags=re.IGNORECASE,
-    )
-    for m in fallback.finditer(html or ""):
-        tid = m.group(1)
-        if tid not in ids:
-            ids.append(tid)
-        if limit is not None and len(ids) >= limit:
-            return ids
-
-    for m in re.finditer(r"(?:problem\?id=)(\d+)", html or ""):
+    soup = BeautifulSoup(html or "", "html.parser")
+    for a in soup.select('span.prob_nums a[href*="/problem?id="]'):
+        href = (a.get("href") or "").strip()
+        m = re.search(r"[?&]id=(\d+)", href)
+        if not m:
+            continue
         tid = m.group(1)
         if tid not in ids:
             ids.append(tid)
         if limit is not None and len(ids) >= limit:
             break
-
     return ids
 
 
@@ -421,6 +418,8 @@ def import_one_task_from_sdamgia(
         return {"task_id": task_id, "status": "skipped", "detail": "prototype solution"}
 
     content_html, answer, solution_html = parse_task_page(html, task_id=task_id)
+    content_html = normalize_task_html(normalize_sdamgia_html(content_html))
+    solution_html = normalize_task_html(normalize_sdamgia_html(solution_html))
 
     if skip_no_answer and not answer:
         return {"task_id": task_id, "status": "skipped", "detail": "no answer"}

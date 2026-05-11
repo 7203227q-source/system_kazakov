@@ -282,6 +282,10 @@ def admin_reshuege_import_start(request):
     limit_raw = (request.POST.get('limit') or '25').strip()
 
     skip_existing = request.POST.get('skip_existing') == 'on'
+    skip_no_answer = request.POST.get('skip_no_answer') == 'on'
+    skip_prototype = request.POST.get('skip_prototype') == 'on'
+    skip_no_solution = request.POST.get('skip_no_solution') == 'on'
+    exclude_larin = request.POST.get('exclude_larin') == 'on'
 
     if not exam_format_id_raw or not type_number_raw or not ids_raw:
         return JsonResponse({'error': 'Missing required fields'}, status=400)
@@ -312,6 +316,13 @@ def admin_reshuege_import_start(request):
             'target': prep['target'],
             'candidates': prep['candidates'],
             'stats': prep['stats'],
+            'filters': {
+                'skip_existing': skip_existing,
+                'skip_no_answer': skip_no_answer,
+                'skip_prototype': skip_prototype,
+                'skip_no_solution': skip_no_solution,
+                'exclude_larin': exclude_larin,
+            }
         })
     except Exception as e:
         return JsonResponse({'error': str(e)[:200]}, status=400)
@@ -650,7 +661,7 @@ def student_dashboard(request):
     )
     
     # Handle subjects
-    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related('subject')
+    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related('subject', 'exam_format')
     total_xp = profiles.aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
     active_subject_id = request.GET.get('subject_id')
@@ -661,6 +672,7 @@ def student_dashboard(request):
         active_subject_id = int(active_subject_id)
         
     active_profile = next((p for p in profiles if p.subject_id == active_subject_id), None)
+    exam_formats_for_subject = ExamFormat.objects.filter(subject_id=active_subject_id).order_by("-is_active", "-year", "name") if active_subject_id else ExamFormat.objects.none()
     
     overdue_qs = Assignment.objects.filter(
         student=request.user,
@@ -753,6 +765,7 @@ def student_dashboard(request):
         'chart_data': chart_data,
         'due_srs_count': due_srs_count,
         'unread_tutor_replies_total': unread_tutor_replies_total,
+        'exam_formats_for_subject': exam_formats_for_subject,
     })
 
 from django.http import JsonResponse
@@ -806,9 +819,14 @@ def student_check_assignment_task(request, assignment_id, task_id):
     xp_gained = max(1, int(task.difficulty / 5))
     if is_correct and created:
         profile, _ = StudentSubjectProfile.objects.get_or_create(
-            student=request.user, 
+            student=request.user,
             subject=task.topic.subject,
-            defaults={'target_score': 80, 'level': 1, 'xp': 0}
+            defaults={
+                'target_score': 80,
+                'level': 1,
+                'xp': 0,
+                'exam_format': ExamFormat.objects.filter(subject=task.topic.subject, is_active=True).order_by("-year", "name").first(),
+            },
         )
         profile.xp += xp_gained
         # Update level logic: 1 level per 100 XP
@@ -1024,7 +1042,12 @@ def student_solve_assignment(request, assignment_id):
                     profile, _ = StudentSubjectProfile.objects.get_or_create(
                         student=request.user,
                         subject=task.topic.subject,
-                        defaults={'target_score': 80, 'level': 1, 'xp': 0}
+                        defaults={
+                            'target_score': 80,
+                            'level': 1,
+                            'xp': 0,
+                            'exam_format': ExamFormat.objects.filter(subject=task.topic.subject, is_active=True).order_by("-year", "name").first(),
+                        },
                     )
                     profile.xp += max(1, int(task.difficulty / 5))
                     profile.level = (profile.xp // 100) + 1
@@ -1255,6 +1278,33 @@ def update_ui_theme_view(request):
     if ui_theme in dict(User.UI_THEME_CHOICES):
         request.user.ui_theme = ui_theme
         request.user.save(update_fields=['ui_theme'])
+    return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+
+@login_required
+@require_POST
+def student_update_exam_format(request):
+    if request.user.role != 'student':
+        return redirect('login')
+
+    subject_id_raw = (request.POST.get('subject_id') or '').strip()
+    exam_format_id_raw = (request.POST.get('exam_format_id') or '').strip()
+    if not (subject_id_raw.isdigit() and exam_format_id_raw.isdigit()):
+        return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+    subject_id = int(subject_id_raw)
+    exam_format_id = int(exam_format_id_raw)
+
+    profile = StudentSubjectProfile.objects.filter(student=request.user, subject_id=subject_id).first()
+    if profile is None:
+        return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+    exam_format = ExamFormat.objects.filter(id=exam_format_id, subject_id=subject_id).first()
+    if exam_format is None:
+        return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+    profile.exam_format = exam_format
+    profile.save(update_fields=['exam_format'])
     return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
 
 @login_required
@@ -1963,9 +2013,12 @@ def tutor_create_assignment(request):
             except Exception:
                 exam_format = None
         if exam_format is None:
-            profile = StudentSubjectProfile.objects.filter(student=student).select_related("subject").first()
+            profile = StudentSubjectProfile.objects.filter(student=student).select_related("subject", "exam_format").first()
             if profile:
-                exam_format = ExamFormat.objects.filter(subject=profile.subject, is_active=True).order_by("-year", "name").first()
+                if profile.exam_format_id:
+                    exam_format = profile.exam_format
+                else:
+                    exam_format = ExamFormat.objects.filter(subject=profile.subject, is_active=True).order_by("-year", "name").first()
         if exam_format is None:
             messages.error(request, "Выберите формат экзамена.")
             request.session['saved_assignment_form'] = dict(request.POST)
@@ -2074,7 +2127,8 @@ def tutor_create_assignment(request):
             tutor=request.user,
             student=student,
             title=title,
-            is_draft=True
+            is_draft=True,
+            exam_format=exam_format,
         )
         assignment.tasks.add(*unique_tasks)
         
@@ -2895,7 +2949,10 @@ def role_selection_view(request):
                         StudentSubjectProfile.objects.get_or_create(
                             student=request.user,
                             subject=subject,
-                            defaults={'target_score': target_score}
+                            defaults={
+                                'target_score': target_score,
+                                'exam_format': ExamFormat.objects.filter(subject=subject, is_active=True).order_by("-year", "name").first(),
+                            }
                         )
                     except Subject.DoesNotExist:
                         pass
@@ -3100,14 +3157,19 @@ def api_verify_with_ai(request, submission_id):
     submission.ai_feedback = feedback
     submission.save(update_fields=['primary_score', 'is_correct', 'score', 'ai_feedback'])
     
-        # Award XP if correct
+    # Award XP if correct
     xp_gained = 0
     if is_correct:
         xp_gained = max(1, int(task.difficulty / 5))
         profile, _ = StudentSubjectProfile.objects.get_or_create(
             student=request.user,
             subject=task.topic.subject,
-            defaults={'target_score': 80, 'level': 1, 'xp': 0}
+            defaults={
+                'target_score': 80,
+                'level': 1,
+                'xp': 0,
+                'exam_format': ExamFormat.objects.filter(subject=task.topic.subject, is_active=True).order_by("-year", "name").first(),
+            },
         )
         profile.xp += xp_gained
         profile.level = (profile.xp // 100) + 1

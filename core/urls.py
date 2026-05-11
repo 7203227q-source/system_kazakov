@@ -20,6 +20,7 @@ urlpatterns = [
     path('student/assignment/<int:assignment_id>/extension-request/', views.student_extension_request, name='student_extension_request'),
     path('student/assignment/<int:assignment_id>/task/<int:task_id>/comment/', views.student_add_submission_comment, name='student_add_submission_comment'),
     path('student/update-theme/', views.update_theme_view, name='update_theme'),
+    path('student/update-exam-format/', views.student_update_exam_format, name='student_update_exam_format'),
     path('update-ui-theme/', views.update_ui_theme_view, name='update_ui_theme'),
 
     path('board/<int:session_id>/', views.whiteboard_page, name='whiteboard_page'),

@@ -368,6 +368,17 @@
             if (clearBtn) clearBtn.classList.toggle('hidden', n === 0);
         }
 
+        function filterHintText(filters) {
+            const f = filters || {};
+            const bits = [];
+            if (f.skip_existing) bits.push('skip_existing');
+            if (f.skip_no_answer) bits.push('skip_no_answer');
+            if (f.skip_no_solution) bits.push('skip_no_solution');
+            if (f.skip_prototype) bits.push('skip_prototype');
+            if (f.exclude_larin) bits.push('exclude_larin');
+            return bits.length ? `Фильтры: ${bits.join(', ')}` : '';
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('reshuege-import-form');
             const submitBtn = document.getElementById('reshuege-import-submit');
@@ -457,6 +468,9 @@
                     const target = start.target || 25;
                     const candidates = start.candidates || [];
                     const baseUrl = start.base_url || '';
+                    const filters = start.filters || {};
+                    const hint = filterHintText(filters);
+                    if (hint) setLastStatus(hint);
 
                     if (!resume) {
                         cursor = 0;

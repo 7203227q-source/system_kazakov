@@ -82,6 +82,7 @@ class StudentSubjectProfile(models.Model):
     trust_factor = models.FloatField(default=0.6, verbose_name="Индекс доверия (0.0 - 1.0)")
     last_verified_date = models.DateField(null=True, blank=True, verbose_name="Дата последней верификации")
     learning_velocity = models.FloatField(default=1.0, verbose_name="Коэффициент обучаемости (Темп)")
+    exam_format = models.ForeignKey("ExamFormat", on_delete=models.SET_NULL, null=True, blank=True, related_name="student_profiles")
 
     class Meta:
         unique_together = ('student', 'subject')
@@ -219,6 +220,7 @@ class Assignment(models.Model):
     due_date = models.DateField(null=True, blank=True, verbose_name="Срок (до конца дня)")
     is_expired = models.BooleanField(default=False, verbose_name="Просрочено (автозакрыто)")
     expired_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда просрочено")
+    exam_format = models.ForeignKey(ExamFormat, on_delete=models.SET_NULL, null=True, blank=True, related_name="assignments")
 
     def __str__(self):
         return f"{self.title} для {self.student.username}"

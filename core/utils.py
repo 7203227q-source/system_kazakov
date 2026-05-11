@@ -79,10 +79,17 @@ def download_and_replace_images(html_content, task_fipi_id, theme, base_url=None
             
         try:
             origin = (base_url or 'https://math-ege.sdamgia.ru').rstrip('/')
+            referer_origin = origin
+            try:
+                p_ref = urlparse(img_url)
+                if p_ref.scheme in ('http', 'https') and p_ref.netloc:
+                    referer_origin = f"{p_ref.scheme}://{p_ref.netloc}"
+            except Exception:
+                referer_origin = origin
             headers = {
                 'User-Agent': 'Mozilla/5.0',
                 'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-                'Referer': origin + '/',
+                'Referer': referer_origin + '/',
             }
             response = requests.get(img_url, headers=headers, timeout=15)
             if response.status_code == 200 and response.content:
