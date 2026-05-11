@@ -200,6 +200,12 @@
                                 <div id="prac_task_{{ sub.id }}" class="hidden px-4 py-3 bg-white border border-gray-200 border-t-0 rounded-b-lg -mt-3 mb-3 text-sm text-gray-800 prose max-w-none shadow-inner">
                                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Условие задачи:</p>
                                     {{ sub.task.get_content_for_theme|safe }}
+                                    <form method="POST" action="{% url 'tutor_student_srs_remove' student.id sub.task.id %}" class="not-prose mt-3" onsubmit="return confirm('Убрать задачу из повторения?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="bg-white border border-red-200 text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg text-xs font-bold transition">
+                                            <i class="fas fa-ban mr-2"></i> Убрать из повторения
+                                        </button>
+                                    </form>
                                     <div class="not-prose mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
                                         <div class="text-sm font-bold text-gray-800 mb-3">Вопросы по задаче</div>
                                         {% if sub.comments.count %}

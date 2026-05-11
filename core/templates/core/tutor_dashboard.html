@@ -422,6 +422,39 @@
                     </div>
                 </div>
 
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+                    <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider flex items-center mb-6">
+                        <i class="fas fa-list-check text-indigo-500 mr-2"></i> Экзамен
+                    </h3>
+                    <div class="space-y-3">
+                        {% for p in profiles %}
+                        <form method="POST" action="{% url 'tutor_update_student_exam_settings' selected_student.id %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-gray-50 border border-gray-100 rounded-xl p-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="subject_id" value="{{ p.subject.id }}">
+                            <div class="md:col-span-1">
+                                <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Предмет</div>
+                                <div class="text-sm font-bold text-gray-800">{{ p.subject.name }}</div>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Формат</label>
+                                <select name="exam_format_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                                    {% for f in p.exam_formats_for_subject %}
+                                    <option value="{{ f.id }}" {% if p.exam_format_id == f.id %}selected{% endif %}>{{ f.name }} {{ f.year }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="md:col-span-1">
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Дата экзамена</label>
+                                <input type="date" name="exam_date" value="{% if p.exam_date %}{{ p.exam_date|date:'Y-m-d' }}{% endif %}" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                            </div>
+                            <div class="md:col-span-4 flex justify-end">
+                                <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">Сохранить</button>
+                            </div>
+                        </form>
+                        {% endfor %}
+                    </div>
+                </div>
+
                 <!-- Contacts and Notes -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
                     <div class="flex justify-between items-center mb-6">

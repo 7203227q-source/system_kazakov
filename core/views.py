@@ -1314,6 +1314,99 @@ def student_update_exam_format(request):
     profile.save(update_fields=['exam_format'])
     return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
 
+
+@login_required
+@require_POST
+def student_update_exam_date(request):
+    if request.user.role != 'student':
+        return redirect('login')
+
+    subject_id_raw = (request.POST.get('subject_id') or '').strip()
+    exam_date_raw = (request.POST.get('exam_date') or '').strip()
+    if not subject_id_raw.isdigit():
+        return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+    subject_id = int(subject_id_raw)
+    profile = StudentSubjectProfile.objects.filter(student=request.user, subject_id=subject_id).first()
+    if profile is None:
+        return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+    if not exam_date_raw:
+        if profile.exam_date is not None:
+            profile.exam_date = None
+            profile.save(update_fields=['exam_date'])
+        return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+    try:
+        profile.exam_date = date.fromisoformat(exam_date_raw)
+    except Exception:
+        return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+    profile.save(update_fields=['exam_date'])
+    return redirect(request.META.get('HTTP_REFERER', 'student_dashboard'))
+
+
+@login_required
+@require_POST
+def tutor_update_student_exam_settings(request, student_id):
+    if request.user.role != 'tutor':
+        return redirect('login')
+
+    student = request.user.students.filter(id=student_id).first()
+    if student is None:
+        messages.error(request, "Ученик не найден в вашем списке.")
+        return redirect('tutor_dashboard')
+
+    subject_id_raw = (request.POST.get('subject_id') or '').strip()
+    exam_format_id_raw = (request.POST.get('exam_format_id') or '').strip()
+    exam_date_raw = (request.POST.get('exam_date') or '').strip()
+
+    if not subject_id_raw.isdigit():
+        return redirect(request.META.get('HTTP_REFERER', reverse('tutor_dashboard')))
+    subject_id = int(subject_id_raw)
+
+    profile, _ = StudentSubjectProfile.objects.get_or_create(
+        student=student,
+        subject_id=subject_id,
+        defaults={'target_score': 80, 'level': 1, 'xp': 0},
+    )
+
+    if exam_format_id_raw and exam_format_id_raw.isdigit():
+        exam_format = ExamFormat.objects.filter(id=int(exam_format_id_raw), subject_id=subject_id).first()
+        if exam_format is not None:
+            profile.exam_format = exam_format
+            profile.save(update_fields=['exam_format'])
+
+    if not exam_date_raw:
+        if profile.exam_date is not None:
+            profile.exam_date = None
+            profile.save(update_fields=['exam_date'])
+        return redirect(request.META.get('HTTP_REFERER', reverse('tutor_dashboard')))
+
+    try:
+        profile.exam_date = date.fromisoformat(exam_date_raw)
+    except Exception:
+        return redirect(request.META.get('HTTP_REFERER', reverse('tutor_dashboard')))
+
+    profile.save(update_fields=['exam_date'])
+    return redirect(request.META.get('HTTP_REFERER', reverse('tutor_dashboard')))
+
+
+@login_required
+@require_POST
+def tutor_student_srs_remove(request, student_id, task_id):
+    if request.user.role != 'tutor':
+        return redirect('login')
+
+    student = request.user.students.filter(id=student_id).first()
+    if student is None:
+        messages.error(request, "Ученик не найден в вашем списке.")
+        return redirect('tutor_dashboard')
+
+    SpacedRepetition.objects.filter(student=student, task_id=task_id).delete()
+    messages.success(request, "Задача убрана из повторения.")
+    return redirect(request.META.get('HTTP_REFERER', reverse('tutor_student_history', args=[student.id])))
+
 @login_required
 def tutor_update_student_contacts(request, student_id):
     if request.user.role not in ['tutor', 'admin'] or request.method != 'POST':
@@ -1463,6 +1556,8 @@ def tutor_dashboard(request):
                 active_assignments.append(a)
 
         profiles = list(selected_student.subject_profiles.all())
+        for p in profiles:
+            p.exam_formats_for_subject = ExamFormat.objects.filter(subject_id=p.subject_id).order_by('-is_active', '-year', 'name')
         if profiles:
             chart_subject_id = int(chart_subject_id_raw) if chart_subject_id_raw.isdigit() else profiles[0].subject_id
             chart_range = int(chart_range_raw) if chart_range_raw.isdigit() else 30
@@ -1573,6 +1668,7 @@ def tutor_dashboard(request):
         'student_total_submissions': student_total_submissions,
         'student_correct_rate': student_correct_rate,
         'recent_rewards': recent_rewards,
+        'profiles': profiles if selected_student else [],
     }
     return render(request, 'core/tutor_dashboard.html', context)
 

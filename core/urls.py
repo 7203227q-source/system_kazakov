@@ -21,6 +21,7 @@ urlpatterns = [
     path('student/assignment/<int:assignment_id>/task/<int:task_id>/comment/', views.student_add_submission_comment, name='student_add_submission_comment'),
     path('student/update-theme/', views.update_theme_view, name='update_theme'),
     path('student/update-exam-format/', views.student_update_exam_format, name='student_update_exam_format'),
+    path('student/update-exam-date/', views.student_update_exam_date, name='student_update_exam_date'),
     path('update-ui-theme/', views.update_ui_theme_view, name='update_ui_theme'),
 
     path('board/<int:session_id>/', views.whiteboard_page, name='whiteboard_page'),
@@ -32,7 +33,9 @@ urlpatterns = [
     
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/contacts/', views.tutor_update_student_contacts, name='tutor_update_student_contacts'),
+    path('tutor/student/<int:student_id>/exam-settings/', views.tutor_update_student_exam_settings, name='tutor_update_student_exam_settings'),
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
+    path('tutor/student/<int:student_id>/srs/remove/<int:task_id>/', views.tutor_student_srs_remove, name='tutor_student_srs_remove'),
     path('tutor/submission/<int:submission_id>/comment/', views.tutor_add_submission_comment, name='tutor_add_submission_comment'),
     path('tutor/tasks/', views.tutor_task_bank, name='tutor_task_bank'),
     path('tutor/tasks/uniqualize/', views.tutor_bulk_uniqualize, name='tutor_bulk_uniqualize'),

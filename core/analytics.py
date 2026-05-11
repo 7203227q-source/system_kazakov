@@ -149,9 +149,26 @@ def update_student_analytics(student, subject):
     # 3. Расчет прогноза (Простая линейная экстраполяция для MVP)
     # Predicted Score = Current Mastery * Learning Velocity
     predicted_score = current_mastery * profile.learning_velocity
-    
-    # Ограничиваем прогноз
-    predicted_score = max(0.0, min(100.0, predicted_score))
+
+    exam_date = getattr(profile, "exam_date", None)
+    if exam_date and exam_date >= today:
+        days_left = (exam_date - today).days
+        if days_left > 0:
+            start = today - datetime.timedelta(days=14)
+            hist = list(
+                DailySnapshot.objects.filter(student=student, subject=subject, date__gte=start, date__lt=today)
+                .order_by("date")
+                .values_list("date", "current_mastery")
+            )
+            if len(hist) >= 2:
+                d0, m0 = hist[0]
+                d1, m1 = hist[-1]
+                span = max(1, (d1 - d0).days)
+                slope = (float(m1 or 0.0) - float(m0 or 0.0)) / float(span)
+                projected_mastery = float(current_mastery) + slope * float(days_left)
+                predicted_score = projected_mastery * float(profile.learning_velocity or 1.0)
+
+    predicted_score = max(0.0, min(100.0, float(predicted_score)))
     
     snapshot.current_mastery = round(current_mastery, 2)
     snapshot.predicted_exam_score = round(predicted_score, 2)
