@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Subject, Topic, Task, SpacedRepetition, Submission, Payment, SystemConfig
+from .models import User, Subject, Topic, Task, SpacedRepetition, Submission, Payment, SystemConfig, ExamFormat, TaskType
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -50,3 +50,5 @@ class SystemConfigAdmin(admin.ModelAdmin):
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Subject)
 admin.site.register(Topic)
+admin.site.register(ExamFormat)
+admin.site.register(TaskType)
