@@ -148,7 +148,41 @@ def update_student_analytics(student, subject):
     
     # 3. Расчет прогноза (Простая линейная экстраполяция для MVP)
     # Predicted Score = Current Mastery * Learning Velocity
-    predicted_score = current_mastery * profile.learning_velocity
+    # --- Hybrid forecast (EMA mastery + recent performance) ---
+    # current_mastery уже включает trust_factor (verified=1.0, unverified=trust_factor).
+    # Добавляем "текущий перформанс" как отдельный сигнал без сильного занижения trust_factor:
+    # это позволяет прогнозу реагировать на стабильный текущий результативный перформанс.
+    perf_logs = list(
+        TaskLog.objects.filter(
+            student=student,
+            task__topic__subject=subject,
+            is_anomaly=False,
+        )
+        .select_related("task")
+        .order_by("-created_at")[:30]
+    )
+    recent_perf = None
+    if perf_logs:
+        total_w = 0.0
+        total = 0.0
+        for log in perf_logs:
+            max_points = float(getattr(log.task, "exam_points", 0) or 0.0)
+            pct = (float(log.score or 0.0) / max_points * 100.0) if max_points > 0 else 0.0
+            w = 1.0 if log.is_verified else 0.8
+            total += pct * w
+            total_w += w
+        recent_perf = (total / total_w) if total_w > 0 else None
+
+    blended_mastery = float(current_mastery)
+    perf_delta = 0.0
+    if recent_perf is not None:
+        blended_mastery = 0.7 * float(current_mastery) + 0.3 * float(recent_perf)
+        perf_delta = float(recent_perf) - float(current_mastery)
+
+    predicted_score = blended_mastery * float(profile.learning_velocity or 1.0)
+
+    def _clamp(x: float, lo: float, hi: float) -> float:
+        return max(lo, min(hi, x))
 
     exam_date = getattr(profile, "exam_date", None)
     if exam_date and exam_date >= today:
@@ -165,10 +199,12 @@ def update_student_analytics(student, subject):
                 d1, m1 = hist[-1]
                 span = max(1, (d1 - d0).days)
                 slope = (float(m1 or 0.0) - float(m0 or 0.0)) / float(span)
-                projected_mastery = float(current_mastery) + slope * float(days_left)
+                # Если текущий перформанс выше/ниже мастерства — усиливаем/ослабляем тренд.
+                slope *= (1.0 + _clamp(perf_delta / 50.0, -0.5, 0.5))
+                projected_mastery = float(blended_mastery) + slope * float(days_left)
                 predicted_score = projected_mastery * float(profile.learning_velocity or 1.0)
 
-    predicted_score = max(0.0, min(100.0, float(predicted_score)))
+    predicted_score = _clamp(float(predicted_score), 0.0, 100.0)
     
     snapshot.current_mastery = round(current_mastery, 2)
     snapshot.predicted_exam_score = round(predicted_score, 2)

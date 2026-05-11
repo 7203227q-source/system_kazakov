@@ -36,3 +36,37 @@ class ExamDateForecastTests(TestCase):
         snap = update_student_analytics(student, subject)
         self.assertGreater(float(snap.predicted_exam_score), 50.0)
 
+    def test_forecast_uses_current_performance_not_only_trust_weighted_mastery(self):
+        """
+        Если trust_factor низкий (мастерство занижено), но текущий перформанс высокий,
+        прогноз к дате экзамена должен подтягиваться вверх.
+        """
+        student = User.objects.create_user(username="s2", password="pass", role="student")
+        subject = Subject.objects.create(name="Математика 2")
+        fmt = ExamFormat.objects.create(subject=subject, name="ОГЭ математика", year=2026, is_active=True)
+        StudentSubjectProfile.objects.create(
+            student=student,
+            subject=subject,
+            target_score=80,
+            level=1,
+            xp=0,
+            exam_format=fmt,
+            learning_velocity=1.0,
+            trust_factor=0.1,
+            exam_date=timezone.now().date() + datetime.timedelta(days=10),
+        )
+
+        base_date = timezone.now().date() - datetime.timedelta(days=10)
+        DailySnapshot.objects.create(student=student, subject=subject, date=base_date, current_mastery=10.0, predicted_exam_score=10.0)
+        DailySnapshot.objects.create(student=student, subject=subject, date=timezone.now().date() - datetime.timedelta(days=1), current_mastery=12.0, predicted_exam_score=12.0)
+
+        topic = Topic.objects.create(subject=subject, name="T")
+        tt = TaskType.objects.create(exam_format=fmt, number=1, name="Тип 1", max_points=1)
+        task = Task.objects.create(topic=topic, task_type=tt, subtype_tag="x", correct_answer="1", difficulty=10, exam_points=1)
+
+        # 10 решений подряд по 100%, но unverified (EMA будет занижено из-за trust_factor=0.1)
+        for _ in range(10):
+            TaskLog.objects.create(student=student, task=task, score=1.0, time_spent=60, is_anomaly=False, is_verified=False)
+
+        snap = update_student_analytics(student, subject)
+        self.assertGreater(float(snap.predicted_exam_score), 20.0)
