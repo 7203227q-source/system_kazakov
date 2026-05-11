@@ -26,3 +26,11 @@ class TexReplaceMathWordsTests(SimpleTestCase):
         self.assertGreater(changed, 0)
         self.assertIn(r"$\infty$", out)
         self.assertIn(r"$-\infty$", out)
+
+    def test_fix_hyphenation_in_degrees_word(self):
+        from core.tex_replace import fix_math_words_in_html
+
+        html = "<p>Ответ дайте в гра- дусах.</p>"
+        out, _changed = fix_math_words_in_html(html)
+        self.assertIn("градусах", out.lower())
+        self.assertNotIn("гра-", out.lower())

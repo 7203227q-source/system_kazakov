@@ -113,3 +113,9 @@ class SdamgiaLatexTests(SimpleTestCase):
         alt = "(-3; +бесконечность)"
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), r"(-3;\infty)".replace(" ", ""))
+
+    def test_degrees_word_hyphenation_cleanup(self):
+        alt = "Ответ дайте в гра- дусах."
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertIn("градусах", latex.lower())
+        self.assertNotIn("гра-", latex.lower())

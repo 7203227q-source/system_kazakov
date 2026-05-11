@@ -26,6 +26,11 @@ _INF_WORD_HTML_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_DEG_HYPHENATION_RE = re.compile(
+    r"гра-\s*дус(?P<suffix>ах|ов|а)?",
+    flags=re.IGNORECASE,
+)
+
 
 def fix_math_words_in_html(html: str) -> tuple[str, int]:
     if not html:
@@ -33,7 +38,20 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
     lower = html.lower()
     if not any(
         k in lower
-        for k in ["градус", "бесконечност", "синус", "косинус", "тангенс", "котангенс", " sin", " cos", " tg", "ctg", " tan"]
+        for k in [
+            "градус",
+            "гра-",
+            "бесконечност",
+            "синус",
+            "косинус",
+            "тангенс",
+            "котангенс",
+            " sin",
+            " cos",
+            " tg",
+            "ctg",
+            " tan",
+        ]
     ):
         return html, 0
 
@@ -54,6 +72,8 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
             continue
 
         original = text
+
+        text = _DEG_HYPHENATION_RE.sub(lambda m: "градус" + (m.group("suffix") or ""), text)
 
         def trig_ru(m: re.Match) -> str:
             fn = m.group("fn").lower()
