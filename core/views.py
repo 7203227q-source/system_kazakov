@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from datetime import timedelta, date
+import uuid
 from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition
 import time
 import json
@@ -561,7 +562,31 @@ def student_practice(request):
     if request.method == 'POST':
         task_id = request.POST.get('task_id')
         user_answer = request.POST.get('answer', '').strip()
+        attempt_token = (request.POST.get("attempt_token") or "").strip()
         task = get_object_or_404(Task, id=task_id)
+
+        # Protect against re-submitting the same "checked" attempt (back button / refresh / multi-click)
+        results = request.session.get("practice_results") or {}
+        if attempt_token and attempt_token in results:
+            saved = results.get(attempt_token) or {}
+            if int(saved.get("task_id") or 0) == int(task.id) and (saved.get("mode") or "") == mode:
+                return render(request, 'core/student_practice_result.html', {
+                    'task': task,
+                    'user_answer': saved.get("user_answer", ""),
+                    'is_correct': bool(saved.get("is_correct")),
+                    'xp_gained': int(saved.get("xp_gained") or 0),
+                    'total_xp': int(saved.get("total_xp") or total_xp),
+                    'total_level': int(saved.get("total_level") or total_level),
+                    'points_earned': int(saved.get("points_earned") or 0),
+                    'points_max': int(saved.get("points_max") or 0),
+                    'mode': mode,
+                })
+
+        # Validate that the posted attempt token matches the current shown task
+        current = request.session.get("practice_current") or {}
+        if not attempt_token or current.get("token") != attempt_token or int(current.get("task_id") or 0) != int(task.id) or (current.get("mode") or "") != mode:
+            messages.error(request, "Эта задача уже была проверена. Откройте следующую задачу.")
+            return redirect("student_practice")
         
         # Простейшая логика проверки (с учетом точек и запятых)
         norm_user_answer = user_answer.lower().replace(',', '.')
@@ -604,13 +629,34 @@ def student_practice(request):
         points_max = int(task.exam_points or 0)
         points_earned = points_max if is_correct else 0
 
+        # Store result so refresh/resubmit can't change it
+        display_total_xp = total_xp + xp_gained
+        display_total_level = ((int(display_total_xp) // 100) + 1)
+        results[attempt_token] = {
+            "task_id": int(task.id),
+            "mode": mode,
+            "user_answer": user_answer,
+            "is_correct": bool(is_correct),
+            "xp_gained": int(xp_gained),
+            "total_xp": int(display_total_xp),
+            "total_level": int(display_total_level),
+            "points_earned": int(points_earned),
+            "points_max": int(points_max),
+        }
+        # Keep last ~50 results to avoid unbounded session growth
+        if len(results) > 50:
+            for k in list(results.keys())[: len(results) - 50]:
+                results.pop(k, None)
+        request.session["practice_results"] = results
+        request.session.modified = True
+
         return render(request, 'core/student_practice_result.html', {
             'task': task,
             'user_answer': user_answer,
             'is_correct': is_correct,
             'xp_gained': xp_gained,
-            'total_xp': total_xp + xp_gained,
-            'total_level': ((int(total_xp + xp_gained) // 100) + 1),
+            'total_xp': display_total_xp,
+            'total_level': display_total_level,
             'points_earned': points_earned,
             'points_max': points_max,
             'mode': mode,
@@ -623,7 +669,15 @@ def student_practice(request):
     else:
         # Обычный тренажёр (адаптивный)
         task = get_adaptive_task_for_student(request.user)
-    return render(request, 'core/student_practice.html', {'task': task, 'total_xp': total_xp, 'total_level': total_level, 'mode': mode})
+
+    attempt_token = None
+    if task is not None:
+        attempt_token = uuid.uuid4().hex
+        request.session["practice_current"] = {"token": attempt_token, "task_id": int(task.id), "mode": mode}
+        request.session.setdefault("practice_results", {})
+        request.session.modified = True
+
+    return render(request, 'core/student_practice.html', {'task': task, 'total_xp': total_xp, 'total_level': total_level, 'mode': mode, 'attempt_token': attempt_token})
 
 
 @login_required
