@@ -26,6 +26,7 @@ jobs:
             git config --global --add safe.directory /var/www/system_kazakov || true
             git fetch origin main
             git reset --hard origin/main
+            git clean -fd
 
             source venv/bin/activate
 
