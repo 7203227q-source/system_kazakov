@@ -1822,15 +1822,41 @@ def tutor_dashboard(request):
             task_types_for_exam = list(TaskType.objects.filter(exam_format=active_exam_format).only("number", "name").order_by("number"))
             task_type_name_map = {int(tt.number): tt.name for tt in task_types_for_exam}
 
-        rows = (
-            Submission.objects.filter(student=selected_student)
-            .exclude(task__task_type__number__isnull=True)
-            .values('task__task_type__number')
+        submissions_base = Submission.objects.filter(student=selected_student)
+        if active_exam_format:
+            submissions_base = submissions_base.filter(task__task_type__exam_format=active_exam_format)
+        submissions_base = submissions_base.exclude(task__task_type__number__isnull=True)
+
+        last_sub = submissions_base.filter(task_id=OuterRef("task_id")).order_by("-created_at")
+        latest_rows = (
+            submissions_base.values("task_id", "task__task_type__number")
+            .distinct()
             .annotate(
-                total=models.Count('id'),
-                correct=models.Count('id', filter=Q(is_correct=True)),
+                last_created_at=Subquery(last_sub.values("created_at")[:1]),
+                last_is_correct=Subquery(last_sub.values("is_correct")[:1]),
             )
         )
+
+        half_life_days = 14.0
+        agg = {}
+        for r in latest_rows:
+            n_raw = r.get("task__task_type__number")
+            if n_raw is None:
+                continue
+            dt = r.get("last_created_at")
+            if not dt:
+                continue
+            age_days = (today - dt.date()).days
+            if age_days < 0:
+                age_days = 0
+            weight = 0.5 ** (age_days / half_life_days)
+            is_corr = bool(r.get("last_is_correct"))
+            n = int(n_raw)
+            a = agg.setdefault(n, {"wt": 0.0, "wc": 0.0, "total": 0, "correct": 0})
+            a["wt"] = float(a["wt"]) + float(weight)
+            a["wc"] = float(a["wc"]) + (float(weight) * (1.0 if is_corr else 0.0))
+            a["total"] = int(a["total"]) + 1
+            a["correct"] = int(a["correct"]) + (1 if is_corr else 0)
         totals = Submission.objects.filter(student=selected_student).aggregate(
             total=models.Count('id'),
             correct=models.Count('id', filter=Q(is_correct=True)),
@@ -1838,17 +1864,14 @@ def tutor_dashboard(request):
         student_total_submissions = int(totals.get('total') or 0)
         correct_total = int(totals.get('correct') or 0)
         student_correct_rate = (correct_total / student_total_submissions * 100.0) if student_total_submissions else None
-        rate_map = {int(r['task__task_type__number']): r for r in rows if r.get('task__task_type__number') is not None}
         numbers = sorted(task_type_name_map.keys()) if task_type_name_map else list(range(1, 20))
         for n in numbers:
-            r = rate_map.get(n)
-            if not r:
+            a = agg.get(int(n))
+            if not a or float(a.get("wt") or 0.0) <= 0:
                 task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': None, 'total': 0, 'correct': 0})
                 continue
-            total = int(r.get('total') or 0)
-            correct = int(r.get('correct') or 0)
-            rate = (correct / total * 100.0) if total > 0 else None
-            task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': rate, 'total': total, 'correct': correct})
+            rate = (float(a["wc"]) / float(a["wt"]) * 100.0) if float(a["wt"]) > 0 else None
+            task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': rate, 'total': int(a["total"]), 'correct': int(a["correct"])})
 
         from core.models import TutorReward
 
