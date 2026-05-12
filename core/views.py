@@ -772,6 +772,36 @@ def student_dashboard(request):
         'exam_formats_for_subject': exam_formats_for_subject,
     })
 
+
+@login_required
+def student_learning_settings(request):
+    if request.user.role != "student":
+        return redirect("login")
+
+    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related("subject")
+    active_subject_id_raw = (request.GET.get("subject_id") or "").strip()
+    if active_subject_id_raw.isdigit():
+        active_subject_id = int(active_subject_id_raw)
+    else:
+        active_subject_id = profiles.first().subject_id if profiles.exists() else None
+
+    active_profile = next((p for p in profiles if p.subject_id == active_subject_id), None)
+    exam_formats_for_subject = (
+        ExamFormat.objects.filter(subject_id=active_subject_id).order_by("-is_active", "-year", "name")
+        if active_subject_id
+        else ExamFormat.objects.none()
+    )
+    return render(
+        request,
+        "core/student_learning_settings.html",
+        {
+            "profiles": profiles,
+            "active_profile": active_profile,
+            "active_subject_id": active_subject_id,
+            "exam_formats_for_subject": exam_formats_for_subject,
+        },
+    )
+
 from django.http import JsonResponse
 
 @login_required
