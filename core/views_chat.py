@@ -6,6 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Max, Count, Subquery, OuterRef
 from django.utils import timezone
 from .models import User, Message
+from .models import Assignment
 
 def get_user_dialogs(user):
     """Возвращает список пользователей, с которыми у текущего пользователя может быть диалог, 
@@ -20,6 +21,9 @@ def get_user_dialogs(user):
             tutors.add(link.tutor)
         for t in user.tutors.all():
             tutors.add(t)
+        for a in Assignment.objects.filter(student=user).select_related("tutor"):
+            if a.tutor_id:
+                tutors.add(a.tutor)
         dialogs.extend(list(tutors))
     elif user.role == 'parent':
         # Родитель видит репетиторов своих детей
@@ -35,6 +39,9 @@ def get_user_dialogs(user):
         students = set(user.students.all())
         for link in user.linked_students.all():
             students.add(link.student)
+        for a in Assignment.objects.filter(tutor=user).select_related("student"):
+            if a.student_id:
+                students.add(a.student)
         dialogs.extend(list(students))
         for student in students:
             parents = student.parents.all()
