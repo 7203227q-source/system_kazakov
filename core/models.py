@@ -119,12 +119,28 @@ class TaskType(models.Model):
     number = models.IntegerField(verbose_name="Номер в КИМе")
     name = models.CharField(max_length=200, verbose_name="Краткое описание типа")
     max_points = models.IntegerField(default=1, verbose_name="Максимальный балл")
+    is_geometry = models.BooleanField(default=False, verbose_name="Геометрия (для ОГЭ)")
     
     class Meta:
         ordering = ['number']
         
     def __str__(self):
         return f"№{self.number} - {self.name} ({self.exam_format})"
+
+
+class ExamScoreScale(models.Model):
+    """
+    Настройки шкалы перевода экзамена:
+    - max_primary_score: максимальный первичный балл
+    - grade_rules: правила перевода в оценку (2–5), включая доп. условия (например, по геометрии)
+    """
+
+    exam_format = models.OneToOneField(ExamFormat, on_delete=models.CASCADE, related_name="score_scale")
+    max_primary_score = models.PositiveIntegerField(default=100, verbose_name="Максимальный первичный балл")
+    grade_rules = models.JSONField(default=list, blank=True, verbose_name="Правила перевода в оценку (JSON)")
+
+    def __str__(self):
+        return f"Scale for {self.exam_format}"
 
 
 class Topic(models.Model):
