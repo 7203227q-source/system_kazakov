@@ -34,3 +34,16 @@ class StudentSubjectProfileCreateTests(TestCase):
         res = self.client.post(reverse("student_add_subject_profile"), {"subject_id": self.subject2.id})
         self.assertEqual(res.status_code, 302)
         self.assertTrue(StudentSubjectProfile.objects.filter(student=self.student, subject=self.subject2).exists())
+
+
+class StudentDashboardIsCompactTests(TestCase):
+    def test_dashboard_does_not_show_exam_forms(self):
+        student = User.objects.create(username="s", role="student")
+        subject = Subject.objects.create(name="Математика")
+        StudentSubjectProfile.objects.create(student=student, subject=subject)
+        self.client.force_login(student)
+        res = self.client.get(reverse("student_dashboard"))
+        self.assertEqual(res.status_code, 200)
+        html = res.content.decode("utf-8")
+        self.assertNotIn(reverse("student_update_exam_format"), html)
+        self.assertNotIn(reverse("student_update_exam_date"), html)
