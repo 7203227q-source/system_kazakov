@@ -9,6 +9,25 @@ class TexReplaceMathWordsTests(SimpleTestCase):
         out, changed = fix_math_words_in_html(html)
         self.assertGreater(changed, 0)
         self.assertIn(r"$\sin A$", out)
+        self.assertNotIn(r"\$\sin", out)
+        self.assertNotIn("$$", out)
+
+    def test_converts_cos_tan_and_angle_trig_words_in_plain_html(self):
+        from core.tex_replace import fix_math_words_in_html
+
+        html = "<p>косинусA = 5/7, тангенсA = 2. синус∠A = 4/5.</p>"
+        out, changed = fix_math_words_in_html(html)
+        self.assertGreater(changed, 0)
+        self.assertIn(r"$\cos A$", out)
+        self.assertIn(r"$\tan A$", out)
+        self.assertIn(r"$\sin A$", out)
+        self.assertNotIn("косинус", out.lower())
+        self.assertNotIn("тангенс", out.lower())
+        self.assertNotIn("синус", out.lower())
+        self.assertNotIn(r"\$\cos", out)
+        self.assertNotIn(r"\$\tan", out)
+        self.assertNotIn(r"\$\sin", out)
+        self.assertNotIn("$$", out)
 
     def test_converts_degrees_word_in_plain_html(self):
         from core.tex_replace import fix_math_words_in_html
