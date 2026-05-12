@@ -24,14 +24,13 @@ jobs:
             cd /var/www/system_kazakov
 
             git config --global --add safe.directory /var/www/system_kazakov || true
-            git fetch origin main
-            git reset --hard origin/main
+            git fetch --prune origin main
+            git reset --hard 0b37087
             git clean -fd
 
             source venv/bin/activate
 
             python -m pip install -r requirements.txt
-            python manage.py migrate
             python manage.py collectstatic --noinput
 
             sudo -n systemctl restart examprep
