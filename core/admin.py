@@ -1,6 +1,18 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Subject, Topic, Task, SpacedRepetition, Submission, Payment, SystemConfig, ExamFormat, TaskType
+from .models import (
+    ExamFormat,
+    ExamScoreScale,
+    Payment,
+    SpacedRepetition,
+    Subject,
+    Submission,
+    SystemConfig,
+    Task,
+    TaskType,
+    Topic,
+    User,
+)
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -51,4 +63,16 @@ admin.site.register(User, CustomUserAdmin)
 admin.site.register(Subject)
 admin.site.register(Topic)
 admin.site.register(ExamFormat)
-admin.site.register(TaskType)
+
+
+@admin.register(ExamScoreScale)
+class ExamScoreScaleAdmin(admin.ModelAdmin):
+    list_display = ("exam_format", "max_primary_score")
+    search_fields = ("exam_format__name", "exam_format__subject__name")
+
+
+@admin.register(TaskType)
+class TaskTypeAdmin(admin.ModelAdmin):
+    list_display = ("exam_format", "number", "name", "max_points", "is_geometry")
+    list_filter = ("exam_format", "exam_format__subject", "is_geometry")
+    search_fields = ("name",)
