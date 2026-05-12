@@ -10,15 +10,47 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RenameIndex(
-            model_name="submissioncomment",
-            new_name="core_submis_submiss_02e47f_idx",
-            old_name="core_submitm_submiss_56d497_idx",
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql=[
+                        "DROP INDEX IF EXISTS core_submitm_submiss_56d497_idx",
+                        "CREATE INDEX IF NOT EXISTS core_submis_submiss_02e47f_idx ON core_submissioncomment (submission_id, created_at)",
+                    ],
+                    reverse_sql=[
+                        "DROP INDEX IF EXISTS core_submis_submiss_02e47f_idx",
+                        "CREATE INDEX IF NOT EXISTS core_submitm_submiss_56d497_idx ON core_submissioncomment (submission_id, created_at)",
+                    ],
+                ),
+            ],
+            state_operations=[
+                migrations.RenameIndex(
+                    model_name="submissioncomment",
+                    new_name="core_submis_submiss_02e47f_idx",
+                    old_name="core_submitm_submiss_56d497_idx",
+                ),
+            ],
         ),
-        migrations.RenameIndex(
-            model_name="whiteboardsession",
-            new_name="core_whiteb_student_5cdef5_idx",
-            old_name="wb_session_student_task_idx",
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql=[
+                        "DROP INDEX IF EXISTS wb_session_student_task_idx",
+                        "CREATE INDEX IF NOT EXISTS core_whiteb_student_5cdef5_idx ON core_whiteboardsession (student_id, assignment_id, task_id, created_at)",
+                    ],
+                    reverse_sql=[
+                        "DROP INDEX IF EXISTS core_whiteb_student_5cdef5_idx",
+                        "CREATE INDEX IF NOT EXISTS wb_session_student_task_idx ON core_whiteboardsession (student_id, assignment_id, task_id, created_at)",
+                    ],
+                ),
+            ],
+            state_operations=[
+                migrations.RenameIndex(
+                    model_name="whiteboardsession",
+                    new_name="core_whiteb_student_5cdef5_idx",
+                    old_name="wb_session_student_task_idx",
+                ),
+            ],
         ),
         migrations.AddField(
             model_name="submissioncomment",
