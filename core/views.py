@@ -865,15 +865,18 @@ def student_check_assignment_task(request, assignment_id, task_id):
         }
     )
     
-    # Если уже было создано, обновляем (разрешаем менять ответ до завершения варианта)
-    if not created:
+    locked = False
+    if not created and submission.is_correct is not None:
+        locked = True
+        is_correct = bool(submission.is_correct)
+    elif not created:
         submission.user_answer = user_answer
         submission.is_correct = is_correct
         submission.score = task.exam_points if is_correct else 0
         submission.save()
 
     # Автодобавление в интервальное повторение: только из вариантов и только неверные
-    if not is_correct:
+    if not is_correct and not locked:
         try:
             process_task_submission(request.user, task, 1)
         except Exception:
@@ -917,6 +920,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
         'comments_count': submission.comments.count(),
         'can_view_comments': submission.is_correct is not None,
         'submission_id': submission.id,
+        'locked': locked,
     })
 
 @login_required
