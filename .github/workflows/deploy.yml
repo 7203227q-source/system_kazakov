@@ -29,6 +29,17 @@ jobs:
           ssh-keygen -lf "$tmp"
           rm -f "$tmp"
 
+      - name: SSH connection test
+        shell: bash
+        run: |
+          set -e
+          tmp="$(mktemp)"
+          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > "$tmp"
+          chmod 600 "$tmp"
+          ssh -v -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -i "$tmp" -p "${{ secrets.VPS_PORT || '22' }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo ssh_ok"
+          rm -f "$tmp"
+
       - name: Execute deployment commands via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
