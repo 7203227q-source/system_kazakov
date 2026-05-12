@@ -1647,6 +1647,24 @@ def tutor_dashboard(request):
             except Exception:
                 xp = 1
             today_xp_map[int(sid)] = int(today_xp_map.get(int(sid), 0)) + int(xp)
+
+    # Forecast for student list: take today's max predicted score across subjects (fast),
+    # fallback to latest snapshots via subject_profiles if needed.
+    today_pred_map: dict[int, float] = {}
+    if student_ids:
+        rows = (
+            DailySnapshot.objects.filter(student_id__in=student_ids, date=today)
+            .values("student_id")
+            .annotate(pred=models.Max("predicted_exam_score"))
+            .values_list("student_id", "pred")
+        )
+        for sid, pred in rows:
+            if pred is None:
+                continue
+            try:
+                today_pred_map[int(sid)] = float(pred)
+            except Exception:
+                continue
     
     for s in students:
         s.total_xp = sum(int(p.xp or 0) for p in s.subject_profiles.all())
@@ -1654,6 +1672,21 @@ def tutor_dashboard(request):
         # Fetch latest snapshot for each profile
         for profile in s.subject_profiles.all():
             profile.latest_snapshot = DailySnapshot.objects.filter(student=s, subject=profile.subject).order_by('-date').first()
+
+        # Forecast for student list (best available across subjects)
+        best_pred = today_pred_map.get(int(s.id))
+        if best_pred is None:
+            for profile in s.subject_profiles.all():
+                snap = getattr(profile, "latest_snapshot", None)
+                if not snap or snap.predicted_exam_score is None:
+                    continue
+                try:
+                    v = float(snap.predicted_exam_score)
+                except Exception:
+                    continue
+                if best_pred is None or v > best_pred:
+                    best_pred = v
+        s.list_forecast = best_pred
             
         # Check for active assignments
         active_assignments_count = Assignment.objects.filter(student=s, is_draft=False, is_completed=False).count()

@@ -36,3 +36,13 @@ class TutorTodayXpTests(TestCase):
         self.assertContains(res, "Сегодня")
         self.assertContains(res, "+10 XP")
 
+    def test_tutor_student_list_shows_real_forecast_not_hardcoded(self):
+        from core.models import DailySnapshot
+
+        # create a snapshot so forecast is real and deterministic
+        DailySnapshot.objects.create(student=self.student, subject=self.task1.topic.subject, predicted_exam_score=72.0, current_mastery=45.0)
+
+        self.client.login(username="t", password="pass")
+        res = self.client.get(reverse("tutor_dashboard"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Прогноз: 72")
