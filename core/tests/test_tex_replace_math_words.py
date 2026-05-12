@@ -46,6 +46,25 @@ class TexReplaceMathWordsTests(SimpleTestCase):
         self.assertIn(r"$\infty$", out)
         self.assertIn(r"$-\infty$", out)
 
+    def test_converts_infinity_word_with_long_dashes(self):
+        from core.tex_replace import fix_math_words_in_html
+
+        html = "<p>(—бесконечность; 0)</p><p>(–бесконечность; 0)</p>"
+        out, changed = fix_math_words_in_html(html)
+        self.assertGreater(changed, 0)
+        self.assertIn(r"$-\infty$", out)
+
+    def test_converts_system_tokens_in_plain_html(self):
+        from core.tex_replace import fix_math_words_in_html
+
+        html = "<p>системавыраженийноваястрока5x + 13 ≤ 0, новаястрокаx + 5 ≥ 1.конецсистемы</p>"
+        out, changed = fix_math_words_in_html(html)
+        self.assertGreater(changed, 0)
+        self.assertIn(r"$\begin{cases}", out)
+        self.assertIn(r"5x+13\le0", out)
+        self.assertIn(r"x+5\ge1", out)
+        self.assertIn(r"\end{cases}$", out)
+
     def test_fix_hyphenation_in_degrees_word(self):
         from core.tex_replace import fix_math_words_in_html
 

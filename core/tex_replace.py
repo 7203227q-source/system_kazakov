@@ -22,8 +22,13 @@ _DEG_WORD_HTML_RE = re.compile(
 )
 
 _INF_WORD_HTML_RE = re.compile(
-    r"(?P<sign>[+\-−])?\s*бесконечност[ьи]\b",
+    r"(?P<sign>[+\-−–—])?\s*бесконечност[ьи]\b",
     flags=re.IGNORECASE,
+)
+
+_SYSTEM_TOKENS_RE = re.compile(
+    r"(?P<open>система\s*выражений|системавыражений)\s*(?P<body>.*?)\s*(?P<close>конец\s*системы|конецсистемы)\b",
+    flags=re.IGNORECASE | re.DOTALL,
 )
 
 _DEG_HYPHENATION_RE = re.compile(
@@ -48,6 +53,9 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
             "гра-",
             "граду-",
             "бесконечност",
+            "системавыражений",
+            "конецсистемы",
+            "новаястрока",
             "синус",
             "косинус",
             "тангенс",
@@ -116,14 +124,35 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
 
         def inf(m: re.Match) -> str:
             sign = (m.group("sign") or "").strip()
-            if sign in {"-", "−"}:
+            if sign in {"-", "−", "–", "—"}:
                 return r"$-\infty$"
             return r"$\infty$"
+
+        def system_tokens(m: re.Match) -> str:
+            body = m.group("body") or ""
+            parts = re.split(r"новая\s*строка", body, flags=re.IGNORECASE)
+            lines = []
+            for raw in parts:
+                line = raw.strip()
+                if not line:
+                    continue
+                line = line.strip(" ,.;")
+                line = line.replace("≤", r"\le").replace("≥", r"\ge")
+                line = re.sub(r"\s*\\(le|ge)\s*", lambda mm: "\\" + mm.group(1), line)
+                line = re.sub(r"\s*([+\-=<>])\s*", r"\1", line)
+                line = sanitize_math_latex(line)
+                if line:
+                    lines.append(line)
+            if not lines:
+                return m.group(0)
+            latex = r"\begin{cases}" + r"\\".join(lines) + r"\end{cases}"
+            return f"${latex}$"
 
         text = _RU_TRIG_RE.sub(trig_ru, text)
         text = _LAT_TRIG_RE.sub(trig_lat, text)
         text = _DEG_WORD_HTML_RE.sub(lambda m: rf"${m.group('num')}^{{\circ}}$", text)
         text = _INF_WORD_HTML_RE.sub(inf, text)
+        text = _SYSTEM_TOKENS_RE.sub(system_tokens, text)
 
         if text != original:
             node.replace_with(NavigableString(text))
