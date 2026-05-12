@@ -1450,21 +1450,27 @@ def tutor_dashboard(request):
         request.user.invite_code = generate_invite_code()
         request.user.save(update_fields=['invite_code'])
 
-    from django.db.models import Q
+    from django.db.models import Q, Count, IntegerField, OuterRef, Subquery
+    from django.db.models.functions import Coalesce
 
     # Get students with their profiles
+    unresolved_qs = (
+        SubmissionComment.objects.filter(
+            submission__student_id=OuterRef("pk"),
+            author_role="student",
+            seen_by_tutor_at__isnull=True,
+            submission__assignment__tutor=request.user,
+        )
+        .exclude(submission__comments__author_role="tutor")
+        .values("submission__student_id")
+        .annotate(c=Count("id"))
+        .values("c")[:1]
+    )
     students = (
         request.user.students.all()
         .prefetch_related('subject_profiles', 'subject_profiles__subject')
         .annotate(
-            unread_student_questions=models.Count(
-                'submissions__comments',
-                filter=Q(
-                    submissions__comments__author_role='student',
-                    submissions__comments__seen_by_tutor_at__isnull=True,
-                    submissions__assignment__tutor=request.user,
-                ),
-            )
+            unread_student_questions=Coalesce(Subquery(unresolved_qs, output_field=IntegerField()), 0)
         )
     )
     selected_student_id = request.GET.get('student_id')
@@ -2974,6 +2980,11 @@ def tutor_add_submission_comment(request, submission_id):
         text=text,
         seen_by_tutor_at=timezone.now(),
     )
+    SubmissionComment.objects.filter(
+        submission=submission,
+        author_role="student",
+        seen_by_tutor_at__isnull=True,
+    ).update(seen_by_tutor_at=timezone.now())
     return JsonResponse({"ok": True, "comments_count": submission.comments.count(), "submission_id": submission.id})
 
 

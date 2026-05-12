@@ -69,3 +69,15 @@ class SubmissionCommentUnreadTests(TestCase):
         c.refresh_from_db()
         self.assertIsNotNone(c.seen_by_tutor_at)
 
+    def test_tutor_reply_marks_student_question_seen(self):
+        self.client.force_login(self.student)
+        self.client.post(reverse("student_add_submission_comment", args=[self.assignment.id, self.task.id]), {"text": "q"})
+        student_c = SubmissionComment.objects.get(submission=self.sub, author_role="student")
+        self.assertIsNone(student_c.seen_by_tutor_at)
+
+        self.client.force_login(self.tutor)
+        res = self.client.post(reverse("tutor_add_submission_comment", args=[self.sub.id]), {"text": "a"})
+        self.assertEqual(res.status_code, 200)
+
+        student_c.refresh_from_db()
+        self.assertIsNotNone(student_c.seen_by_tutor_at)

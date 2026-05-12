@@ -72,5 +72,28 @@
             });
         }
         </script>
+        <script>
+        (function () {
+            const badge = document.getElementById('global-unread-badge');
+            if (!badge) return;
+            const url = "{% url 'api_unread_count' %}";
+            async function tick() {
+                try {
+                    const res = await fetch(url, { credentials: 'same-origin' });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const n = parseInt(data && data.count ? data.count : 0, 10) || 0;
+                    if (n > 0) {
+                        badge.textContent = String(n);
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                } catch (e) {}
+            }
+            tick();
+            setInterval(tick, 15000);
+        })();
+        </script>
     </div>
 </aside>
