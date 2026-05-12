@@ -1,0 +1,363 @@
+=== HEAD ===
+dc02429
+=== Showmigrations (tail) ===
+[X]  contenttypes.0001_initial
+[X]  contenttypes.0002_remove_content_type_name
+[X]  auth.0001_initial
+[X]  auth.0002_alter_permission_name_max_length
+[X]  auth.0003_alter_user_email_max_length
+[X]  auth.0004_alter_user_username_opts
+[X]  auth.0005_alter_user_last_login_null
+[X]  auth.0006_require_contenttypes_0002
+[X]  auth.0007_alter_validators_add_error_messages
+[X]  auth.0008_alter_user_username_max_length
+[X]  auth.0009_alter_user_last_name_max_length
+[X]  auth.0010_alter_group_name_max_length
+[X]  auth.0011_update_proxy_permissions
+[X]  auth.0012_alter_user_first_name_max_length
+[X]  core.0001_initial
+[X]  account.0001_initial
+[X]  account.0002_email_max_length
+[X]  account.0003_alter_emailaddress_create_unique_verified_email
+[X]  account.0004_alter_emailaddress_drop_unique_email
+[X]  account.0005_emailaddress_idx_upper_email
+[X]  account.0006_emailaddress_lower
+[X]  account.0007_emailaddress_idx_email
+[X]  account.0008_emailaddress_unique_primary_email_fixup
+[X]  account.0009_emailaddress_unique_primary_email
+[X]  admin.0001_initial
+[X]  admin.0002_logentry_remove_auto_add
+[X]  admin.0003_logentry_add_action_flag_choices
+[X]  core.0002_submission_is_correct_submission_user_answer_and_more
+[X]  core.0003_examformat_tasktype_task_task_type
+[X]  core.0004_alter_user_role
+[X]  core.0005_task_subtype_tag_user_preferred_theme_taskvariant
+[X]  core.0006_migrate_task_content
+[X]  core.0007_remove_task_content
+[X]  core.0008_remove_user_current_streak_remove_user_level_and_more
+[X]  core.0009_remove_tutorstudentlink_current_streak_and_more
+[X]  core.0010_assignment
+[X]  core.0011_assignment_is_draft
+[X]  core.0012_submission_assignment
+[X]  core.0013_user_parent_name_user_parent_phone_user_tutor_notes
+[X]  core.0014_submission_primary_score_submission_requires_draft_and_more
+[X]  core.0015_systemconfig_remove_payment_paid_at_and_more
+[X]  core.0016_studentsubjectprofile
+[X]  core.0017_migrate_user_xp_to_profile
+[X]  core.0018_assignment_is_verified_and_more
+[X]  core.0019_message
+[X]  core.0020_alter_tasklog_task
+[X]  core.0021_taskgenerationlog
+[X]  core.0022_openroutermodel_subjectaiconfig
+[X]  core.0023_user_parent_invite_code
+[X]  core.0024_user_ui_theme
+[X]  core.0025_whiteboard_models
+[X]  core.0026_assignment_deadlines_and_extensions
+[X]  core.0027_examformat_rename_and_add_oge_math
+[X]  core.0028_move_oge_to_profile_and_remove_math_subject
+[X]  core.0029_rename_math_profile_subject_to_math
+[X]  core.0030_ensure_oge_math_examformat
+[X]  core.0031_add_physics_subject_and_formats
+[X]  core.0032_task_bundle_code
+[X]  core.0033_submissioncomment
+[ ]  core.0034_rename_core_submitm_submiss_56d497_idx_core_submis_submiss_02e47f_idx_and_more
+[ ]  core.0035_assignment_exam_format_and_more
+[ ]  core.0036_studentsubjectprofile_last_streak_date
+[ ]  core.0037_tutorreward
+[ ]  core.0038_studentsubjectprofile_exam_date
+[X]  sessions.0001_initial
+[X]  sites.0001_initial
+[X]  sites.0002_alter_domain_unique
+[X]  socialaccount.0001_initial
+[X]  socialaccount.0002_token_max_lengths
+[X]  socialaccount.0003_extra_data_default_dict
+[X]  socialaccount.0004_app_provider_id_settings
+[X]  socialaccount.0005_socialtoken_nullable_app
+[X]  socialaccount.0006_alter_socialaccount_extra_data
+=== Migrate ===
+Operations to perform:
+  Apply all migrations: account, admin, auth, contenttypes, core, sessions, sites, socialaccount
+Running migrations:
+  Applying core.0034_rename_core_submitm_submiss_56d497_idx_core_submis_submiss_02e47f_idx_and_more...Traceback (most recent call last):
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/sqlite3/base.py", line 359, in execute
+    return super().execute(query, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: no such index: wb_session_student_task_idx
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/www/system_kazakov/manage.py", line 23, in <module>
+    main()
+  File "/var/www/system_kazakov/manage.py", line 19, in main
+    execute_from_command_line(sys.argv)
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/core/management/__init__.py", line 443, in execute_from_command_line
+    utility.execute()
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/core/management/__init__.py", line 437, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/core/management/base.py", line 420, in run_from_argv
+    self.execute(*args, **cmd_options)
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/core/management/base.py", line 464, in execute
+    output = self.handle(*args, **options)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/core/management/base.py", line 111, in wrapper
+    res = handle_func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/core/management/commands/migrate.py", line 354, in handle
+    post_migrate_state = executor.migrate(
+                         ^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/migrations/executor.py", line 137, in migrate
+    state = self._migrate_all_forwards(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/migrations/executor.py", line 169, in _migrate_all_forwards
+    state = self.apply_migration(
+            ^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/migrations/executor.py", line 257, in apply_migration
+    state = migration.apply(state, schema_editor)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/migrations/migration.py", line 132, in apply
+    operation.database_forwards(
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/migrations/operations/models.py", line 1091, in database_forwards
+    schema_editor.rename_index(model, old_index, new_index)
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/base/schema.py", line 588, in rename_index
+    self.remove_index(model, old_index)
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/base/schema.py", line 579, in remove_index
+    self.execute(index.remove_sql(model, self))
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/base/schema.py", line 205, in execute
+    cursor.execute(sql, params)
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/www/system_kazakov/venv/lib/python3.12/site-packages/django/db/backends/sqlite3/base.py", line 359, in execute
+    return super().execute(query, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+django.db.utils.OperationalError: no such index: wb_session_student_task_idx
+=== Restart ===
+● examprep.service - gunicorn daemon for ExamPrep
+     Loaded: loaded (/etc/systemd/system/examprep.service; enabled; preset: enabled)
+    Drop-In: /etc/systemd/system/examprep.service.d
+             └─override.conf
+     Active: active (running) since Tue 2026-05-12 07:05:08 UTC; 48ms ago
+   Main PID: 427270 (gunicorn)
+      Tasks: 1 (limit: 2263)
+     Memory: 2.4M (peak: 2.4M)
+        CPU: 16ms
+     CGroup: /system.slice/examprep.service
+             └─427270 /var/www/system_kazakov/venv/bin/python3 /var/www/system_kazakov/venv/bin/gunicorn --access-logfile - --workers 3 --timeout 600 --bind unix:/var/www/system_kazakov/examprep.sock examprep.wsgi:application
+
+May 12 07:05:08 vm147838.evps.zone systemd[1]: Started examprep.service - gunicorn daemon for ExamPrep.
+=== Journal (last 200) ===
+[2026-05-12 05:22:45 +0000] [425451] [INFO] Booting worker with pid: 425451
+[2026-05-12 05:22:45 +0000] [425452] [INFO] Booting worker with pid: 425452
+[2026-05-12 05:22:45 +0000] [425453] [INFO] Booting worker with pid: 425453
+[2026-05-12 05:22:46 +0000] [425447] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
+ - - [12/May/2026:05:23:33 +0000] "POST /platform-admin/reshuege-import/start/ HTTP/1.0" 200 1402 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:35 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:36 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:38 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:40 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:41 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:43 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:45 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:47 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:48 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:50 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:52 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:54 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:54 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:55 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:56 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:57 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:59 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:23:59 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 64 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:00 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:01 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:02 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:04 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:06 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:07 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:09 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:10 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:11 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:12 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:13 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:14 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:16 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:17 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:18 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:20 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:22 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:23 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:25 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:29 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:30 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:31 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:33 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:34 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:36 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:37 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:38 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:40 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:41 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:42 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:43 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:45 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:47 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:49 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:51 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:53 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:56 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:24:59 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:01 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:03 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:05 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:07 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:09 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:11 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:13 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:13 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:14 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:16 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:17 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:19 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:20 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:22 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:22 +0000] "GET /wp-admin/install.php?step=1 HTTP/1.0" 404 179 "-" "http://kazakov-system.ru/wp-admin/install.php?step=1"
+ - - [12/May/2026:05:25:23 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:24 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:25 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:27 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:28 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:29 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:30 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:31 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:34 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:36 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:37 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:38 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:40 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:41 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:42 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:43 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:25:45 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:16 +0000] "POST /platform-admin/reshuege-import/start/ HTTP/1.0" 200 774 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:17 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:19 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:20 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 77 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:24 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:26 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:27 +0000] "GET /tutor/?student_id=56 HTTP/1.0" 500 145 "https://kazakov-system.ru/tutor/assignment/36/view/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:34:28 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 0 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:34:31 +0000] "GET /tutor/?student_id=56 HTTP/1.0" 500 145 "https://kazakov-system.ru/tutor/assignment/36/view/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:34:42 +0000] "GET /tutor/?student_id=48 HTTP/1.0" 500 145 "https://kazakov-system.ru/tutor/?student_id=56&subject_id=1&range=30" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:34:44 +0000] "GET /tutor/?student_id=48 HTTP/1.0" 500 145 "https://kazakov-system.ru/tutor/?student_id=56&subject_id=1&range=30" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:34:58 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 68 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:35:01 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:35:04 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:35:07 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:35:09 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:35:11 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:35:15 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 76 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:37:07 +0000] "GET / HTTP/1.0" 200 15064 "-" ""
+ - - [12/May/2026:05:45:18 +0000] "GET /tutor/?student_id=56&subject_id=1&range=30 HTTP/1.0" 500 145 "https://kazakov-system.ru/tutor/?student_id=56" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:45:41 +0000] "GET /student/ HTTP/1.0" 500 145 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15"
+ - - [12/May/2026:05:49:17 +0000] "GET / HTTP/1.0" 200 15064 "-" "Mozilla/5.0 (Linux; Android 5.0.2; P023) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.136 Safari/537.36"
+ - - [12/May/2026:05:53:33 +0000] "GET /platform-admin/reshuege-import/ HTTP/1.0" 200 37153 "https://kazakov-system.ru/platform-admin/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:53:36 +0000] "POST /platform-admin/reshuege-import/step/ HTTP/1.0" 200 0 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:53:38 +0000] "GET /tutor/tasks/?subject=3&exam_format=3&type=&subtype=&q= HTTP/1.0" 200 185139 "https://kazakov-system.ru/tutor/tasks/?subject=3&exam_format=4&type=&subtype=&q=" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+ - - [12/May/2026:05:53:48 +0000] "GET /tutor HTTP/1.0" 301 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:53:48 +0000] "GET /tutor/ HTTP/1.0" 500 145 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:53:54 +0000] "GET / HTTP/1.0" 200 15064 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:54:09 +0000] "POST / HTTP/1.0" 302 0 "https://kazakov-system.ru/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:54:09 +0000] "GET /tutor/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:59:38 +0000] "GET /tutor/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:05:59:45 +0000] "GET / HTTP/1.0" 200 15064 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:06:01:13 +0000] "POST / HTTP/1.0" 302 0 "https://kazakov-system.ru/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:06:01:13 +0000] "GET /tutor/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 OPR/98.0.0.0"
+ - - [12/May/2026:06:09:48 +0000] "PROPFIND / HTTP/1.0" 403 1004 "http://95.164.92.187:443/" "-"
+ - - [12/May/2026:06:30:48 +0000] "GET /wp-admin/install.php?step=1 HTTP/1.0" 404 179 "-" "http://kazakov-system.ru/wp-admin/install.php?step=1"
+ - - [12/May/2026:06:35:23 +0000] "GET / HTTP/1.0" 200 15064 "https://aisearchindex.space" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.3800.65"
+ - - [12/May/2026:06:35:24 +0000] "GET / HTTP/1.0" 200 15064 "-" "-"
+ - - [12/May/2026:06:40:10 +0000] "GET / HTTP/1.0" 200 15064 "https://yandex.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:40:17 +0000] "POST / HTTP/1.0" 302 0 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:40:17 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:40:19 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:40:25 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:40:28 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:41:06 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:41:10 +0000] "GET /robots.txt HTTP/1.0" 404 179 "-" "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)"
+ - - [12/May/2026:06:41:11 +0000] "GET / HTTP/1.0" 200 15064 "-" "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0"
+ - - [12/May/2026:06:41:28 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:41:36 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 YaBrowser/26.4.3.651 Chrome/146.0.7680.216 Safari/605.1.15"
+ - - [12/May/2026:06:42:31 +0000] "GET / HTTP/1.0" 200 15064 "https://yandex.by/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1"
+ - - [12/May/2026:06:42:58 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 YaBrowser/26.4.3.651 Chrome/146.0.7680.216 Safari/605.1.15"
+ - - [12/May/2026:06:43:03 +0000] "POST / HTTP/1.0" 403 1004 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:43:08 +0000] "POST / HTTP/1.0" 403 1004 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:43:11 +0000] "POST / HTTP/1.0" 403 1004 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:50:45 +0000] "GET / HTTP/1.0" 200 15064 "https://yandex.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:50:49 +0000] "POST / HTTP/1.0" 302 0 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+ - - [12/May/2026:06:50:49 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 YaBrowser/26.4.3.651.10 YaApp_iOS/2604.3 YaApp_iOS_Browser/2604.3 Safari/604.1 SA/3 Version/26.4"
+Stopping examprep.service - gunicorn daemon for ExamPrep...
+[2026-05-12 06:53:38 +0000] [425452] [INFO] Worker exiting (pid: 425452)
+[2026-05-12 06:53:38 +0000] [425453] [INFO] Worker exiting (pid: 425453)
+[2026-05-12 06:53:38 +0000] [425447] [INFO] Handling signal: term
+[2026-05-12 06:53:38 +0000] [425451] [INFO] Worker exiting (pid: 425451)
+[2026-05-12 06:53:38 +0000] [425447] [INFO] Worker (pid:425451) was sent SIGTERM!
+[2026-05-12 06:53:38 +0000] [425447] [INFO] Worker (pid:425452) was sent SIGTERM!
+[2026-05-12 06:53:38 +0000] [425447] [INFO] Worker (pid:425453) was sent SIGTERM!
+[2026-05-12 06:53:39 +0000] [425447] [INFO] Shutting down: Master
+examprep.service: Deactivated successfully.
+Stopped examprep.service - gunicorn daemon for ExamPrep.
+examprep.service: Consumed 1min 6.327s CPU time, 2.6M memory peak, 0B memory swap peak.
+Started examprep.service - gunicorn daemon for ExamPrep.
+[2026-05-12 06:53:39 +0000] [426976] [INFO] Starting gunicorn 25.3.0
+[2026-05-12 06:53:39 +0000] [426976] [INFO] Listening at: unix:/var/www/system_kazakov/examprep.sock (426976)
+[2026-05-12 06:53:39 +0000] [426976] [INFO] Using worker: sync
+[2026-05-12 06:53:39 +0000] [426980] [INFO] Booting worker with pid: 426980
+[2026-05-12 06:53:39 +0000] [426981] [INFO] Booting worker with pid: 426981
+[2026-05-12 06:53:39 +0000] [426982] [INFO] Booting worker with pid: 426982
+[2026-05-12 06:53:39 +0000] [426976] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
+ - - [12/May/2026:06:53:56 +0000] "GET /tutor/?student_id=56 HTTP/1.0" 302 0 "https://kazakov-system.ru/tutor/?student_id=54" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:53:57 +0000] "GET /accounts/login/?next=/tutor/%3Fstudent_id%3D56 HTTP/1.0" 200 2701 "https://kazakov-system.ru/tutor/?student_id=54" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:54:04 +0000] "GET / HTTP/1.0" 200 15064 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:54:18 +0000] "POST / HTTP/1.0" 302 0 "https://kazakov-system.ru/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:54:18 +0000] "GET /tutor/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:54:20 +0000] "GET /tutor/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:55:31 +0000] "GET /platform-admin/reshuege-import/ HTTP/1.0" 302 0 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:55:31 +0000] "GET /accounts/login/?next=/platform-admin/reshuege-import/ HTTP/1.0" 200 2730 "https://kazakov-system.ru/platform-admin/reshuege-import/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:55:36 +0000] "GET / HTTP/1.0" 200 15064 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:55:42 +0000] "POST / HTTP/1.0" 302 0 "https://kazakov-system.ru/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:55:42 +0000] "GET /platform-admin/ HTTP/1.0" 200 74270 "https://kazakov-system.ru/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:55:48 +0000] "GET /tutor/tasks/?subject=3&exam_format=3&type=&subtype=&q= HTTP/1.0" 200 185139 "https://kazakov-system.ru/tutor/tasks/?subject=3&exam_format=2&type=34&subtype=&q=" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:57:07 +0000] "GET /student/ HTTP/1.0" 302 0 "https://kazakov-system.ru/student/assignment/21/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:57:10 +0000] "GET /accounts/login/?next=/student/ HTTP/1.0" 200 2657 "https://kazakov-system.ru/student/assignment/21/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:57:16 +0000] "GET /accounts/login/?next=/student/ HTTP/1.0" 200 2657 "https://kazakov-system.ru/student/assignment/21/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:57:25 +0000] "GET / HTTP/1.0" 200 15064 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:57:37 +0000] "POST / HTTP/1.0" 302 0 "https://kazakov-system.ru/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+ - - [12/May/2026:06:57:39 +0000] "GET /student/ HTTP/1.0" 500 145 "https://kazakov-system.ru/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+Stopping examprep.service - gunicorn daemon for ExamPrep...
+[2026-05-12 07:05:07 +0000] [426976] [INFO] Handling signal: term
+[2026-05-12 07:05:07 +0000] [426982] [INFO] Worker exiting (pid: 426982)
+[2026-05-12 07:05:07 +0000] [426980] [INFO] Worker exiting (pid: 426980)
+[2026-05-12 07:05:07 +0000] [426981] [INFO] Worker exiting (pid: 426981)
+[2026-05-12 07:05:07 +0000] [426976] [INFO] Worker (pid:426980) was sent SIGTERM!
+[2026-05-12 07:05:07 +0000] [426976] [INFO] Worker (pid:426982) was sent SIGTERM!
+[2026-05-12 07:05:08 +0000] [426976] [INFO] Shutting down: Master
+examprep.service: Deactivated successfully.
+Stopped examprep.service - gunicorn daemon for ExamPrep.
+examprep.service: Consumed 9.512s CPU time, 2.6M memory peak, 0B memory swap peak.
+Started examprep.service - gunicorn daemon for ExamPrep.
+(venv) root@vm147838:/var/www/system_kazakov#
