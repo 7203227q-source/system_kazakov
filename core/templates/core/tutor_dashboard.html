@@ -261,17 +261,29 @@
                             </form>
                         </div>
                     </div>
-                    {% if selected_student.subject_profiles.exists %}
+                    {% if profiles %}
                         <div class="space-y-4">
-                        {% for profile in selected_student.subject_profiles.all %}
+                        {% for profile in profiles %}
                             <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
                                 <div class="flex justify-between items-center mb-2">
                                     <span class="font-bold text-gray-700 text-sm">{{ profile.subject.name }}</span>
-                                    <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">Прогноз: {{ profile.latest_snapshot.predicted_exam_score|default:"-" }}</span>
+                                    {% if profile.exam_display %}
+                                        <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">
+                                            Прогноз: {{ profile.exam_display.pred_primary }}/{{ profile.exam_display.max_primary }} (оценка {{ profile.exam_display.pred_grade }})
+                                        </span>
+                                    {% else %}
+                                        <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">Прогноз: {{ profile.latest_snapshot.predicted_exam_score|default:"-" }}</span>
+                                    {% endif %}
                                 </div>
                                 <div class="flex justify-between items-center mb-1">
                                     <span class="text-xs text-gray-500">Мастерство:</span>
-                                    <span class="text-xs font-bold text-gray-800">{{ profile.latest_snapshot.current_mastery|default:"0.0" }}%</span>
+                                    {% if profile.exam_display %}
+                                        <span class="text-xs font-bold text-gray-800">
+                                            {{ profile.exam_display.cur_primary }}/{{ profile.exam_display.max_primary }} (оценка {{ profile.exam_display.cur_grade }})
+                                        </span>
+                                    {% else %}
+                                        <span class="text-xs font-bold text-gray-800">{{ profile.latest_snapshot.current_mastery|default:"0.0" }}%</span>
+                                    {% endif %}
                                 </div>
                                 <div class="flex justify-between items-center">
                                     <span class="text-xs text-gray-500">Индекс доверия (Trust):</span>

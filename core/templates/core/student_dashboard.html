@@ -101,7 +101,14 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="text-sm text-gray-500 mb-1">Текущее мастерство</p>
-                            <h3 class="text-3xl font-bold text-gray-800">{{ latest_snapshot.current_mastery|default:"0.0" }}<span class="text-lg text-gray-400">%</span></h3>
+                            {% if exam_display %}
+                                <h3 class="text-3xl font-bold text-gray-800">
+                                    {{ exam_display.cur_primary }}/{{ exam_display.max_primary }}
+                                    <span class="text-base text-gray-500">(оценка {{ exam_display.cur_grade }})</span>
+                                </h3>
+                            {% else %}
+                                <h3 class="text-3xl font-bold text-gray-800">{{ latest_snapshot.current_mastery|default:"0.0" }}<span class="text-lg text-gray-400">%</span></h3>
+                            {% endif %}
                         </div>
                         <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
                             <i class="fas fa-chart-bar text-xl"></i>
@@ -121,7 +128,14 @@
                     <div class="flex justify-between items-start mt-2">
                         <div>
                             <p class="text-sm text-gray-500 mb-1">Прогноз ИИ на экзамен</p>
-                            <h3 class="text-3xl font-bold text-primary">{{ latest_snapshot.predicted_exam_score|default:"-" }}<span class="text-lg text-gray-400">/100</span></h3>
+                            {% if exam_display %}
+                                <h3 class="text-3xl font-bold text-primary">
+                                    {{ exam_display.pred_primary }}/{{ exam_display.max_primary }}
+                                    <span class="text-base text-gray-500">(оценка {{ exam_display.pred_grade }})</span>
+                                </h3>
+                            {% else %}
+                                <h3 class="text-3xl font-bold text-primary">{{ latest_snapshot.predicted_exam_score|default:"-" }}<span class="text-lg text-gray-400">/100</span></h3>
+                            {% endif %}
                         </div>
                         <div class="p-3 bg-indigo-50 text-primary rounded-lg">
                             <i class="fas fa-robot text-xl"></i>
@@ -135,7 +149,7 @@
                     
                     <div class="w-full bg-gray-200 rounded-full h-2 mt-3 relative">
                         <!-- Progress -->
-                        <div class="bg-primary h-2 rounded-full" style="width: {{ latest_snapshot.predicted_exam_score|default:0 }}%"></div>
+                        <div class="bg-primary h-2 rounded-full" style="width: {% if exam_display %}{{ exam_display.pred_percent|default:0 }}{% else %}{{ latest_snapshot.predicted_exam_score|default:0 }}{% endif %}%"></div>
                     </div>
 
                     <div class="mt-3 text-right">

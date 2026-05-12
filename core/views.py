@@ -761,8 +761,49 @@ def student_dashboard(request):
     xp_to_next = next_level_xp - int(total_xp)
     progress_percent = int((int(total_xp) % 100) / 100 * 100)
 
+    exam_display = None
     if active_profile:
         latest_snapshot = DailySnapshot.objects.filter(student=request.user, subject=active_profile.subject).order_by('-date').first()
+        try:
+            from core.exam_scoring import estimate_geometry_primary, grade_from_primary, primary_from_percent
+            exam_format = active_profile.exam_format or (
+                ExamFormat.objects.filter(subject=active_profile.subject, is_active=True).order_by("-year", "name").first()
+                or ExamFormat.objects.filter(subject=active_profile.subject).order_by("-year", "name").first()
+            )
+            scale = getattr(exam_format, "score_scale", None) if exam_format else None
+            if latest_snapshot and scale:
+                max_primary = int(getattr(scale, "max_primary_score", 0) or 0)
+                if max_primary > 0:
+                    cur_primary = primary_from_percent(latest_snapshot.current_mastery, max_primary)
+                    pred_primary = primary_from_percent(latest_snapshot.predicted_exam_score, max_primary)
+
+                    sums = (
+                        TaskType.objects.filter(exam_format=exam_format)
+                        .aggregate(
+                            total=models.Sum("max_points"),
+                            geo=models.Sum("max_points", filter=models.Q(is_geometry=True)),
+                        )
+                    )
+                    total_pts = float(sums.get("total") or 0.0)
+                    geo_pts = float(sums.get("geo") or 0.0)
+                    geometry_share = (geo_pts / total_pts) if total_pts > 0 else 0.0
+
+                    cur_geom = estimate_geometry_primary(total_primary=cur_primary, geometry_share=geometry_share)
+                    pred_geom = estimate_geometry_primary(total_primary=pred_primary, geometry_share=geometry_share)
+                    rules = list(getattr(scale, "grade_rules", None) or [])
+
+                    cur_grade = grade_from_primary(cur_primary, geometry_primary=cur_geom, grade_rules=rules)
+                    pred_grade = grade_from_primary(pred_primary, geometry_primary=pred_geom, grade_rules=rules)
+                    exam_display = {
+                        "max_primary": max_primary,
+                        "cur_primary": cur_primary,
+                        "pred_primary": pred_primary,
+                        "cur_grade": cur_grade,
+                        "pred_grade": pred_grade,
+                        "pred_percent": round((pred_primary / max_primary) * 100) if max_primary > 0 else 0,
+                    }
+        except Exception:
+            exam_display = None
 
     # Prepare chart data (last 30 snapshots)
     chart_dates = []
@@ -816,6 +857,7 @@ def student_dashboard(request):
         'available_subjects': available_subjects,
         'active_profile': active_profile,
         'latest_snapshot': latest_snapshot,
+        'exam_display': exam_display,
         'active_subject_id': active_subject_id,
         'xp_to_next': xp_to_next,
         'progress_percent': progress_percent,
@@ -1758,6 +1800,7 @@ def tutor_dashboard(request):
         profiles = list(selected_student.subject_profiles.all())
         for p in profiles:
             p.exam_formats_for_subject = ExamFormat.objects.filter(subject_id=p.subject_id).order_by('-is_active', '-year', 'name')
+            p.latest_snapshot = DailySnapshot.objects.filter(student=selected_student, subject=p.subject).order_by('-date').first()
         if profiles:
             chart_subject_id = int(chart_subject_id_raw) if chart_subject_id_raw.isdigit() else profiles[0].subject_id
             chart_range = int(chart_range_raw) if chart_range_raw.isdigit() else 30
@@ -1821,6 +1864,54 @@ def tutor_dashboard(request):
         if active_exam_format:
             task_types_for_exam = list(TaskType.objects.filter(exam_format=active_exam_format).only("number", "name").order_by("number"))
             task_type_name_map = {int(tt.number): tt.name for tt in task_types_for_exam}
+
+        # --- Exam display (баллы + оценка) for profile cards ---
+        try:
+            from core.exam_scoring import estimate_geometry_primary, grade_from_primary, primary_from_percent
+
+            # Precompute geometry share per exam_format for the selected student's subjects
+            exam_format_ids = {p.exam_format_id for p in profiles if p.exam_format_id}
+            ef_share = {}
+            if exam_format_ids:
+                for row in (
+                    TaskType.objects.filter(exam_format_id__in=list(exam_format_ids))
+                    .values("exam_format_id")
+                    .annotate(
+                        total=models.Sum("max_points"),
+                        geo=models.Sum("max_points", filter=Q(is_geometry=True)),
+                    )
+                ):
+                    total_pts = float(row.get("total") or 0.0)
+                    geo_pts = float(row.get("geo") or 0.0)
+                    ef_share[int(row["exam_format_id"])] = (geo_pts / total_pts) if total_pts > 0 else 0.0
+
+            for p in profiles:
+                snap = getattr(p, "latest_snapshot", None)
+                ef = getattr(p, "exam_format", None)
+                scale = getattr(ef, "score_scale", None) if ef else None
+                if not snap or not scale:
+                    p.exam_display = None
+                    continue
+                max_primary = int(getattr(scale, "max_primary_score", 0) or 0)
+                if max_primary <= 0:
+                    p.exam_display = None
+                    continue
+                cur_primary = primary_from_percent(snap.current_mastery, max_primary)
+                pred_primary = primary_from_percent(snap.predicted_exam_score, max_primary)
+                geometry_share = float(ef_share.get(int(ef.id), 0.0)) if ef else 0.0
+                cur_geom = estimate_geometry_primary(total_primary=cur_primary, geometry_share=geometry_share)
+                pred_geom = estimate_geometry_primary(total_primary=pred_primary, geometry_share=geometry_share)
+                rules = list(getattr(scale, "grade_rules", None) or [])
+                p.exam_display = {
+                    "max_primary": max_primary,
+                    "cur_primary": cur_primary,
+                    "pred_primary": pred_primary,
+                    "cur_grade": grade_from_primary(cur_primary, geometry_primary=cur_geom, grade_rules=rules),
+                    "pred_grade": grade_from_primary(pred_primary, geometry_primary=pred_geom, grade_rules=rules),
+                }
+        except Exception:
+            for p in profiles:
+                p.exam_display = None
 
         submissions_base = Submission.objects.filter(student=selected_student)
         if active_exam_format:
