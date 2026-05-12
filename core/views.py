@@ -1626,10 +1626,31 @@ def tutor_dashboard(request):
     # Calculate idle status for all students
     from django.utils import timezone
     from .models import SpacedRepetition
-    today = timezone.now().date()
+    today = timezone.localdate()
+
+    # XP gained today (only from solving tasks, not tutor rewards)
+    student_ids = list(students.values_list("id", flat=True))
+    today_xp_map: dict[int, int] = {}
+    if student_ids:
+        rows = (
+            Submission.objects.filter(
+                student_id__in=student_ids,
+                is_correct=True,
+                created_at__date=today,
+            )
+            .select_related("task")
+            .values_list("student_id", "task__difficulty")
+        )
+        for sid, diff in rows:
+            try:
+                xp = max(1, int(int(diff or 0) / 5))
+            except Exception:
+                xp = 1
+            today_xp_map[int(sid)] = int(today_xp_map.get(int(sid), 0)) + int(xp)
     
     for s in students:
         s.total_xp = sum(int(p.xp or 0) for p in s.subject_profiles.all())
+        s.today_xp = int(today_xp_map.get(int(s.id), 0))
         # Fetch latest snapshot for each profile
         for profile in s.subject_profiles.all():
             profile.latest_snapshot = DailySnapshot.objects.filter(student=s, subject=profile.subject).order_by('-date').first()
