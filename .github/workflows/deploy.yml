@@ -16,29 +16,32 @@ jobs:
           missing=0
           if [ -z "${{ secrets.VPS_HOST }}" ]; then echo "::error::Missing secret VPS_HOST"; missing=1; fi
           if [ -z "${{ secrets.VPS_USER }}" ]; then echo "::error::Missing secret VPS_USER"; missing=1; fi
-          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then echo "::error::Missing secret VPS_SSH_KEY"; missing=1; fi
+          if [ -z "${{ secrets.VPS_SSH_KEY }}" ] && [ -z "${{ secrets.VPS_SSH_KEY_B64 }}" ]; then
+            echo "::error::Missing secret VPS_SSH_KEY (or VPS_SSH_KEY_B64)"
+            missing=1
+          fi
           if [ "$missing" -ne 0 ]; then exit 1; fi
 
-      - name: Show deploy key fingerprint
+      - name: Prepare deploy key file
         shell: bash
         run: |
           set -e
-          tmp="$(mktemp)"
-          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > "$tmp"
-          chmod 600 "$tmp"
-          ssh-keygen -lf "$tmp"
-          rm -f "$tmp"
+          key_path="$GITHUB_WORKSPACE/.deploy_key"
+          rm -f "$key_path"
+          if [ -n "${{ secrets.VPS_SSH_KEY_B64 }}" ]; then
+            printf '%s' "${{ secrets.VPS_SSH_KEY_B64 }}" | base64 -d > "$key_path"
+          else
+            printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" | tr -d '\r' | sed 's/^[[:space:]]*//' > "$key_path"
+          fi
+          chmod 600 "$key_path"
+          ssh-keygen -lf "$key_path"
 
       - name: SSH connection test
         shell: bash
         run: |
           set -e
-          tmp="$(mktemp)"
-          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > "$tmp"
-          chmod 600 "$tmp"
           ssh -v -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -i "$tmp" -p "${{ secrets.VPS_PORT || '22' }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo ssh_ok"
-          rm -f "$tmp"
+            -i "$GITHUB_WORKSPACE/.deploy_key" -p "${{ secrets.VPS_PORT || '22' }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "echo ssh_ok"
 
       - name: Execute deployment commands via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -46,7 +49,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           port: ${{ secrets.VPS_PORT || '22' }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          key_path: /github/workspace/.deploy_key
           debug: true
           script_stop: true
           request_pty: true
@@ -66,3 +69,8 @@ jobs:
             python manage.py collectstatic --noinput
 
             sudo -n systemctl restart examprep
+
+      - name: Cleanup deploy key file
+        if: always()
+        shell: bash
+        run: rm -f "$GITHUB_WORKSPACE/.deploy_key"
