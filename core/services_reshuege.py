@@ -388,6 +388,8 @@ def import_one_task_from_sdamgia(
     theme: str = "classic",
     allow_bundle: bool = True,
 ) -> dict:
+    from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html, replace_svg_images_with_latex
+
     exam_format = ExamFormat.objects.select_related("subject").get(id=exam_format_id)
     topic = Topic.objects.get_or_create(subject=exam_format.subject, name="Задания из Открытого Банка")[0]
     task_type, _ = TaskType.objects.get_or_create(
@@ -431,6 +433,13 @@ def import_one_task_from_sdamgia(
 
     processed_content = download_and_replace_images(content_html, task_id, theme, base_url=base_url, segment="content")
     processed_solution = download_and_replace_images(solution_html, task_id, theme, base_url=base_url, segment="solution")
+
+    processed_content, _ = replace_svg_images_with_latex(processed_content)
+    processed_solution, _ = replace_svg_images_with_latex(processed_solution)
+    processed_content, _ = fix_latex_tokens_in_html(processed_content)
+    processed_solution, _ = fix_latex_tokens_in_html(processed_solution)
+    processed_content, _ = fix_math_words_in_html(processed_content)
+    processed_solution, _ = fix_math_words_in_html(processed_solution)
 
     task, created = Task.objects.update_or_create(
         fipi_id=task_id,
