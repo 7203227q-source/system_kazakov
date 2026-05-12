@@ -24,9 +24,7 @@ jobs:
         run: |
           set -e
           tmp="$(mktemp)"
-          cat > "$tmp" <<EOF
-          ${{ secrets.VPS_SSH_KEY }}
-          EOF
+          printf '%s' "${{ secrets.VPS_SSH_KEY }}" > "$tmp"
           chmod 600 "$tmp"
           ssh-keygen -lf "$tmp"
           rm -f "$tmp"
