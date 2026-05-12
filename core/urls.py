@@ -22,6 +22,7 @@ urlpatterns = [
     path('student/update-theme/', views.update_theme_view, name='update_theme'),
     path('student/add-subject/', views.student_add_subject_profile, name='student_add_subject_profile'),
     path('student/learning-settings/', views.student_learning_settings, name='student_learning_settings'),
+    path('student/update-target-score/', views.student_update_target_score, name='student_update_target_score'),
     path('student/update-exam-format/', views.student_update_exam_format, name='student_update_exam_format'),
     path('student/update-exam-date/', views.student_update_exam_date, name='student_update_exam_date'),
     path('update-ui-theme/', views.update_ui_theme_view, name='update_ui_theme'),

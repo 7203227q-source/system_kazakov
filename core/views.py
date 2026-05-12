@@ -1374,6 +1374,31 @@ def student_update_exam_format(request):
 
 @login_required
 @require_POST
+def student_update_target_score(request):
+    if request.user.role != "student":
+        return redirect("login")
+
+    subject_id_raw = (request.POST.get("subject_id") or "").strip()
+    target_raw = (request.POST.get("target_score") or "").strip()
+    if not (subject_id_raw.isdigit() and target_raw.isdigit()):
+        return redirect(request.META.get("HTTP_REFERER", reverse("student_learning_settings")))
+
+    subject_id = int(subject_id_raw)
+    target = int(target_raw)
+    if target < 1 or target > 100:
+        return redirect(request.META.get("HTTP_REFERER", reverse("student_learning_settings")))
+
+    profile = StudentSubjectProfile.objects.filter(student=request.user, subject_id=subject_id).first()
+    if profile is None:
+        return redirect(request.META.get("HTTP_REFERER", reverse("student_learning_settings")))
+
+    profile.target_score = target
+    profile.save(update_fields=["target_score"])
+    return redirect(request.META.get("HTTP_REFERER", reverse("student_learning_settings")))
+
+
+@login_required
+@require_POST
 def student_update_exam_date(request):
     if request.user.role != 'student':
         return redirect('login')

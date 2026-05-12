@@ -47,3 +47,18 @@ class StudentDashboardIsCompactTests(TestCase):
         html = res.content.decode("utf-8")
         self.assertNotIn(reverse("student_update_exam_format"), html)
         self.assertNotIn(reverse("student_update_exam_date"), html)
+
+
+class StudentTargetScoreUpdateTests(TestCase):
+    def test_student_can_update_target_score_for_active_subject(self):
+        student = User.objects.create(username="s", role="student")
+        subject = Subject.objects.create(name="Математика")
+        profile = StudentSubjectProfile.objects.create(student=student, subject=subject, target_score=80)
+        self.client.force_login(student)
+        res = self.client.post(
+            reverse("student_update_target_score"),
+            {"subject_id": subject.id, "target_score": "90"},
+        )
+        self.assertEqual(res.status_code, 302)
+        profile.refresh_from_db()
+        self.assertEqual(profile.target_score, 90)

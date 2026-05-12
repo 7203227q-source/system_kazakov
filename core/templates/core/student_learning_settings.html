@@ -65,6 +65,15 @@
                             <i class="fas fa-flag-checkered text-primary mr-2"></i> Экзамен
                         </h2>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <form method="POST" action="{% url 'student_update_target_score' %}" class="space-y-2 md:col-span-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="subject_id" value="{{ active_profile.subject.id }}">
+                                <label class="block text-xs font-bold text-gray-600">Цель (баллы)</label>
+                                <div class="flex gap-2">
+                                    <input type="number" min="1" max="100" name="target_score" value="{{ active_profile.target_score|default:80 }}" class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <button class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">Сохранить</button>
+                                </div>
+                            </form>
                             <form method="POST" action="{% url 'student_update_exam_format' %}" class="space-y-2">
                                 {% csrf_token %}
                                 <input type="hidden" name="subject_id" value="{{ active_profile.subject.id }}">
