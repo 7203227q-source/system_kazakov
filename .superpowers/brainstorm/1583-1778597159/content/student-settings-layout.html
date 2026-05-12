@@ -1,0 +1,128 @@
+<h2>Предметы и «Настройки обучения»</h2>
+<p class="subtitle">Выбери вариант, как исправляем добавление 2-го предмета и куда переносим перегруженную карточку прогноза.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Вариант A (рекомендую): отдельная страница настроек</div>
+        <div class="mockup-body">
+          <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;min-height:220px">
+            <div style="border:1px solid var(--border);border-radius:12px;padding:12px">
+              <div style="font-weight:700;margin-bottom:10px">Меню</div>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+                <div>Главная</div>
+                <div>Журнал</div>
+                <div>Сообщения</div>
+                <div style="padding:8px 10px;border-radius:10px;background:rgba(79,70,229,0.12);font-weight:700">Настройки обучения</div>
+              </div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:12px;padding:12px">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+                <div style="padding:6px 10px;border-radius:999px;background:#eef2ff;font-weight:700">Математика</div>
+                <div style="padding:6px 10px;border-radius:999px;background:#fff;border:1px dashed #a5b4fc;color:#4f46e5;font-weight:700">+ Предмет</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div style="border:1px solid var(--border);border-radius:12px;padding:10px">
+                  <div style="font-weight:700;margin-bottom:6px">Экзамен</div>
+                  <div style="font-size:12px;opacity:.8">Формат • Дата • Цель</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:12px;padding:10px">
+                  <div style="font-weight:700;margin-bottom:6px">Прогноз и ИИ</div>
+                  <div style="font-size:12px;opacity:.8">Индекс доверия • Ошибка • Темп</div>
+                </div>
+              </div>
+              <div style="margin-top:10px;border:1px solid var(--border);border-radius:12px;padding:10px">
+                <div style="font-weight:700;margin-bottom:6px">Управление предметами</div>
+                <div style="font-size:12px;opacity:.8">Добавить/удалить предметы, выбрать активный</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;border:1px solid var(--border);border-radius:12px;padding:12px">
+            <div style="font-weight:700;margin-bottom:6px">Главная (упрощённая карточка прогноза)</div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <div style="flex:1">
+                <div style="font-size:12px;opacity:.75">Прогноз ИИ</div>
+                <div style="font-size:22px;font-weight:800;color:#4f46e5">72/100</div>
+              </div>
+              <div style="font-size:12px;opacity:.8">Цель: 85</div>
+              <div style="font-size:12px;opacity:.8">Доверие: 0.6</div>
+              <div style="margin-left:auto;font-size:12px;color:#4f46e5;font-weight:700">Настроить →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Отдельный пункт «Настройки обучения»</h3>
+      <p>Добавление предметов + все настройки экзамена/прогноза выносим из главной. На главной оставляем компактный прогноз и ссылку «Настроить».</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Вариант B: всё на главной, но в сворачиваемом блоке</div>
+        <div class="mockup-body">
+          <div style="border:1px solid var(--border);border-radius:12px;padding:12px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+              <div style="padding:6px 10px;border-radius:999px;background:#eef2ff;font-weight:700">Математика</div>
+              <div style="padding:6px 10px;border-radius:999px;background:#fff;border:1px dashed #a5b4fc;color:#4f46e5;font-weight:700">+ Предмет</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+              <div style="border:1px solid var(--border);border-radius:12px;padding:10px">Мастерство</div>
+              <div style="border:1px solid var(--border);border-radius:12px;padding:10px">
+                Прогноз (коротко)
+                <div style="margin-top:8px;font-size:12px;color:#4f46e5;font-weight:700">Подробнее ▼</div>
+              </div>
+              <div style="border:1px solid var(--border);border-radius:12px;padding:10px">Темп</div>
+            </div>
+            <div style="margin-top:10px;border:1px dashed #a5b4fc;border-radius:12px;padding:10px;font-size:12px;opacity:.9">
+              В раскрытом виде показываем формат/дату/доверие/ошибку. Добавление предмета через модалку.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Сворачиваемая «подкарточка»</h3>
+      <p>Меньше страниц, но главная всё равно остаётся насыщенной. Риск, что снова “не помещается” на мобильном.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Вариант C: отдельная страница «Прогноз и аналитика»</div>
+        <div class="mockup-body">
+          <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;min-height:200px">
+            <div style="border:1px solid var(--border);border-radius:12px;padding:12px">
+              <div style="font-weight:700;margin-bottom:10px">Меню</div>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+                <div>Главная</div>
+                <div>Журнал</div>
+                <div>Сообщения</div>
+                <div style="padding:8px 10px;border-radius:10px;background:rgba(79,70,229,0.12);font-weight:700">Прогноз и аналитика</div>
+              </div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:12px;padding:12px">
+              <div style="font-weight:800;margin-bottom:6px">Прогноз ИИ: 72/100</div>
+              <div style="font-size:12px;opacity:.8;margin-bottom:10px">Доверие • Ошибка • Разрыв Solo/Verified</div>
+              <div style="border:1px solid var(--border);border-radius:12px;padding:10px;font-size:12px;opacity:.9">
+                Здесь же “Настройки экзамена” и “Предметы”.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Отдельная страница “аналитики”</h3>
+      <p>Подходит если хочешь развивать аналитику отдельно, но по смыслу “настройки” и “прогноз” смешиваются.</p>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Ключевой баг:</strong> сейчас кнопка “+ Предмет” ведёт на страницу выбора роли, поэтому второй предмет не добавляется. В любом варианте нужно сделать отдельный поток добавления предмета.
+</div>
