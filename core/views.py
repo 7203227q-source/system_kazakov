@@ -1806,12 +1806,21 @@ def tutor_dashboard(request):
         active_exam_format = None
         task_type_name_map = {}
         if profiles:
-            active_exam_format = ExamFormat.objects.filter(subject_id=chart_subject_id, is_active=True).order_by('-year').first()
+            profile = (
+                StudentSubjectProfile.objects.filter(student=selected_student, subject_id=chart_subject_id)
+                .select_related("exam_format")
+                .first()
+            )
+            if profile and profile.exam_format_id:
+                active_exam_format = profile.exam_format
+            else:
+                active_exam_format = (
+                    ExamFormat.objects.filter(subject_id=chart_subject_id, is_active=True).order_by("-year", "name").first()
+                    or ExamFormat.objects.filter(subject_id=chart_subject_id).order_by("-year", "name").first()
+                )
         if active_exam_format:
-            task_type_name_map = {
-                int(tt.number): tt.name
-                for tt in TaskType.objects.filter(exam_format=active_exam_format).only('number', 'name')
-            }
+            task_types_for_exam = list(TaskType.objects.filter(exam_format=active_exam_format).only("number", "name").order_by("number"))
+            task_type_name_map = {int(tt.number): tt.name for tt in task_types_for_exam}
 
         rows = (
             Submission.objects.filter(student=selected_student)
