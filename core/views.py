@@ -663,6 +663,7 @@ def student_dashboard(request):
     
     # Handle subjects
     profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related('subject', 'exam_format')
+    available_subjects = Subject.objects.exclude(id__in=profiles.values_list("subject_id", flat=True)).order_by("name")
     total_xp = profiles.aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
     active_subject_id = (request.GET.get('subject_id') or '').strip()
@@ -758,6 +759,7 @@ def student_dashboard(request):
         'recent_submissions': recent_submissions,
         'pending_assignments': pending_assignments,
         'profiles': profiles,
+        'available_subjects': available_subjects,
         'active_profile': active_profile,
         'latest_snapshot': latest_snapshot,
         'active_subject_id': active_subject_id,
@@ -779,6 +781,7 @@ def student_learning_settings(request):
         return redirect("login")
 
     profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related("subject")
+    available_subjects = Subject.objects.exclude(id__in=profiles.values_list("subject_id", flat=True)).order_by("name")
     active_subject_id_raw = (request.GET.get("subject_id") or "").strip()
     if active_subject_id_raw.isdigit():
         active_subject_id = int(active_subject_id_raw)
@@ -799,8 +802,28 @@ def student_learning_settings(request):
             "active_profile": active_profile,
             "active_subject_id": active_subject_id,
             "exam_formats_for_subject": exam_formats_for_subject,
+            "available_subjects": available_subjects,
         },
     )
+
+
+@login_required
+@require_POST
+def student_add_subject_profile(request):
+    if request.user.role != "student":
+        return redirect("login")
+
+    subject_id_raw = (request.POST.get("subject_id") or "").strip()
+    if not subject_id_raw.isdigit():
+        return redirect(request.META.get("HTTP_REFERER", reverse("student_dashboard")))
+    subject_id = int(subject_id_raw)
+
+    subject = Subject.objects.filter(id=subject_id).first()
+    if subject is None:
+        return redirect(request.META.get("HTTP_REFERER", reverse("student_dashboard")))
+
+    StudentSubjectProfile.objects.get_or_create(student=request.user, subject=subject)
+    return redirect(f"{reverse('student_dashboard')}?subject_id={subject_id}")
 
 from django.http import JsonResponse
 
