@@ -9,6 +9,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate deploy secrets
+        shell: bash
+        run: |
+          set -e
+          missing=0
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then echo "::error::Missing secret VPS_HOST"; missing=1; fi
+          if [ -z "${{ secrets.VPS_USER }}" ]; then echo "::error::Missing secret VPS_USER"; missing=1; fi
+          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then echo "::error::Missing secret VPS_SSH_KEY"; missing=1; fi
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+
       - name: Execute deployment commands via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -19,6 +29,7 @@ jobs:
           fingerprint: ${{ secrets.VPS_FINGERPRINT }}
           debug: true
           script_stop: true
+          request_pty: true
           script: |
             set -e
             cd /var/www/system_kazakov
