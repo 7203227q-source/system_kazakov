@@ -33,7 +33,7 @@ jobs:
           else
             printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" | tr -d '\r' | sed 's/^[[:space:]]*//' > "$key_path"
           fi
-          chmod 600 "$key_path"
+          chmod 644 "$key_path"
           ssh-keygen -lf "$key_path"
 
       - name: SSH connection test
