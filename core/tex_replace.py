@@ -7,12 +7,12 @@ from core.sdamgia_latex import latex_from_sdamgia_alt, sanitize_math_latex
 
 
 _RU_TRIG_RE = re.compile(
-    r"\b(?P<fn>синус|синуса|косинус|косинуса|тангенс|тангенса|котангенс|котангенса)\s*(?P<arg>[A-Za-zА-Яа-я])\b",
+    r"\b(?P<fn>синус|синуса|косинус|косинуса|тангенс|тангенса|котангенс|котангенса)\s*(?P<arg>(?:∠)?[A-Za-zА-Яа-я])\b",
     flags=re.IGNORECASE,
 )
 
 _LAT_TRIG_RE = re.compile(
-    r"\b(?P<fn>sin|cos|tan|tg|ctg|cot)\s*(?P<arg>[A-Za-z])\b",
+    r"(?<![A-Za-z\\])(?P<fn>sin|cos|tan|tg|ctg|cot)\s*(?P<arg>(?:∠)?[A-Za-z])\b",
     flags=re.IGNORECASE,
 )
 
@@ -90,6 +90,7 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
 
         def trig_ru(m: re.Match) -> str:
             fn = m.group("fn").lower()
+            arg = (m.group("arg") or "").lstrip("∠")
             if fn.startswith("синус"):
                 cmd = r"\sin"
             elif fn.startswith("косинус"):
@@ -98,10 +99,11 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
                 cmd = r"\tan"
             else:
                 cmd = r"\cot"
-            return rf"${cmd} {m.group('arg')}$"
+            return rf"${cmd} {arg}$"
 
         def trig_lat(m: re.Match) -> str:
             fn = m.group("fn").lower()
+            arg = (m.group("arg") or "").lstrip("∠")
             if fn in {"sin"}:
                 cmd = r"\sin"
             elif fn in {"cos"}:
@@ -110,7 +112,7 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
                 cmd = r"\tan"
             else:
                 cmd = r"\cot"
-            return rf"${cmd} {m.group('arg')}$"
+            return rf"${cmd} {arg}$"
 
         def inf(m: re.Match) -> str:
             sign = (m.group("sign") or "").strip()
