@@ -4068,6 +4068,9 @@ def api_verify_with_ai(request, submission_id):
             for t in soup(["script", "style", "noscript"]):
                 t.decompose()
             task_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True) or "").strip()
+            # Некоторые провайдеры (например Google AI Studio через OpenRouter) могут падать на сырых backslash в тексте.
+            # Дублируем "\" → "\\" чтобы избежать ошибок вида "Invalid \\escape".
+            task_text = task_text.replace("\\", "\\\\")
 
             allowed_hosts_suffix = "sdamgia.ru"
             seen = set()
