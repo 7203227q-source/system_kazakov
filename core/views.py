@@ -3878,6 +3878,8 @@ def api_submission_upload(request, submission_id):
 
 import re
 from django.conf import settings
+from urllib.parse import urlparse
+from bs4 import BeautifulSoup
 
 def api_verify_with_ai(request, submission_id):
     if request.method != 'POST' or not request.user.is_authenticated:
@@ -3930,6 +3932,51 @@ def api_verify_with_ai(request, submission_id):
         import mimetypes
         import json as pyjson
 
+        task_html = ""
+        try:
+            task_html = task.get_content_for_theme() or ""
+        except Exception:
+            task_html = ""
+
+        soup = BeautifulSoup(task_html, "html.parser") if task_html else None
+        task_text = ""
+        task_image_urls = []
+        if soup:
+            for t in soup(["script", "style", "noscript"]):
+                t.decompose()
+            task_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True) or "").strip()
+
+            allowed_hosts_suffix = "sdamgia.ru"
+            seen = set()
+            for img in soup.find_all("img"):
+                src = (img.get("src") or img.get("data-src") or img.get("data-original") or "").strip().strip('"').strip("'")
+                if not src:
+                    continue
+                low = src.lower()
+                if low.startswith("data:") or low.startswith("javascript:") or low.startswith("file:"):
+                    continue
+
+                resolved = src
+                if src.startswith("/"):
+                    if not (src.startswith("/media/") or src.startswith("/proxy-image/")):
+                        continue
+                    resolved = request.build_absolute_uri(src)
+                else:
+                    try:
+                        parsed = urlparse(src)
+                    except Exception:
+                        continue
+                    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                        continue
+                    host = parsed.netloc.lower()
+                    if not host.endswith(allowed_hosts_suffix):
+                        continue
+
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                task_image_urls.append(resolved)
+
         file_path = submission.image_url.path
         mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
         with open(file_path, "rb") as f:
@@ -3954,6 +4001,13 @@ def api_verify_with_ai(request, submission_id):
             "- Что исправить:\n"
             "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
         )
+
+        if task_text:
+            prompt = f"{prompt}\n\nУсловие:\n{task_text}"
+
+        user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
+        for u in task_image_urls:
+            user_content.append({"type": "image_url", "image_url": {"url": u}})
 
         if mode == "compare":
             compare_models = []
@@ -3987,10 +4041,7 @@ def api_verify_with_ai(request, submission_id):
                             {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
                             {
                                 "role": "user",
-                                "content": [
-                                    {"type": "text", "text": prompt},
-                                    {"type": "image_url", "image_url": {"url": data_url}},
-                                ],
+                                "content": user_content,
                             },
                         ],
                     },
@@ -4038,10 +4089,7 @@ def api_verify_with_ai(request, submission_id):
                     {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
                     {
                         "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": data_url}},
-                        ],
+                        "content": user_content,
                     },
                 ],
             },

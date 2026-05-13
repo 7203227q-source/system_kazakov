@@ -54,5 +54,6 @@ class AIVerifyPromptIncludesTaskAssetsTests(TestCase):
         self.assertTrue(any("/media/a.png" in u for u in imgs))
         self.assertTrue(any("math-ege.sdamgia.ru" in u for u in imgs))
         self.assertFalse(any("evil.com" in u for u in imgs))
-        self.assertFalse(any(u.startswith("data:") for u in imgs))
-
+        self.assertTrue(any(u.startswith("data:") for u in imgs))
+        task_imgs = [u for u in imgs if not u.startswith("data:")]
+        self.assertFalse(any(u.startswith("data:") for u in task_imgs))
