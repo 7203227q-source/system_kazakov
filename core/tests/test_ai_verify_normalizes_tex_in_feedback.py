@@ -32,7 +32,7 @@ class AIVerifyNormalizesTexInFeedbackTests(TestCase):
     def test_fixes_common_missing_backslashes_inside_math(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
 
-        feedback = "Проверь: $t=frac{1}{cos x}$ и $x=pm fracpi3+2pi n$, $x in mathbbZ$. Также $cos(fracpi2+2x)=-sin(2x)$ и $x=pm frac3pi4+2pik, kinmathbbZ$."
+        feedback = "Проверь: $t=frac{1}{cos x}$ и $x=pm fracpi3+2pi n$, $x in mathbbZ$. Также $cos(fracpi2+2x)=-sin(2x)$ и $x=pm frac3pi4+2pik, kinmathbbZ$. И ещё: $cos x=-fracsqrt22$ и $x=pin, ninmathbbZ$."
         dummy = {"choices": [{"message": {"content": json.dumps({"primary_score": 1, "is_correct": False, "feedback": feedback})}}]}
 
         from unittest.mock import patch
@@ -51,3 +51,5 @@ class AIVerifyNormalizesTexInFeedbackTests(TestCase):
         self.assertIn("$x \\in \\mathbb{Z}$", fb)
         self.assertIn("$\\cos(\\frac{\\pi}{2}+2x)=-\\sin(2x)$", fb)
         self.assertIn("$x=\\pm \\frac{3\\pi}{4}+2\\pi k, k \\in \\mathbb{Z}$", fb)
+        self.assertIn("$\\cos x=-\\frac{\\sqrt{2}}{2}$", fb)
+        self.assertIn("$x=\\pi n, n \\in \\mathbb{Z}$", fb)

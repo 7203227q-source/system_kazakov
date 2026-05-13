@@ -3980,6 +3980,8 @@ def normalize_tex_in_feedback(text: str) -> str:
         return text
 
     def fix_body(body: str) -> str:
+        body = re.sub(r"(?<!\\)\bfracsqrt(\d+)(\d+)\b", r"\\frac{\\sqrt{\1}}{\2}", body)
+        body = re.sub(r"(?<!\\)\bpi([nkm])\b", r"\\pi \1", body)
         body = re.sub(r"(?<!\\)\bfrac(\d+)pi(\d+)\b", r"\\frac{\1\\pi}{\2}", body)
         body = re.sub(r"(?<!\\)\bfracpi(\d+)\b", r"\\frac{\\pi}{\1}", body)
         body = re.sub(r"(?<!\\)\bfrac(\d+)\b", r"\\frac{\1}", body)
