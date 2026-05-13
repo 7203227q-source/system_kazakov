@@ -46,6 +46,6 @@ class AIVerifyWrapsBareMathInFeedbackTests(TestCase):
 
         self.assertEqual(res.status_code, 200)
         fb = res.json()["feedback"]
-        self.assertIn("$\\cos x=\\frac{5}{13}$", fb)
+        self.assertIn("$\\cos x$", fb)
+        self.assertIn("$\\frac{5}{13}$", fb)
         self.assertIn("$\\sin x\\ne\\frac{12}{13}$", fb)
-

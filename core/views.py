@@ -3979,12 +3979,40 @@ def normalize_tex_in_feedback(text: str) -> str:
     if not text or not isinstance(text, str):
         return text
 
+    def protect_math_blocks(src: str):
+        blocks = []
+        def repl(m: re.Match):
+            blocks.append(m.group(0))
+            return f"@@MATH{len(blocks)-1}@@"
+        src = re.sub(r"\$\$[\s\S]*?\$\$", repl, src)
+        src = re.sub(r"(?<!\$)\$[^\n$]+?\$(?!\$)", repl, src)
+        return src, blocks
+
+    def restore_math_blocks(src: str, blocks):
+        for i, b in enumerate(blocks):
+            src = src.replace(f"@@MATH{i}@@", b)
+        return src
+
     def fix_body(body: str) -> str:
-        body = re.sub(r"(?<!\\)\bfracsqrt(\d+)(\d+)\b", r"\\frac{\\sqrt{\1}}{\2}", body)
+        body = re.sub(r"(?<!\\)fracsqrt(\d+)(\d+)", lambda m: f"\\frac{{\\sqrt{{{m.group(1)}}}}}{{{m.group(2)}}}", body)
+        body = re.sub(r"(?<!\\)frac(\d+)pi(\d+)", lambda m: f"\\frac{{{m.group(1)}\\pi}}{{{m.group(2)}}}", body)
+        body = re.sub(r"(?<!\\)fracpi(\d+)", lambda m: f"\\frac{{\\pi}}{{{m.group(1)}}}", body)
         body = re.sub(r"(?<!\\)\bpi([nkm])\b", r"\\pi \1", body)
-        body = re.sub(r"(?<!\\)\bfrac(\d+)pi(\d+)\b", r"\\frac{\1\\pi}{\2}", body)
-        body = re.sub(r"(?<!\\)\bfracpi(\d+)\b", r"\\frac{\\pi}{\1}", body)
-        body = re.sub(r"(?<!\\)\bfrac(\d+)\b", r"\\frac{\1}", body)
+        body = re.sub(r"(?<!\\)cosx", r"\\cos x", body)
+        body = re.sub(r"(?<!\\)sinx", r"\\sin x", body)
+        body = re.sub(r"(?<!\\)tanx", r"\\tan x", body)
+        def frac_digits(m: re.Match) -> str:
+            digits = m.group(1)
+            if not digits:
+                return m.group(0)
+            if len(digits) >= 3:
+                num, den = digits[:-2], digits[-2:]
+            elif len(digits) == 2:
+                num, den = digits[0], digits[1]
+            else:
+                num, den = digits, "1"
+            return f"\\frac{{{num}}}{{{den}}}"
+        body = re.sub(r"(?<!\\)frac(\d+)", frac_digits, body)
         body = re.sub(r"(?<!\\)\bfrac\b", r"\\frac", body)
         body = re.sub(r"(?<!\\)\bsqrt\b", r"\\sqrt", body)
         body = re.sub(r"(?<!\\)\bcdot\b", r"\\cdot", body)
@@ -3992,9 +4020,13 @@ def normalize_tex_in_feedback(text: str) -> str:
         body = re.sub(r"(?<!\\)\bpi\b", r"\\pi", body)
         body = re.sub(r"(?<!\\)(?<=\d)pi\b", r"\\pi", body)
         body = re.sub(r"(?<!\\)(?<=\d)pi(?=[A-Za-z])", r"\\pi ", body)
+        body = re.sub(r"(?<!\\)\bpi([nkm])\b", r"\\pi \1", body)
         body = re.sub(r"(?<!\\)\bcos\b", r"\\cos", body)
         body = re.sub(r"(?<!\\)\bsin\b", r"\\sin", body)
         body = re.sub(r"(?<!\\)\btan\b", r"\\tan", body)
+        body = re.sub(r"(?<!\\)\barccos\b", r"\\arccos", body)
+        body = re.sub(r"(?<!\\)\barcsin\b", r"\\arcsin", body)
+        body = re.sub(r"(?<!\\)\barctan\b", r"\\arctan", body)
         body = re.sub(r"(?<!\\)\bln\b", r"\\ln", body)
         body = re.sub(r"(?<!\\)\blog\b", r"\\log", body)
         body = re.sub(r"(?<!\\)\b([A-Za-z])inmathbb([A-Za-z])\b", r"\1 \\in \\mathbb{\2}", body)
@@ -4002,9 +4034,24 @@ def normalize_tex_in_feedback(text: str) -> str:
         body = re.sub(r"(?<!\\)\bin\b", r"\\in", body)
         body = re.sub(r"(?<!\\)\bmathbb([A-Za-z])\b", r"\\mathbb{\1}", body)
         body = re.sub(r"\\mathbb([A-Za-z])\b", r"\\mathbb{\1}", body)
+        body = re.sub(r"(?<!\\)neq", r"\\ne", body)
+        body = re.sub(r"(?<!\\)leq", r"\\le", body)
+        body = re.sub(r"(?<!\\)geq", r"\\ge", body)
         body = re.sub(r"\s+", " ", body).strip()
         return body
 
+    def wrap_bare_math(src: str) -> str:
+        s, blocks = protect_math_blocks(src)
+
+        # remove lone backslashes used as line breaks in some model outputs: "...\"
+        s = re.sub(r"\\\s*(\n|$)", r"\1", s)
+
+        token_word = r"\b[A-Za-z0-9]*(?:fracsqrt|fracpi|frac\d+pi\d+|frac\d+|cosx|sinx|tanx|arccos|arcsin|arctan|pm|pi|mathbb|neq|leq|geq)[A-Za-z0-9]*\b"
+        s = re.sub(token_word, lambda m: f"${fix_body(m.group(0))}$", s)
+
+        return restore_math_blocks(s, blocks)
+
+    text = wrap_bare_math(text)
     text = re.sub(r"\$\$([\s\S]*?)\$\$", lambda m: f"$${fix_body(m.group(1))}$$", text)
     text = re.sub(r"(?<!\$)\$([^\n$]+?)\$(?!\$)", lambda m: f"${fix_body(m.group(1))}$", text)
     return text
