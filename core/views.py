@@ -4081,19 +4081,14 @@ def api_verify_with_ai(request, submission_id):
 
                 resolved = src
                 if src.startswith("/"):
-                    if not (src.startswith("/media/") or src.startswith("/proxy-image/")):
+                    # Для ИИ отправляем только локальные картинки (/media/).
+                    # /proxy-image и внешние URL могут отдавать HTML/ошибку, из-за чего провайдеры (например Gemini) падают.
+                    if not src.startswith("/media/"):
                         continue
                     resolved = request.build_absolute_uri(src)
                 else:
-                    try:
-                        parsed = urlparse(src)
-                    except Exception:
-                        continue
-                    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-                        continue
-                    host = parsed.netloc.lower()
-                    if not host.endswith(allowed_hosts_suffix):
-                        continue
+                    # Внешние картинки не прикладываем, чтобы избежать ошибок "URL did not return an image"
+                    continue
 
                 if resolved in seen:
                     continue
