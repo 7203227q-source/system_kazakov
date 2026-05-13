@@ -48,5 +48,4 @@ class AIVerifyNormalizesTexInFeedbackTests(TestCase):
         fb = payload["feedback"]
         self.assertIn("$t=\\frac{1}{\\cos x}$", fb)
         self.assertIn("$x=\\pm \\frac{\\pi}{3}+2\\pi n$", fb)
-        self.assertIn("$x in \\mathbb{Z}$", fb)
-
+        self.assertIn("$x \\in \\mathbb{Z}$", fb)

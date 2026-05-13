@@ -3975,6 +3975,32 @@ from django.conf import settings
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
+def normalize_tex_in_feedback(text: str) -> str:
+    if not text or not isinstance(text, str):
+        return text
+
+    def fix_body(body: str) -> str:
+        body = re.sub(r"(?<!\\)\bfrac\b", r"\\frac", body)
+        body = re.sub(r"(?<!\\)\bsqrt\b", r"\\sqrt", body)
+        body = re.sub(r"(?<!\\)\bcdot\b", r"\\cdot", body)
+        body = re.sub(r"(?<!\\)\bpm\b", r"\\pm", body)
+        body = re.sub(r"(?<!\\)\bpi\b", r"\\pi", body)
+        body = re.sub(r"(?<!\\)(?<=\d)pi\b", r"\\pi", body)
+        body = re.sub(r"(?<!\\)\bcos\b", r"\\cos", body)
+        body = re.sub(r"(?<!\\)\bsin\b", r"\\sin", body)
+        body = re.sub(r"(?<!\\)\btan\b", r"\\tan", body)
+        body = re.sub(r"(?<!\\)\bln\b", r"\\ln", body)
+        body = re.sub(r"(?<!\\)\blog\b", r"\\log", body)
+        body = re.sub(r"(?<!\\)\bin\b", r"\\in", body)
+        body = re.sub(r"(?<!\\)\bmathbb([A-Za-z])\b", r"\\mathbb{\1}", body)
+        body = re.sub(r"\\mathbb([A-Za-z])\b", r"\\mathbb{\1}", body)
+        body = re.sub(r"\s+", " ", body).strip()
+        return body
+
+    text = re.sub(r"\$\$([\s\S]*?)\$\$", lambda m: f"$${fix_body(m.group(1))}$$", text)
+    text = re.sub(r"(?<!\$)\$([^\n$]+?)\$(?!\$)", lambda m: f"${fix_body(m.group(1))}$", text)
+    return text
+
 def is_extended_answer_task(task) -> bool:
     """
     Определяет, относится ли задание к развёрнутой части (нужно фото/ИИ).
@@ -4197,7 +4223,7 @@ def api_verify_with_ai(request, submission_id):
 
                 primary_score = int(parsed.get("primary_score") or 0)
                 is_correct = bool(parsed.get("is_correct"))
-                feedback = str(parsed.get("feedback") or "")
+                feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
                 results.append({'model': mcode, 'primary_score': primary_score, 'is_correct': is_correct, 'feedback': feedback})
 
             return JsonResponse({'status': 'ok', 'mode': 'compare', 'max_points': max_points, 'results': results})
@@ -4258,7 +4284,7 @@ def api_verify_with_ai(request, submission_id):
 
         primary_score = int(parsed.get("primary_score") or 0)
         is_correct = bool(parsed.get("is_correct"))
-        feedback = str(parsed.get("feedback") or "")
+        feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
     except Exception as e:
         return JsonResponse({'error': 'ai_failed', 'upstream_message': str(e)}, status=400)
             
