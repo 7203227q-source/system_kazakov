@@ -1936,6 +1936,28 @@ def tutor_dashboard(request):
         ensure_parent_invite_code(selected_student)
         recent_payment = Payment.objects.filter(student=selected_student, tutor=request.user).order_by('-created_at').first()
 
+        profiles = list(selected_student.subject_profiles.all())
+        for p in profiles:
+            p.exam_formats_for_subject = ExamFormat.objects.filter(subject_id=p.subject_id).order_by('-is_active', '-year', 'name')
+            p.latest_snapshot = DailySnapshot.objects.filter(student=selected_student, subject=p.subject).order_by('-date').first()
+        all_subjects = list(Subject.objects.all().order_by("name"))
+        profile_subject_ids = {int(p.subject_id) for p in profiles}
+        available_subjects = [s for s in all_subjects if int(s.id) not in profile_subject_ids]
+
+        active_profile = None
+        if profiles:
+            chart_subject_id = int(chart_subject_id_raw) if chart_subject_id_raw.isdigit() else profiles[0].subject_id
+            chart_range = int(chart_range_raw) if chart_range_raw.isdigit() else 30
+            if chart_range not in {30, 90, 365}:
+                chart_range = 30
+            active_profile = next((p for p in profiles if p.subject_id == chart_subject_id), None) or profiles[0]
+            chart_subject_id = active_profile.subject_id
+        else:
+            chart_subject_id = None
+            chart_range = int(chart_range_raw) if chart_range_raw.isdigit() else 30
+            if chart_range not in {30, 90, 365}:
+                chart_range = 30
+
         scale_2024 = {
             0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58,
             13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84,
@@ -1945,9 +1967,12 @@ def tutor_dashboard(request):
         assignments = (
             Assignment.objects
             .filter(tutor=request.user, student=selected_student, is_draft=False)
+            .select_related('exam_format', 'exam_format__subject')
             .prefetch_related('tasks', 'tasks__task_type')
             .order_by('-created_at')
         )
+        if chart_subject_id:
+            assignments = assignments.filter(exam_format__subject_id=chart_subject_id)
 
         for a in assignments:
             auto_expire_assignment_if_needed(a)
@@ -1987,21 +2012,7 @@ def tutor_dashboard(request):
             else:
                 active_assignments.append(a)
 
-        profiles = list(selected_student.subject_profiles.all())
-        for p in profiles:
-            p.exam_formats_for_subject = ExamFormat.objects.filter(subject_id=p.subject_id).order_by('-is_active', '-year', 'name')
-            p.latest_snapshot = DailySnapshot.objects.filter(student=selected_student, subject=p.subject).order_by('-date').first()
-        all_subjects = list(Subject.objects.all().order_by("name"))
-        profile_subject_ids = {int(p.subject_id) for p in profiles}
-        available_subjects = [s for s in all_subjects if int(s.id) not in profile_subject_ids]
-        if profiles:
-            chart_subject_id = int(chart_subject_id_raw) if chart_subject_id_raw.isdigit() else profiles[0].subject_id
-            chart_range = int(chart_range_raw) if chart_range_raw.isdigit() else 30
-            if chart_range not in {30, 90, 365}:
-                chart_range = 30
-
-            active_profile = next((p for p in profiles if p.subject_id == chart_subject_id), None) or profiles[0]
-            chart_subject_id = active_profile.subject_id
+        if active_profile:
 
             from datetime import timedelta
             from django.db.models.functions import TruncMonth
@@ -2106,7 +2117,11 @@ def tutor_dashboard(request):
             for p in profiles:
                 p.exam_display = None
 
-        submissions_base = Submission.objects.filter(student=selected_student)
+        submissions_subject = Submission.objects.filter(student=selected_student)
+        if chart_subject_id:
+            submissions_subject = submissions_subject.filter(task__topic__subject_id=chart_subject_id)
+
+        submissions_base = submissions_subject
         if active_exam_format:
             submissions_base = submissions_base.filter(task__task_type__exam_format=active_exam_format)
         submissions_base = submissions_base.exclude(task__task_type__number__isnull=True)
@@ -2141,7 +2156,7 @@ def tutor_dashboard(request):
             a["wc"] = float(a["wc"]) + (float(weight) * (1.0 if is_corr else 0.0))
             a["total"] = int(a["total"]) + 1
             a["correct"] = int(a["correct"]) + (1 if is_corr else 0)
-        totals = Submission.objects.filter(student=selected_student).aggregate(
+        totals = submissions_subject.aggregate(
             total=models.Count('id'),
             correct=models.Count('id', filter=Q(is_correct=True)),
         )

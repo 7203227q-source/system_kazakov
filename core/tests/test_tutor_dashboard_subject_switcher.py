@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 
-from core.models import Assignment, ExamFormat, Subject, Submission, Task, TaskType, TaskVariant, Topic, User
+from core.models import Assignment, ExamFormat, StudentSubjectProfile, Subject, Submission, Task, TaskType, TaskVariant, Topic, User
 
 
 class TutorDashboardSubjectSwitcherTests(TestCase):
@@ -14,6 +14,8 @@ class TutorDashboardSubjectSwitcherTests(TestCase):
         self.subj_phys = Subject.objects.create(name="Физика")
         self.ef_math = ExamFormat.objects.create(subject=self.subj_math, name="ЕГЭ", year=2026, is_active=True)
         self.ef_phys = ExamFormat.objects.create(subject=self.subj_phys, name="ЕГЭ", year=2026, is_active=True)
+        StudentSubjectProfile.objects.create(student=self.student, subject=self.subj_math, exam_format=self.ef_math)
+        StudentSubjectProfile.objects.create(student=self.student, subject=self.subj_phys, exam_format=self.ef_phys)
         self.tt_math = TaskType.objects.create(exam_format=self.ef_math, number=1, name="M1", max_points=1, is_extended_answer=False)
         self.tt_phys = TaskType.objects.create(exam_format=self.ef_phys, number=1, name="P1", max_points=1, is_extended_answer=False)
         self.topic_math = Topic.objects.create(subject=self.subj_math, name="TM")
@@ -47,4 +49,3 @@ class TutorDashboardSubjectSwitcherTests(TestCase):
         self.assertContains(page_phys, "Попыток:")
         self.assertContains(page_phys, ">1<")
         self.assertContains(page_phys, "0")
-
