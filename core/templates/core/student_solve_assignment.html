@@ -388,6 +388,20 @@
         if (count && typeof commentsCount === 'number') count.textContent = String(commentsCount);
     }
 
+    function escapeHtml(s) {
+        return String(s || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;');
+    }
+
+    function typesetMath(el) {
+        if (window.MathJax && MathJax.typesetPromise) {
+            try { MathJax.typesetClear && MathJax.typesetClear([el]); } catch (e) {}
+            return MathJax.typesetPromise([el]);
+        }
+    }
+
     async function postStudentComment(assignmentId, taskId) {
         const input = document.getElementById(`comment_text_${taskId}`);
         const text = (input?.value || '').trim();
@@ -462,7 +476,7 @@
             }
 
             // Заменяем блок с правильным ответом на развернутый фидбек от ИИ
-            correctText.parentElement.innerHTML = `<strong>Вердикт ИИ:</strong><br><p class="mt-2 text-gray-700 bg-white p-3 rounded border border-gray-200">${data.feedback}</p>`;
+            correctText.parentElement.innerHTML = `<strong>Вердикт ИИ:</strong><br><p class="mt-2 text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line">${escapeHtml(data.feedback)}</p>`;
             
             if (data.solution_html) {
                 solutionDiv.innerHTML = data.solution_html;
@@ -472,6 +486,7 @@
             } else {
                 solutionDiv.innerHTML = '<p class="text-gray-500 italic">Решение для этой задачи пока не добавлено в базу.</p>';
             }
+            typesetMath(resultDiv);
             unlockTaskChat(taskId, null);
 
         } catch (e) {
@@ -498,7 +513,7 @@
         const items = (results || []).map((r, idx) => {
             const score = typeof r.primary_score === 'number' ? r.primary_score : Number(r.primary_score || 0);
             const header = `${idx + 1}. ${r.model} — ${score}/${maxPoints}`;
-            const body = (r.feedback || '').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+            const body = escapeHtml(r.feedback || '');
             return `
                 <div class="border border-gray-200 rounded-lg overflow-hidden">
                     <button type="button" class="w-full text-left px-4 py-3 bg-gray-50 font-bold text-gray-800 flex items-center justify-between" onclick="this.nextElementSibling.classList.toggle('hidden')">
@@ -518,6 +533,7 @@
         if (solutionDiv) {
             solutionDiv.innerHTML = '<p class="text-gray-500 italic">Подсказка: сравнение не меняет итоговую оценку. Для записи результата используйте обычную проверку.</p>';
         }
+        typesetMath(resultDiv);
     }
 
     async function verifyWithAICompare(submissionId, taskId) {
