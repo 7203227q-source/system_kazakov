@@ -2937,7 +2937,7 @@ def tutor_regenerate_task(request, assignment_id, task_id):
             else:
                 messages.error(request, "Больше нет доступных задач этого типа.")
         
-        return redirect('tutor_preview_assignment', assignment_id=assignment.id)
+        return redirect(f"{reverse('tutor_preview_assignment', args=[assignment.id])}?focus_task_id={new_task.id}")
     return redirect('tutor_dashboard')
 
 @login_required
