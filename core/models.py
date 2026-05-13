@@ -321,6 +321,7 @@ class Submission(models.Model):
 
     recognized_text = models.TextField(blank=True, null=True, verbose_name="Распознанный текст (ИИ)")
     ai_feedback = models.TextField(blank=True, null=True, verbose_name="Вердикт ИИ")
+    ai_last_verify_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя попытка ИИ-проверки")
     
     tutor_comment = models.TextField(blank=True, null=True, verbose_name="Комментарий репетитора")
 

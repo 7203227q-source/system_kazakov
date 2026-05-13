@@ -1445,6 +1445,17 @@ def student_solve_assignment(request, assignment_id):
                 task.saved_submission.ai_feedback_display = normalize_tex_in_feedback(task.saved_submission.ai_feedback)
             except Exception:
                 task.saved_submission.ai_feedback_display = task.saved_submission.ai_feedback
+        if task.saved_submission and getattr(task.saved_submission, "ai_last_verify_at", None):
+            try:
+                dt = task.saved_submission.ai_last_verify_at
+                if dt:
+                    from django.utils import timezone
+                    now = timezone.now()
+                    delta = (now - dt).total_seconds()
+                    remain = int(max(0, 120 - int(delta)))
+                    task.saved_submission.ai_retry_after_seconds = remain
+            except Exception:
+                pass
         
         # Определяем, нужен ли черновик / фото
         max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
@@ -4114,6 +4125,26 @@ def api_verify_with_ai(request, submission_id):
     if not submission.image_url:
         return JsonResponse({'error': 'Image not found'}, status=400)
 
+    # Ограничение повторных запросов: не чаще 1 раза в 2 минуты (чтобы не спамили и не жгли баланс)
+    from django.utils import timezone
+    now = timezone.now()
+    last = getattr(submission, "ai_last_verify_at", None)
+    cooldown_seconds = 120
+    if last:
+        try:
+            delta = (now - last).total_seconds()
+        except Exception:
+            delta = cooldown_seconds + 1
+        if delta < cooldown_seconds:
+            retry_after = int(max(1, cooldown_seconds - int(delta)))
+            return JsonResponse({'error': 'ai_retry_later', 'retry_after': retry_after}, status=429)
+    # Ставим отметку сразу (даже если OpenRouter упадёт), чтобы на "двойной клик" тоже сработал кулдаун
+    try:
+        submission.ai_last_verify_at = now
+        submission.save(update_fields=["ai_last_verify_at"])
+    except Exception:
+        pass
+
     task = submission.task
     max_points = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
     if not is_extended_answer_task(task):
@@ -4301,7 +4332,7 @@ def api_verify_with_ai(request, submission_id):
                 feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
                 results.append({'model': mcode, 'primary_score': primary_score, 'is_correct': is_correct, 'feedback': feedback})
 
-            return JsonResponse({'status': 'ok', 'mode': 'compare', 'max_points': max_points, 'results': results})
+            return JsonResponse({'status': 'ok', 'mode': 'compare', 'max_points': max_points, 'results': results, 'cooldown_seconds': cooldown_seconds})
 
         feedback = ""
         is_correct = False
@@ -4407,7 +4438,8 @@ def api_verify_with_ai(request, submission_id):
         'is_correct': is_correct,
         'xp_gained': xp_gained,
         'solution_html': solution_html,
-        'model': model
+        'model': model,
+        'cooldown_seconds': cooldown_seconds,
     })
 
 from django.contrib.auth import logout
