@@ -1991,7 +1991,16 @@ def tutor_dashboard(request):
         student_total_submissions = int(totals.get('total') or 0)
         correct_total = int(totals.get('correct') or 0)
         student_correct_rate = (correct_total / student_total_submissions * 100.0) if student_total_submissions else None
-        numbers = sorted(task_type_name_map.keys()) if task_type_name_map else list(range(1, 20))
+        numbers = []
+        active_exam_format_label = None
+        if active_exam_format:
+            active_exam_format_label = f"{active_exam_format.name} {active_exam_format.year}"
+            numbers = list(
+                TaskType.objects.filter(exam_format=active_exam_format)
+                .values_list("number", flat=True)
+                .order_by("number")
+            )
+            numbers = [int(n) for n in numbers if n is not None]
         for n in numbers:
             a = agg.get(int(n))
             if not a or float(a.get("wt") or 0.0) <= 0:
@@ -2024,6 +2033,7 @@ def tutor_dashboard(request):
         'chart_range': chart_range or 30,
         'chart_subject_id': chart_subject_id,
         'task_type_rates': task_type_rates,
+        'active_exam_format_label': active_exam_format_label,
         'student_total_submissions': student_total_submissions,
         'student_correct_rate': student_correct_rate,
         'recent_rewards': recent_rewards,

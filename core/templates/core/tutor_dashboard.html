@@ -308,7 +308,12 @@
                     <div class="mt-6">
                         <div class="flex items-center justify-between mb-3">
                             <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Решаемость по номерам</div>
-                            <div class="text-xs text-gray-400">0% → 100%</div>
+                            <div class="flex items-center gap-3">
+                                {% if active_exam_format_label %}
+                                    <div class="text-xs text-gray-500">Формат: {{ active_exam_format_label }}</div>
+                                {% endif %}
+                                <div class="text-xs text-gray-400">0% → 100%</div>
+                            </div>
                         </div>
                         <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
                             {% for item in task_type_rates %}
