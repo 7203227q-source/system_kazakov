@@ -96,6 +96,11 @@ def admin_system_status(request):
                 cfg.image_generate_model = get_fk("image_generate_model")
                 cfg.task_regen_text_model = get_fk("task_regen_text_model")
                 cfg.task_regen_image_model = get_fk("task_regen_image_model")
+                cfg.photo_compare_model_1 = get_fk("photo_compare_model_1")
+                cfg.photo_compare_model_2 = get_fk("photo_compare_model_2")
+                cfg.photo_compare_model_3 = get_fk("photo_compare_model_3")
+                cfg.photo_compare_model_4 = get_fk("photo_compare_model_4")
+                cfg.photo_compare_model_5 = get_fk("photo_compare_model_5")
                 cfg.save()
 
             messages.success(request, "Настройки моделей по предметам сохранены.")

@@ -197,6 +197,7 @@
                                     <tr class="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500">
                                         <th class="px-4 py-3 font-bold">Предмет</th>
                                         <th class="px-4 py-3 font-bold">Анализ фото</th>
+                                        <th class="px-4 py-3 font-bold">Сравнение (1–5)</th>
                                         <th class="px-4 py-3 font-bold">Проверка решения</th>
                                         <th class="px-4 py-3 font-bold">Генерация изображения</th>
                                         <th class="px-4 py-3 font-bold">Регенерация (текст)</th>
@@ -221,6 +222,75 @@
                                                     {% endfor %}
                                                 </optgroup>
                                             </select>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex flex-col gap-2">
+                                                <select name="subject_{{ row.subject.id }}_photo_compare_model_1" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                    <option value="">— (1)</option>
+                                                    <optgroup label="⭐ Избранные">
+                                                        {% for m in featured_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_1_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    <optgroup label="Все остальные">
+                                                        {% for m in other_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_1_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                </select>
+                                                <select name="subject_{{ row.subject.id }}_photo_compare_model_2" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                    <option value="">— (2)</option>
+                                                    <optgroup label="⭐ Избранные">
+                                                        {% for m in featured_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_2_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    <optgroup label="Все остальные">
+                                                        {% for m in other_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_2_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                </select>
+                                                <select name="subject_{{ row.subject.id }}_photo_compare_model_3" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                    <option value="">— (3)</option>
+                                                    <optgroup label="⭐ Избранные">
+                                                        {% for m in featured_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_3_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    <optgroup label="Все остальные">
+                                                        {% for m in other_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_3_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                </select>
+                                                <select name="subject_{{ row.subject.id }}_photo_compare_model_4" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                    <option value="">— (4)</option>
+                                                    <optgroup label="⭐ Избранные">
+                                                        {% for m in featured_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_4_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    <optgroup label="Все остальные">
+                                                        {% for m in other_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_4_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                </select>
+                                                <select name="subject_{{ row.subject.id }}_photo_compare_model_5" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                                                    <option value="">— (5)</option>
+                                                    <optgroup label="⭐ Избранные">
+                                                        {% for m in featured_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_5_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    <optgroup label="Все остальные">
+                                                        {% for m in other_models %}
+                                                        <option value="{{ m.id }}" {% if row.config and row.config.photo_compare_model_5_id == m.id %}selected{% endif %}>{{ m.label|default:m.code }}{% if not m.is_active %} (inactive){% endif %}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                </select>
+                                            </div>
                                         </td>
                                         <td class="px-4 py-3">
                                             <select name="subject_{{ row.subject.id }}_solution_check_model" class="w-56 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
