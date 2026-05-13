@@ -97,16 +97,26 @@
                                     <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
                                     <img src="{{ task.saved_submission.image_url.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
                                     
-                                    {% if task.exam_points_effective > 1 and not task.saved_submission.is_correct and task.saved_submission.is_correct != False %}
                                     <div class="flex flex-col sm:flex-row gap-2 justify-center">
-                                        <button type="button" onclick="verifyWithAI({{ task.saved_submission.id }}, {{ task.id }})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_{{ task.id }}">
-                                            <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
+                                         <button type="button"
+                                                 onclick="verifyWithAI({{ task.saved_submission.id }}, {{ task.id }})"
+                                                 class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto"
+                                                 id="btn_verify_{{ task.id }}"
+                                                 data-retry-after="{{ task.saved_submission.ai_retry_after_seconds|default:0 }}"
+                                                 data-base-label="Проверить ещё раз через ИИ">
+                                             <i class="fas fa-robot mr-2"></i>
+                                             {% if task.saved_submission.ai_feedback %}Проверить ещё раз через ИИ{% else %}Проверить решение через ИИ{% endif %}
                                         </button>
-                                        <button type="button" onclick="verifyWithAICompare({{ task.saved_submission.id }}, {{ task.id }})" class="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_compare_{{ task.id }}">
+                                         <button type="button"
+                                                 onclick="verifyWithAICompare({{ task.saved_submission.id }}, {{ task.id }})"
+                                                 class="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto"
+                                                 id="btn_verify_compare_{{ task.id }}"
+                                                 data-retry-after="{{ task.saved_submission.ai_retry_after_seconds|default:0 }}"
+                                                 data-base-label="Проверить 5 моделями">
                                             <i class="fas fa-layer-group mr-2"></i> Проверить 5 моделями
                                         </button>
                                     </div>
-                                    {% endif %}
+                                     <div class="mt-2 text-xs text-gray-500">Повторная проверка доступна раз в 2 минуты.</div>
                                     <div class="mt-3">
                                         <button type="button" onclick="revealSolution({{ task.saved_submission.id }}, {{ task.id }})" class="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg transition font-bold">
                                             <i class="fas fa-lightbulb mr-2 text-yellow-500"></i> Показать решение (без проверки)
@@ -208,10 +218,10 @@
                                                         <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
                                                         <img src="${data.image_url || (previewImg ? previewImg.src : '')}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
                                                         ${Number({{ task.exam_points_effective|default:0 }}) > 1 ? `<div class="flex flex-col sm:flex-row gap-2 justify-center">
-                                                            <button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}">
+                                                            <button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}" data-retry-after="0" data-base-label="Проверить ещё раз через ИИ">
                                                                 <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
                                                             </button>
-                                                            <button type="button" onclick="verifyWithAICompare(${submissionId}, ${taskId})" class="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_compare_${taskId}">
+                                                            <button type="button" onclick="verifyWithAICompare(${submissionId}, ${taskId})" class="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_compare_${taskId}" data-retry-after="0" data-base-label="Проверить 5 моделями">
                                                                 <i class="fas fa-layer-group mr-2"></i> Проверить 5 моделями
                                                             </button>
                                                         </div>` : ''}
@@ -459,9 +469,31 @@
         }
     }
 
+    function startVerifyCooldown(btn, seconds, baseLabel) {
+        if (!btn) return;
+        const total = Math.max(1, parseInt(seconds || 0, 10));
+        let remaining = total;
+        btn.disabled = true;
+        btn.dataset.retryAfter = String(total);
+        const tick = () => {
+            if (remaining <= 0) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-robot mr-2"></i> ${baseLabel}`;
+                btn.dataset.retryAfter = "0";
+                return;
+            }
+            btn.innerHTML = `<i class="fas fa-clock mr-2"></i> Повтор через ${remaining}с`;
+            remaining -= 1;
+            setTimeout(tick, 1000);
+        };
+        tick();
+    }
+
     async function verifyWithAI(submissionId, taskId) {
         const btn = document.getElementById(`btn_verify_${taskId}`);
-        if(btn) {
+        if (btn) {
+            const existingRetry = parseInt(btn.dataset.retryAfter || "0", 10);
+            if (existingRetry > 0) return;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Проверка ИИ...';
         }
@@ -482,6 +514,12 @@
                 data = {};
             }
             if (!response.ok) {
+                if (data && data.error === 'ai_retry_later') {
+                    const retryAfter = parseInt(data.retry_after || "120", 10);
+                    if (btn) startVerifyCooldown(btn, retryAfter, 'Проверить ещё раз через ИИ');
+                    alert(`Повторная проверка будет доступна через ${retryAfter} секунд.`);
+                    return;
+                }
                 const upstreamStatus = data && (data.upstream_status || response.status);
                 const upstreamMsgRaw = data && data.upstream_message;
                 const upstreamMsg = typeof upstreamMsgRaw === 'string'
@@ -500,7 +538,7 @@
                 alert(msg);
                 if(btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить решение через ИИ';
+                    btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить ещё раз через ИИ';
                 }
                 return;
             }
@@ -536,12 +574,14 @@
             typesetMath(resultDiv);
             unlockTaskChat(taskId, null);
 
+            const cooldownSeconds = parseInt(data.cooldown_seconds || "120", 10);
+            if (btn) startVerifyCooldown(btn, cooldownSeconds, 'Проверить ещё раз через ИИ');
         } catch (e) {
             console.error(e);
             alert('Ошибка при проверке ИИ');
             if(btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить решение через ИИ';
+                btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить ещё раз через ИИ';
             }
         }
     }
@@ -642,6 +682,8 @@
     async function verifyWithAICompare(submissionId, taskId) {
         const btn = document.getElementById(`btn_verify_compare_${taskId}`);
         if (btn) {
+            const existingRetry = parseInt(btn.dataset.retryAfter || "0", 10);
+            if (existingRetry > 0) return;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Сравнение...';
         }
@@ -656,6 +698,12 @@
             });
             const data = await response.json();
             if (!response.ok) {
+                if (data && data.error === 'ai_retry_later') {
+                    const retryAfter = parseInt(data.retry_after || "120", 10);
+                    if (btn) startVerifyCooldown(btn, retryAfter, (btn.dataset.baseLabel || 'Проверить 5 моделями'));
+                    alert(`Повторная проверка будет доступна через ${retryAfter} секунд.`);
+                    return;
+                }
                 const msg = data && data.error === 'compare_models_not_configured'
                     ? 'Модели сравнения не настроены: выберите 5 моделей в админке для этого предмета.'
                     : (data && data.error === 'ai_not_configured'
@@ -666,10 +714,11 @@
             }
 
             renderCompareResults(taskId, data.max_points || 0, data.results || []);
+            const cooldownSeconds = parseInt(data.cooldown_seconds || "120", 10);
+            if (btn) startVerifyCooldown(btn, cooldownSeconds, (btn.dataset.baseLabel || 'Проверить 5 моделями'));
         } catch (e) {
             console.error(e);
             alert('Ошибка при сравнении моделей');
-        } finally {
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-layer-group mr-2"></i> Проверить 5 моделями';
@@ -769,6 +818,18 @@
         try {
             document.querySelectorAll('.ai-feedback-block').forEach(el => {
                 if (typeof typesetMath === 'function') typesetMath(el);
+            });
+            document.querySelectorAll('button[id^="btn_verify_"][data-retry-after]').forEach(btn => {
+                const s = parseInt(btn.dataset.retryAfter || "0", 10);
+                if (s > 0 && typeof startVerifyCooldown === 'function') {
+                    startVerifyCooldown(btn, s, (btn.dataset.baseLabel || btn.textContent.trim() || 'Проверить ещё раз через ИИ'));
+                }
+            });
+            document.querySelectorAll('button[id^="btn_verify_compare_"][data-retry-after]').forEach(btn => {
+                const s = parseInt(btn.dataset.retryAfter || "0", 10);
+                if (s > 0 && typeof startVerifyCooldown === 'function') {
+                    startVerifyCooldown(btn, s, (btn.dataset.baseLabel || btn.textContent.trim() || 'Проверить 5 моделями'));
+                }
             });
         } catch (e) {}
     });
