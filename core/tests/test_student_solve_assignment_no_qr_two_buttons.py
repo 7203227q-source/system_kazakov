@@ -30,4 +30,4 @@ class StudentSolveAssignmentNoQRTwoButtonsTests(TestCase):
         self.assertIsNone(soup.select_one(f"#qr_block_{self.task.id}"))
         self.assertIsNotNone(soup.select_one(f"#camera_file_{self.task.id}"))
         self.assertIsNotNone(soup.select_one(f"#gallery_file_{self.task.id}"))
-
+        self.assertContains(res, "Советы для фото")
