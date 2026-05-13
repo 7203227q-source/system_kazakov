@@ -1576,6 +1576,39 @@ def tutor_update_student_exam_settings(request, student_id):
 
 @login_required
 @require_POST
+def tutor_add_student_subject(request, student_id):
+    if request.user.role != "tutor":
+        return redirect("login")
+
+    student = request.user.students.filter(id=student_id).first()
+    if student is None:
+        messages.error(request, "Ученик не найден в вашем списке.")
+        return redirect("tutor_dashboard")
+
+    subject_id_raw = (request.POST.get("subject_id") or "").strip()
+    if not subject_id_raw.isdigit():
+        return redirect(request.META.get("HTTP_REFERER", reverse("tutor_dashboard")))
+    subject_id = int(subject_id_raw)
+
+    default_exam_format = (
+        ExamFormat.objects.filter(subject_id=subject_id, is_active=True).order_by("-year", "name").first()
+        or ExamFormat.objects.filter(subject_id=subject_id).order_by("-year", "name").first()
+    )
+
+    profile, created = StudentSubjectProfile.objects.get_or_create(
+        student=student,
+        subject_id=subject_id,
+        defaults={"target_score": 80, "level": 1, "xp": 0, "exam_format": default_exam_format},
+    )
+    if (not created) and profile.exam_format_id is None and default_exam_format is not None:
+        profile.exam_format = default_exam_format
+        profile.save(update_fields=["exam_format"])
+
+    return redirect(f"{reverse('tutor_dashboard')}?student_id={student.id}")
+
+
+@login_required
+@require_POST
 def tutor_student_srs_remove(request, student_id, task_id):
     if request.user.role != 'tutor':
         return redirect('login')

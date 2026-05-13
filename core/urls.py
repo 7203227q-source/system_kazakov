@@ -37,6 +37,7 @@ urlpatterns = [
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/contacts/', views.tutor_update_student_contacts, name='tutor_update_student_contacts'),
     path('tutor/student/<int:student_id>/exam-settings/', views.tutor_update_student_exam_settings, name='tutor_update_student_exam_settings'),
+    path('tutor/student/<int:student_id>/add-subject/', views.tutor_add_student_subject, name='tutor_add_student_subject'),
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
     path('tutor/student/<int:student_id>/srs/remove/<int:task_id>/', views.tutor_student_srs_remove, name='tutor_student_srs_remove'),
     path('tutor/submission/<int:submission_id>/comment/', views.tutor_add_submission_comment, name='tutor_add_submission_comment'),
