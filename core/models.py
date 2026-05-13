@@ -261,6 +261,14 @@ class Assignment(models.Model):
     expired_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда просрочено")
     exam_format = models.ForeignKey(ExamFormat, on_delete=models.SET_NULL, null=True, blank=True, related_name="assignments")
 
+    KIND_CHOICES = [
+        ("homework", "Домашняя работа"),
+        ("test", "Тест"),
+        ("control_test", "Контрольный тест"),
+    ]
+    kind = models.CharField(max_length=32, choices=KIND_CHOICES, null=True, blank=True, verbose_name="Тип варианта")
+    student_seq = models.IntegerField(null=True, blank=True, verbose_name="Порядковый номер по ученику")
+
     def __str__(self):
         return f"{self.title} для {self.student.username}"
 
