@@ -3879,6 +3879,7 @@ def api_verify_with_ai(request, submission_id):
     max_points = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
     if int(max_points or 0) <= 1:
         return JsonResponse({'error': 'only_second_part'}, status=400)
+    mode = (request.GET.get("mode") or "").strip()
     if submission.assignment_id:
         unlocked = request.session.get('whiteboard_unlocked', {}) or {}
         unlocked[f"{int(submission.assignment_id)}:{int(task.id)}"] = True
@@ -3888,7 +3889,18 @@ def api_verify_with_ai(request, submission_id):
     model = ""
     try:
         from .models import SubjectAIConfig
-        cfg = SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id).select_related('photo_analysis_model').first()
+        cfg = (
+            SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id)
+            .select_related(
+                'photo_analysis_model',
+                'photo_compare_model_1',
+                'photo_compare_model_2',
+                'photo_compare_model_3',
+                'photo_compare_model_4',
+                'photo_compare_model_5',
+            )
+            .first()
+        )
         if cfg and cfg.photo_analysis_model:
             model = cfg.photo_analysis_model.code
     except Exception:
@@ -3897,10 +3909,6 @@ def api_verify_with_ai(request, submission_id):
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
     if not api_key or not model:
         return JsonResponse({'error': 'ai_not_configured'}, status=400)
-
-    feedback = ""
-    is_correct = False
-    primary_score = 0
 
     try:
         from .http_headers import require_ascii
@@ -3933,6 +3941,74 @@ def api_verify_with_ai(request, submission_id):
             "- Что исправить:\n"
             "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
         )
+
+        if mode == "compare":
+            compare_models = []
+            if cfg:
+                for m in [
+                    cfg.photo_compare_model_1,
+                    cfg.photo_compare_model_2,
+                    cfg.photo_compare_model_3,
+                    cfg.photo_compare_model_4,
+                    cfg.photo_compare_model_5,
+                ]:
+                    if m and m.code:
+                        compare_models.append(m.code)
+            if len(compare_models) != 5:
+                return JsonResponse({'error': 'compare_models_not_configured'}, status=400)
+
+            results = []
+            for mcode in compare_models:
+                res = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": referer,
+                        "X-Title": title,
+                    },
+                    json={
+                        "model": mcode,
+                        "response_format": {"type": "json_object"},
+                        "messages": [
+                            {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {"type": "image_url", "image_url": {"url": data_url}},
+                                ],
+                            },
+                        ],
+                    },
+                    timeout=90,
+                )
+
+                if res.status_code != 200:
+                    results.append({'model': mcode, 'primary_score': 0, 'is_correct': False, 'feedback': 'Ошибка запроса к модели'})
+                    continue
+
+                data = res.json()
+                content = data["choices"][0]["message"]["content"]
+                try:
+                    parsed = pyjson.loads(content)
+                except Exception:
+                    match = re.search(r"\{[\s\S]*\}", str(content))
+                    if not match:
+                        results.append({'model': mcode, 'primary_score': 0, 'is_correct': False, 'feedback': 'Не удалось распарсить ответ модели'})
+                        continue
+                    parsed = pyjson.loads(match.group(0))
+
+                primary_score = int(parsed.get("primary_score") or 0)
+                is_correct = bool(parsed.get("is_correct"))
+                feedback = str(parsed.get("feedback") or "")
+                results.append({'model': mcode, 'primary_score': primary_score, 'is_correct': is_correct, 'feedback': feedback})
+
+            return JsonResponse({'status': 'ok', 'mode': 'compare', 'max_points': max_points, 'results': results})
+
+        feedback = ""
+        is_correct = False
+        primary_score = 0
 
         res = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
