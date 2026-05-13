@@ -120,6 +120,7 @@ class TaskType(models.Model):
     name = models.CharField(max_length=200, verbose_name="Краткое описание типа")
     max_points = models.IntegerField(default=1, verbose_name="Максимальный балл")
     is_geometry = models.BooleanField(default=False, verbose_name="Геометрия (для ОГЭ)")
+    is_extended_answer = models.BooleanField(default=False, verbose_name="Развёрнутый ответ (требует фото)")
     
     class Meta:
         ordering = ['number']
