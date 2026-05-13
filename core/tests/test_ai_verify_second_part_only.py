@@ -27,3 +27,17 @@ class AIVerifySecondPartOnlyTests(TestCase):
         self.assertIsNone(self.sub.is_correct)
         self.assertIsNone(self.sub.ai_feedback)
 
+    def test_verify_requires_openrouter_config(self):
+        tt2 = TaskType.objects.create(exam_format=self.task.task_type.exam_format, number=20, name="Тип 20", max_points=2)
+        t2 = Task.objects.create(topic=self.task.topic, task_type=tt2, correct_answer="1", difficulty=10, exam_points=2)
+        sub2 = Submission.objects.create(student=self.student, task=t2, is_correct=None)
+        sub2.image_url = SimpleUploadedFile("b.jpg", b"fake", content_type="image/jpeg")
+        sub2.save()
+
+        self.client.login(username="s", password="pass")
+        res = self.client.post(reverse("api_verify_with_ai", args=[sub2.id]))
+        self.assertEqual(res.status_code, 400)
+        sub2.refresh_from_db()
+        self.assertIsNone(sub2.primary_score)
+        self.assertIsNone(sub2.is_correct)
+        self.assertIsNone(sub2.ai_feedback)
