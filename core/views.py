@@ -2997,11 +2997,17 @@ def tutor_preview_assignment(request, assignment_id):
         return redirect('login')
 
     assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
-    tasks_qs = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+    through = Assignment.tasks.through
+    from django.db.models import OuterRef, Subquery
+    link_sq = through.objects.filter(assignment_id=assignment.id, task_id=OuterRef('pk')).values('id')[:1]
+    tasks_qs = (
+        assignment.tasks.select_related('task_type')
+        .annotate(_link_id=Subquery(link_sq))
+        .order_by('task_type__number', '_link_id')
+    )
     
     # Расчет статистики по ученику
     success_rates = {}
-    from django.db.models import OuterRef, Subquery
     from .models import SpacedRepetition
     sq = SpacedRepetition.objects.filter(student=assignment.student, task_id=OuterRef('pk')).values('interval')[:1]
     tasks_qs = tasks_qs.annotate(student_interval=Subquery(sq))
@@ -3057,17 +3063,28 @@ def tutor_regenerate_task(request, assignment_id, task_id):
     if request.method == 'POST' and request.user.role == 'tutor':
         assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=True)
         old_task = get_object_or_404(Task, id=task_id)
+        new_task = None
         
-        if old_task in assignment.tasks.all():
-            new_task = Task.objects.filter(task_type=old_task.task_type).exclude(id__in=assignment.tasks.all()).order_by('?').first()
+        if assignment.tasks.filter(id=old_task.id).exists():
+            existing_ids = list(assignment.tasks.values_list('id', flat=True))
+            new_task = (
+                Task.objects.filter(task_type=old_task.task_type)
+                .exclude(id__in=existing_ids)
+                .order_by('?')
+                .first()
+            )
             if new_task:
-                assignment.tasks.remove(old_task)
-                assignment.tasks.add(new_task)
+                through = Assignment.tasks.through
+                updated = through.objects.filter(assignment_id=assignment.id, task_id=old_task.id).update(task_id=new_task.id)
+                if not updated:
+                    assignment.tasks.remove(old_task)
+                    assignment.tasks.add(new_task)
                 messages.success(request, "Задача успешно заменена на аналогичную.")
             else:
                 messages.error(request, "Больше нет доступных задач этого типа.")
         
-        return redirect(f"{reverse('tutor_preview_assignment', args=[assignment.id])}?focus_task_id={new_task.id}")
+        focus_id = new_task.id if new_task else old_task.id
+        return redirect(f"{reverse('tutor_preview_assignment', args=[assignment.id])}?focus_task_id={focus_id}")
     return redirect('tutor_dashboard')
 
 @login_required
