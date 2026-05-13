@@ -3980,17 +3980,23 @@ def normalize_tex_in_feedback(text: str) -> str:
         return text
 
     def fix_body(body: str) -> str:
+        body = re.sub(r"(?<!\\)\bfrac(\d+)pi(\d+)\b", r"\\frac{\1\\pi}{\2}", body)
+        body = re.sub(r"(?<!\\)\bfracpi(\d+)\b", r"\\frac{\\pi}{\1}", body)
+        body = re.sub(r"(?<!\\)\bfrac(\d+)\b", r"\\frac{\1}", body)
         body = re.sub(r"(?<!\\)\bfrac\b", r"\\frac", body)
         body = re.sub(r"(?<!\\)\bsqrt\b", r"\\sqrt", body)
         body = re.sub(r"(?<!\\)\bcdot\b", r"\\cdot", body)
         body = re.sub(r"(?<!\\)\bpm\b", r"\\pm", body)
         body = re.sub(r"(?<!\\)\bpi\b", r"\\pi", body)
         body = re.sub(r"(?<!\\)(?<=\d)pi\b", r"\\pi", body)
+        body = re.sub(r"(?<!\\)(?<=\d)pi(?=[A-Za-z])", r"\\pi ", body)
         body = re.sub(r"(?<!\\)\bcos\b", r"\\cos", body)
         body = re.sub(r"(?<!\\)\bsin\b", r"\\sin", body)
         body = re.sub(r"(?<!\\)\btan\b", r"\\tan", body)
         body = re.sub(r"(?<!\\)\bln\b", r"\\ln", body)
         body = re.sub(r"(?<!\\)\blog\b", r"\\log", body)
+        body = re.sub(r"(?<!\\)\b([A-Za-z])inmathbb([A-Za-z])\b", r"\1 \\in \\mathbb{\2}", body)
+        body = re.sub(r"(?<!\\)\b([A-Za-z])\s+in\s+mathbb([A-Za-z])\b", r"\1 \\in \\mathbb{\2}", body)
         body = re.sub(r"(?<!\\)\bin\b", r"\\in", body)
         body = re.sub(r"(?<!\\)\bmathbb([A-Za-z])\b", r"\\mathbb{\1}", body)
         body = re.sub(r"\\mathbb([A-Za-z])\b", r"\\mathbb{\1}", body)
