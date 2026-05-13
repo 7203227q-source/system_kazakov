@@ -120,7 +120,7 @@
                                             Оценено: {{ task.saved_submission.primary_score|default:0 }} баллов
                                         </div>
                                         <div class="font-bold text-gray-800 mb-2">Вердикт ИИ:</div>
-                                        <div class="text-sm text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line">{{ task.saved_submission.ai_feedback|escape }}</div>
+                                        <div class="text-sm text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line">{{ task.saved_submission.ai_feedback_display|default:task.saved_submission.ai_feedback|escape }}</div>
                                     </div>
                                     {% endif %}
                                 </div>

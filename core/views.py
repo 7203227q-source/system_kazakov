@@ -1440,6 +1440,11 @@ def student_solve_assignment(request, assignment_id):
     
     for task in tasks_list:
         task.saved_submission = saved_submissions.get(task.id)
+        if task.saved_submission and getattr(task.saved_submission, "ai_feedback", None):
+            try:
+                task.saved_submission.ai_feedback_display = normalize_tex_in_feedback(task.saved_submission.ai_feedback)
+            except Exception:
+                task.saved_submission.ai_feedback_display = task.saved_submission.ai_feedback
         
         # Определяем, нужен ли черновик / фото
         max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
