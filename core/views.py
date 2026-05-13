@@ -1310,7 +1310,10 @@ def student_solve_assignment(request, assignment_id):
 
             # Если завершаем, записываем лог в аналитику
             for t in tasks:
-                record_task_log(request.user, t, subs_by_task_id.get(t.id), assignment, time_spent_per_task)
+                try:
+                    record_task_log(request.user, t, subs_by_task_id.get(t.id), assignment, time_spent_per_task)
+                except Exception:
+                    pass
         # We need to know the total primary score possible for this assignment and the student's primary score
         total_primary = 0
         student_primary = 0
