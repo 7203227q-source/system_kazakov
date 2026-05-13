@@ -464,13 +464,28 @@
                 }
             });
 
-            const data = await response.json();
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (e) {
+                data = {};
+            }
             if (!response.ok) {
+                const upstreamStatus = data && (data.upstream_status || response.status);
+                const upstreamMsgRaw = data && data.upstream_message;
+                const upstreamMsg = typeof upstreamMsgRaw === 'string'
+                    ? upstreamMsgRaw
+                    : (upstreamMsgRaw ? JSON.stringify(upstreamMsgRaw) : '');
+
                 const msg = data && data.error === 'ai_not_configured'
                     ? 'ИИ не настроен: выберите модель для проверки фото в настройках предмета и задайте ключ OpenRouter.'
                     : (data && data.error === 'only_second_part'
                         ? 'ИИ-проверка доступна только для задач развернутой части.'
-                        : 'Ошибка при проверке ИИ');
+                        : (data && data.error === 'ai_failed'
+                            ? `OpenRouter вернул ошибку (HTTP ${upstreamStatus}). ${upstreamMsg || ''}`.trim()
+                            : (data && data.error === 'Image not found'
+                                ? 'Фото не найдено. Попробуйте загрузить фото ещё раз.'
+                                : 'Ошибка при проверке ИИ')));
                 alert(msg);
                 if(btn) {
                     btn.disabled = false;
