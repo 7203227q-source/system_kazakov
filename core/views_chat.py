@@ -7,6 +7,7 @@ from django.db.models import Q, Max, Count, Subquery, OuterRef
 from django.utils import timezone
 from .models import User, Message
 from .models import Assignment
+from .datetime_ui import format_ui_datetime
 
 def get_user_dialogs(user):
     """Возвращает список пользователей, с которыми у текущего пользователя может быть диалог, 
@@ -161,6 +162,7 @@ def api_get_messages(request, user_id):
             'attachment_url': attachment_url,
             'is_image': is_image,
             'created_at': msg.created_at.strftime('%H:%M'),
+            'created_at_label': format_ui_datetime(msg.created_at),
         })
         
     return JsonResponse({'messages': results})
