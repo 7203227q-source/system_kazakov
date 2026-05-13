@@ -3998,14 +3998,14 @@ def normalize_tex_in_feedback(text: str) -> str:
         blocks = []
         def repl(m: re.Match):
             blocks.append(m.group(0))
-            return f"@@MATH{len(blocks)-1}@@"
+            return f"§§MATH{len(blocks)-1}§§"
         src = re.sub(r"\$\$[\s\S]*?\$\$", repl, src)
         src = re.sub(r"(?<!\$)\$[^\n$]+?\$(?!\$)", repl, src)
         return src, blocks
 
     def restore_math_blocks(src: str, blocks):
         for i, b in enumerate(blocks):
-            src = src.replace(f"@@MATH{i}@@", b)
+            src = src.replace(f"§§MATH{i}§§", b)
         return src
 
     def fix_body(body: str) -> str:
