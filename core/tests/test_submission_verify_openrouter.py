@@ -58,6 +58,8 @@ class SubmissionVerifyOpenRouterTests(TestCase):
         prompt_text = next(p["text"] for p in user_msg["content"] if p["type"] == "text")
         self.assertIn("0 до", prompt_text)
         self.assertIn("сняты", prompt_text)
+        self.assertIn("$...$", prompt_text)
+        self.assertIn("$$...$$", prompt_text)
 
         self.assertEqual(res.status_code, 200)
         payload = res.json()
