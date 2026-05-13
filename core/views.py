@@ -1697,6 +1697,7 @@ def tutor_dashboard(request):
     task_type_rates = []
     student_total_submissions = 0
     student_correct_rate = None
+    active_exam_format_label = None
     
     # Calculate idle status for all students
     from django.utils import timezone
@@ -1992,7 +1993,6 @@ def tutor_dashboard(request):
         correct_total = int(totals.get('correct') or 0)
         student_correct_rate = (correct_total / student_total_submissions * 100.0) if student_total_submissions else None
         numbers = []
-        active_exam_format_label = None
         if active_exam_format:
             active_exam_format_label = f"{active_exam_format.name} {active_exam_format.year}"
             numbers = list(
