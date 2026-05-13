@@ -15,6 +15,10 @@ class AdminExamStructureEditorTests(TestCase):
         self.tt2 = TaskType.objects.create(exam_format=self.ef, number=2, name="Тип 2", max_points=1)
         self.tt20 = TaskType.objects.create(exam_format=self.ef, number=20, name="Тип 20", max_points=2)
 
+        self.ef_ege = ExamFormat.objects.create(subject=self.subj, name="ЕГЭ математика профиль", year=2026, is_active=False)
+        TaskType.objects.create(exam_format=self.ef_ege, number=12, name="Тип 12", max_points=1)
+        TaskType.objects.create(exam_format=self.ef_ege, number=13, name="Тип 13", max_points=2)
+
     def test_admin_can_open_page(self):
         self.client.login(username="a", password="pass")
         res = self.client.get(reverse("admin_exam_structure"))
@@ -23,6 +27,13 @@ class AdminExamStructureEditorTests(TestCase):
         self.assertContains(res, "Тестовая часть")
         self.assertContains(res, "Развёрнутая часть")
         self.assertContains(res, ">2<")
+
+    def test_ege_math_part_split_is_1_12_and_13_19(self):
+        self.client.login(username="a", password="pass")
+        res = self.client.get(reverse("admin_exam_structure"), {"exam_format": str(self.ef_ege.id)})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Тестовая часть", count=1)
+        self.assertContains(res, "Развёрнутая часть", count=1)
 
     def test_non_admin_forbidden(self):
         self.client.login(username="t", password="pass")

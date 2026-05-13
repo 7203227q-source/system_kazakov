@@ -3456,7 +3456,21 @@ def admin_exam_structure(request):
         messages.success(request, f"Сохранено изменений: {changed}")
         return redirect(f"{reverse('admin_exam_structure')}?exam_format={selected_exam_format.id}")
 
-    task_types = TaskType.objects.filter(exam_format=selected_exam_format).order_by("number") if selected_exam_format else TaskType.objects.none()
+    task_types = list(TaskType.objects.filter(exam_format=selected_exam_format).order_by("number")) if selected_exam_format else []
+    if selected_exam_format:
+        subject_name = getattr(getattr(selected_exam_format, "subject", None), "name", "") or ""
+        fmt_name = getattr(selected_exam_format, "name", "") or ""
+        split_after = None
+        if "Матем" in subject_name and "ОГЭ" in fmt_name:
+            split_after = 19
+        elif "Матем" in subject_name and "ЕГЭ" in fmt_name:
+            split_after = 12
+        if split_after is not None:
+            for tt in task_types:
+                if int(tt.number or 0) <= int(split_after):
+                    tt.part_label = "Тестовая часть"
+                else:
+                    tt.part_label = "Развёрнутая часть"
     return render(request, "core/admin_exam_structure.html", {
         "exam_formats": exam_formats,
         "selected_exam_format": selected_exam_format,
