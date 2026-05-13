@@ -13,7 +13,7 @@ class SubmissionVerifyOpenRouterTests(TestCase):
     def setUp(self):
         self.subject = Subject.objects.create(name="Математика")
         self.exam_format = ExamFormat.objects.create(subject=self.subject, name="ЕГЭ", year=2026, is_active=True)
-        self.task_type = TaskType.objects.create(exam_format=self.exam_format, number=1, name="Тип 1", max_points=1)
+        self.task_type = TaskType.objects.create(exam_format=self.exam_format, number=20, name="Тип 20", max_points=2)
         self.topic = Topic.objects.create(subject=self.subject, name="Задания из Открытого Банка")
         self.task = Task.objects.create(
             fipi_id="X1",
@@ -21,7 +21,7 @@ class SubmissionVerifyOpenRouterTests(TestCase):
             task_type=self.task_type,
             correct_answer="1",
             difficulty=10,
-            exam_points=1,
+            exam_points=2,
         )
         TaskVariant.objects.create(task=self.task, theme="classic", content="<p>Q</p>", solution="<p>S</p>")
 
@@ -58,4 +58,3 @@ class SubmissionVerifyOpenRouterTests(TestCase):
         self.assertEqual(payload["primary_score"], 1)
         self.assertTrue(payload["is_correct"])
         self.assertEqual(payload["model"], "google/gemini-2.0-flash")
-
