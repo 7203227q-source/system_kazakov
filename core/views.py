@@ -1053,7 +1053,7 @@ def student_assignment_summary(request, assignment_id):
         points_earned = 0
         if sub:
             max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
-            is_extended = bool(getattr(task, "task_type", None) and getattr(task.task_type, "is_extended_answer", False))
+            is_extended = is_extended_answer_task(task)
             if not is_extended:
                 points_earned = max_points_effective if sub.is_correct else 0
             else:
@@ -1237,7 +1237,7 @@ def student_solve_assignment(request, assignment_id):
         subs_by_task_id = {}
         for task in tasks:
             max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
-            is_extended = bool(getattr(task, "task_type", None) and getattr(task.task_type, "is_extended_answer", False))
+            is_extended = is_extended_answer_task(task)
             if is_extended:
                 sub, _created = Submission.objects.get_or_create(
                     student=request.user,
@@ -1302,7 +1302,7 @@ def student_solve_assignment(request, assignment_id):
         if action == 'finish':
             missing_part2 = []
             for t in tasks:
-                is_extended = bool(getattr(t, "task_type", None) and getattr(t.task_type, "is_extended_answer", False))
+                is_extended = is_extended_answer_task(t)
                 if is_extended:
                     sub = subs_by_task_id.get(t.id)
                     if not sub or not sub.image_url:
@@ -1325,7 +1325,7 @@ def student_solve_assignment(request, assignment_id):
             total_primary += max_points_effective
             sub = subs_by_task_id.get(t.id) or Submission.objects.filter(assignment=assignment, task=t, student=request.user).first()
             if sub:
-                is_extended = bool(getattr(t, "task_type", None) and getattr(t.task_type, "is_extended_answer", False))
+                is_extended = is_extended_answer_task(t)
                 if not is_extended:
                     student_primary += max_points_effective if sub.is_correct else 0
                 else:
@@ -1377,7 +1377,7 @@ def student_solve_assignment(request, assignment_id):
         # Определяем, нужен ли черновик / фото
         max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
         task.exam_points_effective = max_points_effective
-        is_part2 = bool(getattr(task, "task_type", None) and getattr(task.task_type, "is_extended_answer", False))
+        is_part2 = is_extended_answer_task(task)
         requires_draft = False
         
         if not is_part2 and request.user.draft_check_probability > 0:
@@ -3888,6 +3888,35 @@ from django.conf import settings
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
+def is_extended_answer_task(task) -> bool:
+    """
+    Определяет, относится ли задание к развёрнутой части (нужно фото/ИИ).
+    Основной источник — TaskType.is_extended_answer.
+    Fallback: для стандартных экзаменов вычисляем по предмету/формату/номеру, чтобы не зависеть от точного названия формата.
+    """
+    tt = getattr(task, "task_type", None)
+    if not tt:
+        return False
+    if getattr(tt, "is_extended_answer", False):
+        return True
+
+    ef = getattr(tt, "exam_format", None)
+    subject_name = (getattr(getattr(ef, "subject", None), "name", "") or "")
+    fmt_name = (getattr(ef, "name", "") or "")
+    try:
+        num = int(getattr(tt, "number", 0) or 0)
+    except Exception:
+        num = 0
+
+    # Стандартные разбиения частей (fallback)
+    if "Матем" in subject_name and "ОГЭ" in fmt_name:
+        return num > 19
+    if "Матем" in subject_name and "ЕГЭ" in fmt_name:
+        return num > 12
+    if "Физ" in subject_name and "ЕГЭ" in fmt_name:
+        return num > 20
+    return False
+
 def api_verify_with_ai(request, submission_id):
     if request.method != 'POST' or not request.user.is_authenticated:
         return JsonResponse({'error': 'Unauthorized'}, status=403)
@@ -3899,7 +3928,7 @@ def api_verify_with_ai(request, submission_id):
 
     task = submission.task
     max_points = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
-    if not getattr(task, "task_type", None) or not getattr(task.task_type, "is_extended_answer", False):
+    if not is_extended_answer_task(task):
         return JsonResponse({'error': 'only_second_part'}, status=400)
     mode = (request.GET.get("mode") or "").strip()
     if submission.assignment_id:
