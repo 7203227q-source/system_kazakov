@@ -1038,18 +1038,10 @@ def student_assignment_summary(request, assignment_id):
     total_score = 0
     max_score = 0
     
-    # Таблица перевода первичных баллов во вторичные (ЕГЭ Профиль 2024)
-    # Примерная: 0->0, 1->5, ..., 12->64, 13->66... 32->100
-    # Для простоты используем интерполяцию или словарь. Ограничимся базовым маппингом.
-    scale_2024 = {
-        0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58, 
-        13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84, 
-        24: 86, 25: 88, 26: 90, 27: 92, 28: 94, 29: 96, 30: 98, 31: 99, 32: 100
-    }
-    
-    # Считаем суммарный первичный балл ученика
     total_primary_earned = 0
     max_primary_possible = 0
+    geometry_primary_earned = 0
+    geometry_primary_possible = 0
     
     for task in tasks:
         sub = submissions.get(task.id)
@@ -1062,6 +1054,9 @@ def student_assignment_summary(request, assignment_id):
                 
         total_primary_earned += points_earned
         max_primary_possible += task.exam_points
+        if task.task_type and task.task_type.is_geometry:
+            geometry_primary_earned += points_earned
+            geometry_primary_possible += int(task.exam_points or 0)
         
         if points_earned > 0:
             correct_count += 1
@@ -1074,16 +1069,77 @@ def student_assignment_summary(request, assignment_id):
             'points_earned': points_earned
         })
         
-    # Перевод во вторичные (если максимальный балл <= 32, используем таблицу)
+    exam_display = None
+    try:
+        from core.exam_scoring import grade_from_primary
+
+        exam_format = assignment.exam_format
+        if not exam_format:
+            subject_id = None
+            t0 = assignment.tasks.select_related("topic__subject").order_by("id").first()
+            if t0:
+                subject_id = t0.topic.subject_id
+            if subject_id:
+                profile = (
+                    StudentSubjectProfile.objects.filter(student=request.user, subject_id=subject_id)
+                    .select_related("exam_format")
+                    .first()
+                )
+                if profile and profile.exam_format_id:
+                    exam_format = profile.exam_format
+                else:
+                    exam_format = (
+                        ExamFormat.objects.filter(subject_id=subject_id, is_active=True).order_by("-year", "name").first()
+                        or ExamFormat.objects.filter(subject_id=subject_id).order_by("-year", "name").first()
+                    )
+        scale = getattr(exam_format, "score_scale", None) if exam_format else None
+        if scale and max_primary_possible > 0:
+            max_primary_exam = int(getattr(scale, "max_primary_score", 0) or 0)
+            if max_primary_exam > 0:
+                scaled_total = int(round((float(total_primary_earned) / float(max_primary_possible)) * float(max_primary_exam)))
+                scaled_total = max(0, min(max_primary_exam, scaled_total))
+
+                geometry_target_max = (
+                    TaskType.objects.filter(exam_format=exam_format, is_geometry=True)
+                    .aggregate(s=models.Sum("max_points"))
+                    .get("s")
+                    or 0
+                )
+                geometry_target_max = int(geometry_target_max or 0)
+                scaled_geom = 0
+                if geometry_primary_possible > 0 and geometry_target_max > 0:
+                    scaled_geom = int(
+                        round((float(geometry_primary_earned) / float(geometry_primary_possible)) * float(geometry_target_max))
+                    )
+                    scaled_geom = max(0, min(geometry_target_max, scaled_geom))
+
+                rules = list(getattr(scale, "grade_rules", None) or [])
+                grade = grade_from_primary(scaled_total, geometry_primary=scaled_geom, grade_rules=rules) if rules else None
+                exam_display = {
+                    "exam_format": exam_format,
+                    "primary": scaled_total,
+                    "max_primary": max_primary_exam,
+                    "grade": grade if rules else None,
+                }
+    except Exception:
+        exam_display = None
+
+    scale_2024 = {
+        0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58,
+        13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84,
+        24: 86, 25: 88, 26: 90, 27: 92, 28: 94, 29: 96, 30: 98, 31: 99, 32: 100
+    }
     secondary_score = 0
     if max_primary_possible > 0:
-        # Если вариант неполный, мы пересчитываем пропорционально или используем прямое значение
         if max_primary_possible <= 32:
-            secondary_score = scale_2024.get(total_primary_earned, int((total_primary_earned/max_primary_possible)*100))
+            secondary_score = scale_2024.get(total_primary_earned, int((total_primary_earned / max_primary_possible) * 100))
         else:
             secondary_score = int((total_primary_earned / max_primary_possible) * 100)
-    
-    success_rate = int((total_primary_earned / max_primary_possible) * 100) if max_primary_possible > 0 else 0
+
+    if exam_display:
+        success_rate = int((exam_display["primary"] / exam_display["max_primary"]) * 100) if exam_display["max_primary"] > 0 else 0
+    else:
+        success_rate = int((total_primary_earned / max_primary_possible) * 100) if max_primary_possible > 0 else 0
     
     return render(request, 'core/student_assignment_summary.html', {
         'assignment': assignment,
@@ -1093,7 +1149,8 @@ def student_assignment_summary(request, assignment_id):
         'success_rate': success_rate,
         'total_primary_earned': total_primary_earned,
         'max_primary_possible': max_primary_possible,
-        'secondary_score': secondary_score
+        'secondary_score': secondary_score,
+        'exam_display': exam_display,
     })
 
 
@@ -2072,16 +2129,12 @@ def tutor_assignment_summary(request, assignment_id):
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
     submissions = {s.task_id: s for s in Submission.objects.filter(assignment=assignment, student=student).select_related('task')}
 
-    scale_2024 = {
-        0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58,
-        13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84,
-        24: 86, 25: 88, 26: 90, 27: 92, 28: 94, 29: 96, 30: 98, 31: 99, 32: 100
-    }
-
     tasks_list = []
     solved_count = 0
     total_primary_earned = 0
     max_primary_possible = 0
+    geometry_primary_earned = 0
+    geometry_primary_possible = 0
 
     for t in tasks:
         max_points = int(t.exam_points or 0)
@@ -2099,6 +2152,9 @@ def tutor_assignment_summary(request, assignment_id):
         if solved:
             solved_count += 1
         total_primary_earned += points_earned
+        if t.task_type and t.task_type.is_geometry:
+            geometry_primary_earned += points_earned
+            geometry_primary_possible += max_points
 
         tasks_list.append({
             'task': t,
@@ -2108,6 +2164,66 @@ def tutor_assignment_summary(request, assignment_id):
             'points_max': max_points,
         })
 
+    exam_display = None
+    try:
+        from core.exam_scoring import grade_from_primary
+
+        exam_format = assignment.exam_format
+        if not exam_format:
+            subject_id = None
+            t0 = assignment.tasks.select_related("topic__subject").order_by("id").first()
+            if t0:
+                subject_id = t0.topic.subject_id
+            if subject_id:
+                profile = (
+                    StudentSubjectProfile.objects.filter(student=student, subject_id=subject_id)
+                    .select_related("exam_format")
+                    .first()
+                )
+                if profile and profile.exam_format_id:
+                    exam_format = profile.exam_format
+                else:
+                    exam_format = (
+                        ExamFormat.objects.filter(subject_id=subject_id, is_active=True).order_by("-year", "name").first()
+                        or ExamFormat.objects.filter(subject_id=subject_id).order_by("-year", "name").first()
+                    )
+        scale = getattr(exam_format, "score_scale", None) if exam_format else None
+        if scale and max_primary_possible > 0:
+            max_primary_exam = int(getattr(scale, "max_primary_score", 0) or 0)
+            if max_primary_exam > 0:
+                scaled_total = int(round((float(total_primary_earned) / float(max_primary_possible)) * float(max_primary_exam)))
+                scaled_total = max(0, min(max_primary_exam, scaled_total))
+
+                geometry_target_max = (
+                    TaskType.objects.filter(exam_format=exam_format, is_geometry=True)
+                    .aggregate(s=models.Sum("max_points"))
+                    .get("s")
+                    or 0
+                )
+                geometry_target_max = int(geometry_target_max or 0)
+                scaled_geom = 0
+                if geometry_primary_possible > 0 and geometry_target_max > 0:
+                    scaled_geom = int(
+                        round((float(geometry_primary_earned) / float(geometry_primary_possible)) * float(geometry_target_max))
+                    )
+                    scaled_geom = max(0, min(geometry_target_max, scaled_geom))
+
+                rules = list(getattr(scale, "grade_rules", None) or [])
+                grade = grade_from_primary(scaled_total, geometry_primary=scaled_geom, grade_rules=rules) if rules else None
+                exam_display = {
+                    "exam_format": exam_format,
+                    "primary": scaled_total,
+                    "max_primary": max_primary_exam,
+                    "grade": grade if rules else None,
+                }
+    except Exception:
+        exam_display = None
+
+    scale_2024 = {
+        0: 0, 1: 5, 2: 9, 3: 14, 4: 18, 5: 22, 6: 27, 7: 32, 8: 36, 9: 40, 10: 46, 11: 52, 12: 58,
+        13: 64, 14: 66, 15: 68, 16: 70, 17: 72, 18: 74, 19: 76, 20: 78, 21: 80, 22: 82, 23: 84,
+        24: 86, 25: 88, 26: 90, 27: 92, 28: 94, 29: 96, 30: 98, 31: 99, 32: 100
+    }
     if max_primary_possible > 0:
         if max_primary_possible <= 32:
             secondary_score = scale_2024.get(total_primary_earned, int((total_primary_earned / max_primary_possible) * 100))
@@ -2117,7 +2233,10 @@ def tutor_assignment_summary(request, assignment_id):
     else:
         secondary_score = 0
 
-    success_rate = int((total_primary_earned / max_primary_possible) * 100) if max_primary_possible > 0 else 0
+    if exam_display:
+        success_rate = int((exam_display["primary"] / exam_display["max_primary"]) * 100) if exam_display["max_primary"] > 0 else 0
+    else:
+        success_rate = int((total_primary_earned / max_primary_possible) * 100) if max_primary_possible > 0 else 0
     total_tasks = tasks.count()
 
     return render(request, 'core/tutor_assignment_summary.html', {
@@ -2131,6 +2250,7 @@ def tutor_assignment_summary(request, assignment_id):
         'total_primary_earned': total_primary_earned,
         'max_primary_possible': max_primary_possible,
         'secondary_score': secondary_score,
+        'exam_display': exam_display,
     })
 
 

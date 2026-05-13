@@ -51,8 +51,18 @@
                     <div class="text-2xl font-black text-primary">{{ total_primary_earned }}<span class="text-indigo-300 text-lg">/{{ max_primary_possible }}</span></div>
                 </div>
                 <div>
-                    <div class="text-xs text-green-700 font-bold uppercase">Вторичный (ЕГЭ)</div>
-                    <div class="text-2xl font-black text-green-600">{{ secondary_score }}<span class="text-green-300 text-lg">/100</span></div>
+                    {% if exam_display %}
+                        <div class="text-xs text-green-700 font-bold uppercase">Экзамен</div>
+                        <div class="text-2xl font-black text-green-600">
+                            {{ exam_display.primary }}<span class="text-green-300 text-lg">/{{ exam_display.max_primary }}</span>
+                        </div>
+                        {% if exam_display.grade %}
+                            <div class="text-xs text-gray-500 mt-1">(оценка {{ exam_display.grade }})</div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-xs text-green-700 font-bold uppercase">Вторичный (ЕГЭ)</div>
+                        <div class="text-2xl font-black text-green-600">{{ secondary_score }}<span class="text-green-300 text-lg">/100</span></div>
+                    {% endif %}
                 </div>
                 <div>
                     <div class="text-xs text-gray-500 font-bold uppercase">Успех</div>
