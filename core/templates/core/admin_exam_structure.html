@@ -111,6 +111,7 @@
                             <thead class="bg-gray-50 border-b border-gray-200">
                                 <tr>
                                     <th class="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">№</th>
+                                    <th class="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Часть</th>
                                     <th class="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Название</th>
                                     <th class="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Баллы</th>
                                 </tr>
@@ -120,13 +121,20 @@
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-3 font-bold text-gray-800">№{{ t.number }}</td>
                                     <td class="px-6 py-3">
+                                        {% if t.number <= 19 %}
+                                            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">Тестовая часть</span>
+                                        {% else %}
+                                            <span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold">Развёрнутая часть</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-3">
                                         <input name="name_{{ t.id }}" value="{{ t.name }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                                     </td>
                                     <td class="px-6 py-3 text-gray-600">{{ t.max_points }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="3" class="px-6 py-6 text-center text-gray-500">Нет типов для этого формата</td>
+                                    <td colspan="4" class="px-6 py-6 text-center text-gray-500">Нет типов для этого формата</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -147,4 +155,3 @@
     </script>
 </body>
 </html>
-
