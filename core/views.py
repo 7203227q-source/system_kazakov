@@ -2594,13 +2594,7 @@ def tutor_create_assignment(request):
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
         exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
-        
-        # Генерация дефолтного названия
-        import datetime
-        default_title = f"Вариант {datetime.datetime.now().strftime('%d%m%y%H%M')}"
-        title = request.POST.get('title', '').strip()
-        if not title:
-            title = default_title
+        kind = request.POST.get('kind', 'homework')
         
         if not student_id:
             messages.error(request, "Выберите ученика")
@@ -2639,6 +2633,22 @@ def tutor_create_assignment(request):
             messages.error(request, "Выберите формат экзамена.")
             request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
+            
+        # Генерация дефолтного названия если пустое
+        title = request.POST.get('title', '').strip()
+        student_seq = None
+        if not title:
+            # Находим максимальный seq для этого ученика
+            max_seq = Assignment.objects.filter(student=student).aggregate(m=models.Max('student_seq'))['m'] or 0
+            student_seq = max_seq + 1
+            
+            # Формируем название: Формат — Ученик — Тип №
+            student_name = student.get_full_name() or student.username
+            kind_labels = {'homework': 'Домашняя работа', 'test': 'Тест', 'control_test': 'Контрольный тест'}
+            kind_label = kind_labels.get(kind, 'Домашняя работа')
+            
+            format_str = f"{exam_format.name} {exam_format.year}"
+            title = f"{format_str} — {student_name} — {kind_label} №{student_seq}"
         
         # Collect tasks
         selected_tasks = []
@@ -2743,6 +2753,8 @@ def tutor_create_assignment(request):
             tutor=request.user,
             student=student,
             title=title,
+            kind=kind,
+            student_seq=student_seq,
             is_draft=True,
             exam_format=exam_format,
         )

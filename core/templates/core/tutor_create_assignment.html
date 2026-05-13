@@ -50,39 +50,57 @@
                 {% csrf_token %}
                 
                 <div class="p-6 border-b border-gray-100 space-y-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Название варианта</label>
-                        <input type="text" name="title" value="{{ saved_form.title.0|default:'' }}" placeholder="Например: Домашняя работа №1 (Планиметрия)" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
-                        <p class="text-xs text-gray-500 mt-1">Необязательно. По умолчанию будет "Вариант ДДММГГЧЧММ"</p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Кому назначить <span class="text-red-500">*</span></label>
-                        <select id="student-select" name="student_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required onchange="updateBuilderSelection()">
-                            <option value="">-- Выберите ученика --</option>
-                            {% for student in students %}
-                            <option value="{{ student.id }}" {% if saved_form.student_id.0 == student.id|stringformat:"s" or request.GET.student_id == student.id|stringformat:"s" %}selected{% endif %}>{{ student.get_full_name|default:student.username }}</option>
-                            {% endfor %}
-                        </select>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Кому назначить <span class="text-red-500">*</span></label>
+                            <select id="student-select" name="student_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required onchange="updateBuilderSelection()">
+                                <option value="">-- Выберите ученика --</option>
+                                {% for student in students %}
+                                <option value="{{ student.id }}" {% if saved_form.student_id.0 == student.id|stringformat:"s" or request.GET.student_id == student.id|stringformat:"s" %}selected{% endif %}>{{ student.get_full_name|default:student.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Формат экзамена <span class="text-red-500">*</span></label>
+                            <select id="exam-format-select" name="exam_format" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required onchange="updateBuilderSelection()">
+                                <option value="">-- Выберите формат --</option>
+                                {% for f in exam_formats %}
+                                <option value="{{ f.id }}"
+                                    {% if saved_form.exam_format.0 == f.id|stringformat:"s" %}
+                                        selected
+                                    {% elif not saved_form and selected_exam_format and selected_exam_format.id == f.id %}
+                                        selected
+                                    {% endif %}
+                                >
+                                    {{ f.subject.name }} · {{ f.name }} {{ f.year }}{% if not f.is_active %} (не активен){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Если не выбрать, система попробует подобрать активный формат по предмету ученика.</p>
+                        </div>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Формат экзамена <span class="text-red-500">*</span></label>
-                        <select id="exam-format-select" name="exam_format" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required onchange="updateBuilderSelection()">
-                            <option value="">-- Выберите формат --</option>
-                            {% for f in exam_formats %}
-                            <option value="{{ f.id }}"
-                                {% if saved_form.exam_format.0 == f.id|stringformat:"s" %}
-                                    selected
-                                {% elif not saved_form and selected_exam_format and selected_exam_format.id == f.id %}
-                                    selected
-                                {% endif %}
-                            >
-                                {{ f.subject.name }} · {{ f.name }} {{ f.year }}{% if not f.is_active %} (не активен){% endif %}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">Если не выбрать, система попробует подобрать активный формат по предмету ученика.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Название варианта</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="title-input" name="title" value="{{ saved_form.title.0|default:'' }}" placeholder="Оставьте пустым для автогенерации" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                <button type="button" onclick="generateTitle()" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg font-medium transition text-sm flex items-center border border-gray-300" title="Сгенерировать название">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Если пусто, сгенерируется автоматически (Формат — Ученик — Тип №)</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Тип варианта</label>
+                            <select id="kind-select" name="kind" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="homework" {% if saved_form.kind.0 == 'homework' %}selected{% endif %}>Домашняя работа</option>
+                                <option value="test" {% if saved_form.kind.0 == 'test' %}selected{% endif %}>Тест</option>
+                                <option value="control_test" {% if saved_form.kind.0 == 'control_test' %}selected{% endif %}>Контрольный тест</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -338,6 +356,25 @@
         }
         const query = params.toString();
         window.location.href = url.pathname + (query ? `?${query}` : "");
+    }
+
+    function generateTitle() {
+        const studentSelect = document.getElementById("student-select");
+        const formatSelect = document.getElementById("exam-format-select");
+        const kindSelect = document.getElementById("kind-select");
+        const titleInput = document.getElementById("title-input");
+        
+        if (!studentSelect.value || !formatSelect.value) {
+            alert("Сначала выберите ученика и формат экзамена.");
+            return;
+        }
+        
+        const studentName = studentSelect.options[studentSelect.selectedIndex].text;
+        const formatText = formatSelect.options[formatSelect.selectedIndex].text.split(' · ')[1] || formatSelect.options[formatSelect.selectedIndex].text;
+        const cleanFormatText = formatText.replace(' (не активен)', '');
+        const kindText = kindSelect.options[kindSelect.selectedIndex].text;
+        
+        titleInput.value = `${cleanFormatText} — ${studentName} — ${kindText}`;
     }
 </script>
 {% include "core/image_modal.html" %}
