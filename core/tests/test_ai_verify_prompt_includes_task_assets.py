@@ -19,7 +19,7 @@ class AIVerifyPromptIncludesTaskAssetsTests(TestCase):
         TaskVariant.objects.create(
             task=self.task,
             theme="classic",
-            content="<p>Условие: построй график</p><img src=\"/media/a.png\"><img src=\"https://math-ege.sdamgia.ru/img/b.png\"><img src=\"data:image/png;base64,AAA\"><img src=\"https://evil.com/x.png\">",
+            content="<p>Условие: формула \\frac{1}{2} и построй график</p><img src=\"/media/a.png\"><img src=\"https://math-ege.sdamgia.ru/img/b.png\"><img src=\"data:image/png;base64,AAA\"><img src=\"https://evil.com/x.png\">",
             solution="",
         )
 
@@ -49,6 +49,8 @@ class AIVerifyPromptIncludesTaskAssetsTests(TestCase):
         content = user_msg["content"]
         text = next(p["text"] for p in content if p["type"] == "text")
         self.assertIn("Условие:", text)
+        # Экранируем обратные слэши в тексте, чтобы у провайдеров не ломался JSON
+        self.assertIn("\\\\frac{1}{2}", text)
 
         imgs = [p["image_url"]["url"] for p in content if p["type"] == "image_url"]
         self.assertTrue(any("/media/a.png" in u for u in imgs))
