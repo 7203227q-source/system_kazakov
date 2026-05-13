@@ -98,7 +98,7 @@
                                     <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
                                     <img src="{{ task.saved_submission.image_url.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
                                     
-                                    {% if not task.saved_submission.is_correct and task.saved_submission.is_correct != False %}
+                                    {% if task.exam_points > 1 and not task.saved_submission.is_correct and task.saved_submission.is_correct != False %}
                                     <button type="button" onclick="verifyWithAI({{ task.saved_submission.id }}, {{ task.id }})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_{{ task.id }}">
                                         <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
                                     </button>
@@ -150,9 +150,9 @@
                                                                 </div>
                                                                 <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
                                                                 <img src="${data.image_url}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
-                                                                <button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}">
+                                                                ${Number({{ task.exam_points|default:0 }}) > 1 ? `<button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}">
                                                                     <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
-                                                                </button>
+                                                                </button>` : ''}
                                                             </div>
                                                         `;
                                                     }
@@ -388,6 +388,19 @@
             });
 
             const data = await response.json();
+            if (!response.ok) {
+                const msg = data && data.error === 'ai_not_configured'
+                    ? 'ИИ не настроен: выберите модель для проверки фото в настройках предмета и задайте ключ OpenRouter.'
+                    : (data && data.error === 'only_second_part'
+                        ? 'ИИ-проверка доступна только для задач развернутой части.'
+                        : 'Ошибка при проверке ИИ');
+                alert(msg);
+                if(btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить решение через ИИ';
+                }
+                return;
+            }
             
             const resultDiv = document.getElementById(`result_${taskId}`);
             const title = resultDiv.querySelector('.result-title');
