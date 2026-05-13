@@ -4006,6 +4006,7 @@ def api_verify_with_ai(request, submission_id):
             "- Ошибки:\n"
             "- За что сняты баллы:\n"
             "- Что исправить:\n"
+            "В поле feedback используй Markdown. Все формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
             "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
         )
 
