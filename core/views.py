@@ -4150,6 +4150,8 @@ def api_verify_with_ai(request, submission_id):
     if not is_extended_answer_task(task):
         return JsonResponse({'error': 'only_second_part'}, status=400)
     mode = (request.GET.get("mode") or "").strip()
+    if mode == "compare":
+        return JsonResponse({'error': 'compare_not_supported'}, status=400)
     if submission.assignment_id:
         unlocked = request.session.get('whiteboard_unlocked', {}) or {}
         unlocked[f"{int(submission.assignment_id)}:{int(task.id)}"] = True
@@ -4263,76 +4265,6 @@ def api_verify_with_ai(request, submission_id):
         user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
         for u in task_image_urls:
             user_content.append({"type": "image_url", "image_url": {"url": u}})
-
-        if mode == "compare":
-            compare_models = []
-            if cfg:
-                for m in [
-                    cfg.photo_compare_model_1,
-                    cfg.photo_compare_model_2,
-                    cfg.photo_compare_model_3,
-                    cfg.photo_compare_model_4,
-                    cfg.photo_compare_model_5,
-                ]:
-                    if m and m.code:
-                        compare_models.append(m.code)
-            if len(compare_models) != 5:
-                return JsonResponse({'error': 'compare_models_not_configured'}, status=400)
-
-            results = []
-            for mcode in compare_models:
-                res = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": referer,
-                        "X-Title": title,
-                    },
-                    json={
-                        "model": mcode,
-                        "response_format": {"type": "json_object"},
-                        "messages": [
-                            {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
-                            {
-                                "role": "user",
-                                "content": user_content,
-                            },
-                        ],
-                    },
-                    timeout=90,
-                )
-
-                if res.status_code != 200:
-                    results.append({'model': mcode, 'primary_score': 0, 'is_correct': False, 'feedback': f'Ошибка запроса к модели (HTTP {res.status_code})'})
-                    continue
-
-                data = res.json()
-                content = data["choices"][0]["message"]["content"]
-                def _repair_json_for_latex(raw: str) -> str:
-                    if not isinstance(raw, str):
-                        return raw
-                    # 1) LaTeX-команды вида \frac, \text, \nabla ломают JSON (\f,\t,\n трактуются как escape).
-                    raw = re.sub(r'\\([bfnrt])(?=[A-Za-z])', r'\\\\\1', raw)
-                    # 2) Остальные невалидные escape (\c, \q, \{ ...) делаем безопасными.
-                    raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
-                    return raw
-                content = _repair_json_for_latex(content)
-                try:
-                    parsed = pyjson.loads(content)
-                except Exception:
-                    match = re.search(r"\{[\s\S]*\}", str(content))
-                    if not match:
-                        results.append({'model': mcode, 'primary_score': 0, 'is_correct': False, 'feedback': 'Не удалось распарсить ответ модели'})
-                        continue
-                    parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
-
-                primary_score = int(parsed.get("primary_score") or 0)
-                is_correct = bool(parsed.get("is_correct"))
-                feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
-                results.append({'model': mcode, 'primary_score': primary_score, 'is_correct': is_correct, 'feedback': feedback})
-
-            return JsonResponse({'status': 'ok', 'mode': 'compare', 'max_points': max_points, 'results': results, 'cooldown_seconds': cooldown_seconds})
 
         feedback = ""
         is_correct = False

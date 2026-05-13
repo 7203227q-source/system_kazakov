@@ -36,29 +36,13 @@ class AIVerifyCompareModeTests(TestCase):
             photo_compare_model_5=self.m5,
         )
 
-    def test_compare_returns_5_results_and_does_not_mutate_submission(self):
+    def test_compare_is_not_supported_anymore(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
-
-        dummy = {
-            "choices": [
-                {"message": {"content": json.dumps({"primary_score": 1, "is_correct": False, "feedback": "ok"})}}
-            ]
-        }
-
-        from unittest.mock import patch
-
-        with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy
-
-            self.client.force_login(self.student)
-            res = self.client.post(reverse("api_verify_with_ai", args=[self.sub.id]) + "?mode=compare")
-
-        self.assertEqual(res.status_code, 200)
+        self.client.force_login(self.student)
+        res = self.client.post(reverse("api_verify_with_ai", args=[self.sub.id]) + "?mode=compare")
+        self.assertEqual(res.status_code, 400)
         payload = res.json()
-        self.assertEqual(payload["mode"], "compare")
-        self.assertEqual(len(payload["results"]), 5)
-        self.assertEqual(post.call_count, 5)
+        self.assertEqual(payload.get("error"), "compare_not_supported")
 
         self.sub.refresh_from_db()
         self.assertIsNone(self.sub.primary_score)
