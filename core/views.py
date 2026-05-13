@@ -16,6 +16,7 @@ import json
 from .analytics import record_task_log, get_adaptive_task_for_student
 from .services import process_task_submission, get_due_tasks_for_student
 from .system_info import get_system_metrics, check_openrouter_api
+import os
 
 from django.core.management import call_command
 from django.http import HttpResponse
@@ -127,6 +128,72 @@ def admin_system_status(request):
     }
     
     return render(request, 'core/admin_system.html', context)
+
+
+@login_required
+def admin_openrouter_balance(request):
+    """Страница баланса OpenRouter для Администратора (по ключу и, при наличии, по management key)."""
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    mgmt_key = os.environ.get("OPENROUTER_MANAGEMENT_KEY", "").strip()
+
+    key_info = None
+    key_error = None
+    credits = None
+    credits_error = None
+    credits_remaining = None
+    activity_by_model = []
+    activity_error = None
+
+    def _get(url, token):
+        res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        if res.status_code >= 400:
+            raise RuntimeError(f"{res.status_code}: {res.text[:200]}")
+        return res.json()
+
+    if api_key:
+        try:
+            key_info = _get("https://openrouter.ai/api/v1/key", api_key).get("data")
+        except Exception as e:
+            key_error = str(e)
+
+    if mgmt_key:
+        try:
+            credits = _get("https://openrouter.ai/api/v1/credits", mgmt_key).get("data")
+            if credits and credits.get("total_credits") is not None and credits.get("total_usage") is not None:
+                credits_remaining = float(credits.get("total_credits") or 0) - float(credits.get("total_usage") or 0)
+        except Exception as e:
+            credits_error = str(e)
+
+        try:
+            raw = _get("https://openrouter.ai/api/v1/activity", mgmt_key).get("data") or []
+            agg = {}
+            for row in raw:
+                model = row.get("model") or "unknown"
+                usage = float(row.get("usage") or 0)
+                reqs = int(row.get("requests") or 0)
+                cur = agg.get(model) or {"model": model, "usage": 0.0, "requests": 0}
+                cur["usage"] += usage
+                cur["requests"] += reqs
+                agg[model] = cur
+            activity_by_model = sorted(agg.values(), key=lambda x: x["usage"], reverse=True)
+        except Exception as e:
+            activity_error = str(e)
+
+    context = {
+        "openrouter_api_key_present": bool(api_key),
+        "openrouter_management_key_present": bool(mgmt_key),
+        "key_info": key_info,
+        "key_error": key_error,
+        "credits": credits,
+        "credits_error": credits_error,
+        "credits_remaining": credits_remaining,
+        "activity_by_model": activity_by_model,
+        "activity_error": activity_error,
+    }
+    return render(request, "core/admin_openrouter_balance.html", context)
 
 
 @login_required

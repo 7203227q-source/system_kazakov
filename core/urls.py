@@ -70,6 +70,7 @@ urlpatterns = [
     path('platform-admin/reshuege-import/svg-to-latex/', views.admin_svg_to_latex_convert, name='admin_svg_to_latex_convert'),
     path('proxy-image/', views.proxy_image, name='proxy_image'),
     path('platform-admin/system/', views.admin_system_status, name='admin_system'),
+    path('platform-admin/openrouter/balance/', views.admin_openrouter_balance, name='admin_openrouter_balance'),
     path('apply-migrations/', views.run_migrations, name='run_migrations'),
     
     path('select-role/', views.role_selection_view, name='select_role'),
