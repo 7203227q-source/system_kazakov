@@ -51,6 +51,8 @@ class AIVerifyPromptIncludesTaskAssetsTests(TestCase):
         self.assertIn("Условие:", text)
         # Экранируем обратные слэши в тексте, чтобы у провайдеров не ломался JSON
         self.assertIn("\\\\frac{1}{2}", text)
+        # В системном промпте не должно быть примеров LaTeX-команд с backslash (из-за провайдеров, которые падают на \escape)
+        self.assertNotIn("\\\\sqrt", text)
 
         imgs = [p["image_url"]["url"] for p in content if p["type"] == "image_url"]
         self.assertTrue(any("/media/a.png" in u for u in imgs))
