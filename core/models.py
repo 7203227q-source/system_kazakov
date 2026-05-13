@@ -419,6 +419,11 @@ class SubjectAIConfig(models.Model):
     image_generate_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     task_regen_text_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     task_regen_image_model = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    photo_compare_model_1 = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    photo_compare_model_2 = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    photo_compare_model_3 = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    photo_compare_model_4 = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    photo_compare_model_5 = models.ForeignKey(OpenRouterModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
 
     def __str__(self):
         return f"AI config: {self.subject.name}"
