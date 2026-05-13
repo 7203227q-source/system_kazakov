@@ -52,7 +52,8 @@ class AIVerifyPromptIncludesTaskAssetsTests(TestCase):
 
         imgs = [p["image_url"]["url"] for p in content if p["type"] == "image_url"]
         self.assertTrue(any("/media/a.png" in u for u in imgs))
-        self.assertTrue(any("math-ege.sdamgia.ru" in u for u in imgs))
+        # В OpenRouter отправляем только локальные картинки (/media/), чтобы провайдер не падал на внешних URL
+        self.assertFalse(any("math-ege.sdamgia.ru" in u for u in imgs))
         self.assertFalse(any("evil.com" in u for u in imgs))
         self.assertTrue(any(u.startswith("data:") for u in imgs))
         task_imgs = [u for u in imgs if not u.startswith("data:")]
