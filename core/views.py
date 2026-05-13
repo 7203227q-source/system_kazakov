@@ -4121,6 +4121,7 @@ def api_verify_with_ai(request, submission_id):
             "- За что сняты баллы:\n"
             "- Что исправить:\n"
             "В поле feedback используй Markdown. Все формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
+            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши LaTeX: пиши \\\\frac, \\\\sqrt, \\\\cos и т.д.\n"
             "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
         )
 
@@ -4176,6 +4177,15 @@ def api_verify_with_ai(request, submission_id):
 
                 data = res.json()
                 content = data["choices"][0]["message"]["content"]
+                def _repair_json_for_latex(raw: str) -> str:
+                    if not isinstance(raw, str):
+                        return raw
+                    # 1) LaTeX-команды вида \frac, \text, \nabla ломают JSON (\f,\t,\n трактуются как escape).
+                    raw = re.sub(r'\\([bfnrt])(?=[A-Za-z])', r'\\\\\1', raw)
+                    # 2) Остальные невалидные escape (\c, \q, \{ ...) делаем безопасными.
+                    raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
+                    return raw
+                content = _repair_json_for_latex(content)
                 try:
                     parsed = pyjson.loads(content)
                 except Exception:
@@ -4183,7 +4193,7 @@ def api_verify_with_ai(request, submission_id):
                     if not match:
                         results.append({'model': mcode, 'primary_score': 0, 'is_correct': False, 'feedback': 'Не удалось распарсить ответ модели'})
                         continue
-                    parsed = pyjson.loads(match.group(0))
+                    parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
 
                 primary_score = int(parsed.get("primary_score") or 0)
                 is_correct = bool(parsed.get("is_correct"))
@@ -4231,13 +4241,20 @@ def api_verify_with_ai(request, submission_id):
 
         data = res.json()
         content = data["choices"][0]["message"]["content"]
+        def _repair_json_for_latex(raw: str) -> str:
+            if not isinstance(raw, str):
+                return raw
+            raw = re.sub(r'\\([bfnrt])(?=[A-Za-z])', r'\\\\\1', raw)
+            raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
+            return raw
+        content = _repair_json_for_latex(content)
         try:
             parsed = pyjson.loads(content)
         except Exception:
             match = re.search(r"\{[\s\S]*\}", str(content))
             if not match:
                 return JsonResponse({'error': 'ai_failed'}, status=400)
-            parsed = pyjson.loads(match.group(0))
+            parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
 
         primary_score = int(parsed.get("primary_score") or 0)
         is_correct = bool(parsed.get("is_correct"))
