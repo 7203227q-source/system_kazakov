@@ -3895,8 +3895,17 @@ def api_verify_with_ai(request, submission_id):
         title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
 
         prompt = (
-            "Оцени решение по фото как эксперт экзамена.\n"
+            "Оцени решение по фото как репетитор-эксперт экзамена.\n"
             f"Максимум баллов: {max_points}.\n"
+            f"Поставь первичный балл primary_score как целое число от 0 до {int(max_points or 0)}.\n"
+            "Если решение полностью верное — primary_score = максимум.\n"
+            "Если решение частично верное — поставь частичный балл.\n"
+            "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
+            "В feedback обязательно коротко объясни, за что сняты баллы, в формате:\n"
+            "- Что верно:\n"
+            "- Ошибки:\n"
+            "- За что сняты баллы:\n"
+            "- Что исправить:\n"
             "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
         )
 

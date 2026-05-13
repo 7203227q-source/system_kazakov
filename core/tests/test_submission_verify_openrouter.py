@@ -53,6 +53,12 @@ class SubmissionVerifyOpenRouterTests(TestCase):
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
+        sent_payload = post.call_args.kwargs["json"]
+        user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
+        prompt_text = next(p["text"] for p in user_msg["content"] if p["type"] == "text")
+        self.assertIn("0 до", prompt_text)
+        self.assertIn("сняты", prompt_text)
+
         self.assertEqual(res.status_code, 200)
         payload = res.json()
         self.assertEqual(payload["primary_score"], 1)
