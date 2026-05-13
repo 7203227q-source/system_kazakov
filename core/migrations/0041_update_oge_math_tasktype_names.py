@@ -34,11 +34,8 @@ def forwards(apps, schema_editor):
     ExamFormat = apps.get_model("core", "ExamFormat")
     TaskType = apps.get_model("core", "TaskType")
 
-    for ef in ExamFormat.objects.filter(name__contains="ОГЭ").select_related("subject"):
-        subject = getattr(ef, "subject", None)
-        subject_name = getattr(subject, "name", "") or ""
-        if "Матем" not in subject_name:
-            continue
+    qs = ExamFormat.objects.filter(subject__name="Математика", name__icontains="ОГЭ")
+    for ef in qs:
         for number, name in OGE_MATH_TASKTYPE_NAMES_2025.items():
             TaskType.objects.filter(exam_format=ef, number=number).update(name=name)
 
@@ -46,9 +43,10 @@ def forwards(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0022_openroutermodel_subjectaiconfig"),
+        ("core", "0040_seed_oge_math_scale_and_geometry"),
     ]
 
     operations = [
         migrations.RunPython(forwards, migrations.RunPython.noop),
     ]
+

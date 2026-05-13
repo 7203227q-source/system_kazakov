@@ -7,8 +7,8 @@ from django.db.migrations.executor import MigrationExecutor
 class OgeMathTaskTypeNamesMigrationTests(TransactionTestCase):
     app = "core"
 
-    migrate_from = ("core", "0022_openroutermodel_subjectaiconfig")
-    migrate_to = ("core", "0023_update_oge_math_tasktype_names")
+    migrate_from = ("core", "0040_seed_oge_math_scale_and_geometry")
+    migrate_to = ("core", "0041_update_oge_math_tasktype_names")
 
     def setUp(self):
         super().setUp()
@@ -35,7 +35,7 @@ class OgeMathTaskTypeNamesMigrationTests(TransactionTestCase):
         with connection.cursor() as cur:
             cur.execute(
                 "select count(1) from django_migrations where app=%s and name=%s",
-                ["core", "0023_update_oge_math_tasktype_names"],
+                ["core", "0041_update_oge_math_tasktype_names"],
             )
             self.assertEqual(cur.fetchone()[0], 1)
 
