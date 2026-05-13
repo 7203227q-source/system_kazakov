@@ -13,7 +13,7 @@ class AIVerifyCompareModeTests(TestCase):
         self.student = User.objects.create_user(username="s", password="pass", role="student")
         self.subject = Subject.objects.create(name="Математика")
         ef = ExamFormat.objects.create(subject=self.subject, name="ОГЭ", year=2026, is_active=True)
-        tt = TaskType.objects.create(exam_format=ef, number=20, name="Тип 20", max_points=2)
+        tt = TaskType.objects.create(exam_format=ef, number=20, name="Тип 20", max_points=2, is_extended_answer=True)
         topic = Topic.objects.create(subject=self.subject, name="T")
         self.task = Task.objects.create(topic=topic, task_type=tt, correct_answer="1", difficulty=10, exam_points=2)
 
@@ -64,4 +64,3 @@ class AIVerifyCompareModeTests(TestCase):
         self.assertIsNone(self.sub.primary_score)
         self.assertIsNone(self.sub.ai_feedback)
         self.assertIsNone(self.sub.is_correct)
-

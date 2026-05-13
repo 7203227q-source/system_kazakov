@@ -1052,13 +1052,15 @@ def student_assignment_summary(request, assignment_id):
         sub = submissions.get(task.id)
         points_earned = 0
         if sub:
-            if task.exam_points == 1:
-                points_earned = 1 if sub.is_correct else 0
+            max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+            is_extended = bool(getattr(task, "task_type", None) and getattr(task.task_type, "is_extended_answer", False))
+            if not is_extended:
+                points_earned = max_points_effective if sub.is_correct else 0
             else:
-                points_earned = sub.primary_score or 0
+                points_earned = int(sub.primary_score or 0)
                 
         total_primary_earned += points_earned
-        max_primary_possible += task.exam_points
+        max_primary_possible += max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
         if task.task_type and task.task_type.is_geometry:
             geometry_primary_earned += points_earned
             geometry_primary_possible += int(task.exam_points or 0)
@@ -1066,7 +1068,7 @@ def student_assignment_summary(request, assignment_id):
         if points_earned > 0:
             correct_count += 1
             total_score += task.exam_points
-        max_score += task.exam_points
+        max_score += int(task.exam_points or 0)
         
         tasks_list.append({
             'task': task,
@@ -1235,7 +1237,8 @@ def student_solve_assignment(request, assignment_id):
         subs_by_task_id = {}
         for task in tasks:
             max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
-            if max_points_effective > 1:
+            is_extended = bool(getattr(task, "task_type", None) and getattr(task.task_type, "is_extended_answer", False))
+            if is_extended:
                 sub, _created = Submission.objects.get_or_create(
                     student=request.user,
                     task=task,
@@ -1299,8 +1302,8 @@ def student_solve_assignment(request, assignment_id):
         if action == 'finish':
             missing_part2 = []
             for t in tasks:
-                max_points_effective = max(int(t.exam_points or 0), int(getattr(t.task_type, "max_points", 0) or 0))
-                if max_points_effective > 1:
+                is_extended = bool(getattr(t, "task_type", None) and getattr(t.task_type, "is_extended_answer", False))
+                if is_extended:
                     sub = subs_by_task_id.get(t.id)
                     if not sub or not sub.image_url:
                         missing_part2.append(t)
@@ -1322,8 +1325,9 @@ def student_solve_assignment(request, assignment_id):
             total_primary += max_points_effective
             sub = subs_by_task_id.get(t.id) or Submission.objects.filter(assignment=assignment, task=t, student=request.user).first()
             if sub:
-                if max_points_effective <= 1:
-                    student_primary += 1 if sub.is_correct else 0
+                is_extended = bool(getattr(t, "task_type", None) and getattr(t.task_type, "is_extended_answer", False))
+                if not is_extended:
+                    student_primary += max_points_effective if sub.is_correct else 0
                 else:
                     student_primary += int(sub.primary_score or 0)
 
@@ -1373,7 +1377,7 @@ def student_solve_assignment(request, assignment_id):
         # Определяем, нужен ли черновик / фото
         max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
         task.exam_points_effective = max_points_effective
-        is_part2 = max_points_effective > 1
+        is_part2 = bool(getattr(task, "task_type", None) and getattr(task.task_type, "is_extended_answer", False))
         requires_draft = False
         
         if not is_part2 and request.user.draft_check_probability > 0:
@@ -3895,7 +3899,7 @@ def api_verify_with_ai(request, submission_id):
 
     task = submission.task
     max_points = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
-    if int(max_points or 0) <= 1:
+    if not getattr(task, "task_type", None) or not getattr(task.task_type, "is_extended_answer", False):
         return JsonResponse({'error': 'only_second_part'}, status=400)
     mode = (request.GET.get("mode") or "").strip()
     if submission.assignment_id:

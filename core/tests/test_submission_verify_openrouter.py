@@ -13,7 +13,7 @@ class SubmissionVerifyOpenRouterTests(TestCase):
     def setUp(self):
         self.subject = Subject.objects.create(name="Математика")
         self.exam_format = ExamFormat.objects.create(subject=self.subject, name="ЕГЭ", year=2026, is_active=True)
-        self.task_type = TaskType.objects.create(exam_format=self.exam_format, number=20, name="Тип 20", max_points=2)
+        self.task_type = TaskType.objects.create(exam_format=self.exam_format, number=20, name="Тип 20", max_points=2, is_extended_answer=True)
         self.topic = Topic.objects.create(subject=self.subject, name="Задания из Открытого Банка")
         self.task = Task.objects.create(
             fipi_id="X1",
