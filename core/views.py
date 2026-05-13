@@ -4173,7 +4173,7 @@ def api_verify_with_ai(request, submission_id):
                 )
 
                 if res.status_code != 200:
-                    results.append({'model': mcode, 'primary_score': 0, 'is_correct': False, 'feedback': 'Ошибка запроса к модели'})
+                    results.append({'model': mcode, 'primary_score': 0, 'is_correct': False, 'feedback': f'Ошибка запроса к модели (HTTP {res.status_code})'})
                     continue
 
                 data = res.json()
@@ -4221,7 +4221,15 @@ def api_verify_with_ai(request, submission_id):
         )
 
         if res.status_code != 200:
-            return JsonResponse({'error': 'ai_failed'}, status=400)
+            detail = None
+            try:
+                detail = res.json()
+            except Exception:
+                detail = (res.text or "").strip()[:500]
+            return JsonResponse(
+                {'error': 'ai_failed', 'upstream_status': res.status_code, 'upstream_message': detail},
+                status=400,
+            )
 
         data = res.json()
         content = data["choices"][0]["message"]["content"]
@@ -4236,8 +4244,8 @@ def api_verify_with_ai(request, submission_id):
         primary_score = int(parsed.get("primary_score") or 0)
         is_correct = bool(parsed.get("is_correct"))
         feedback = str(parsed.get("feedback") or "")
-    except Exception:
-        return JsonResponse({'error': 'ai_failed'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': 'ai_failed', 'upstream_message': str(e)}, status=400)
             
     points_earned = int(primary_score or 0) if int(max_points or 0) > 1 else (1 if is_correct else 0)
     submission.primary_score = primary_score
