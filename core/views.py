@@ -3880,8 +3880,28 @@ def api_submission_upload(request, submission_id):
         return JsonResponse({'error': 'Image not found'}, status=400)
 
     submission.image_url = image
-    submission.save(update_fields=['image_url'])
+    submission.show_solution_allowed = True
+    submission.save(update_fields=['image_url', 'show_solution_allowed'])
     return JsonResponse({'status': 'ok', 'image_url': submission.image_url.url})
+
+def api_submission_reveal_solution(request, submission_id):
+    if request.method != 'POST' or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    submission = get_object_or_404(Submission, id=submission_id, student=request.user)
+    task = submission.task
+    if not is_extended_answer_task(task):
+        return JsonResponse({'error': 'only_second_part'}, status=400)
+
+    submission.show_solution_allowed = True
+    submission.save(update_fields=['show_solution_allowed'])
+
+    solution_html = ""
+    variant = task.variants.filter(theme='classic').first()
+    if variant and variant.solution:
+        solution_html = variant.solution
+
+    return JsonResponse({'status': 'ok', 'solution_html': solution_html})
 
 import re
 from django.conf import settings
