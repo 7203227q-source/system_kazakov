@@ -1,6 +1,8 @@
 from django.test import TestCase
 from django.urls import reverse
 
+from bs4 import BeautifulSoup
+
 from core.models import Assignment, ExamFormat, Subject, Task, TaskType, Topic, Submission, User
 
 
@@ -24,6 +26,7 @@ class StudentSolveAssignmentPart2PhotoTests(TestCase):
         res = self.client.get(reverse("student_solve_assignment", args=[self.assignment.id]))
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Загрузите решение с телефона")
-        self.assertNotContains(res, "Введите ответ")
+        soup = BeautifulSoup(res.content, "html.parser")
+        self.assertIsNone(soup.select_one(f"#answer_{self.task.id}"))
+        self.assertIsNotNone(soup.select_one(f"#qr_block_{self.task.id}"))
         self.assertTrue(Submission.objects.filter(student=self.student, assignment=self.assignment, task=self.task).exists())
-

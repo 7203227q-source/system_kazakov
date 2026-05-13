@@ -1229,6 +1229,22 @@ def student_solve_assignment(request, assignment_id):
         correct_count = 0
         subs_by_task_id = {}
         for task in tasks:
+            max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+            if max_points_effective > 1:
+                sub, _created = Submission.objects.get_or_create(
+                    student=request.user,
+                    task=task,
+                    assignment=assignment,
+                    defaults={
+                        'user_answer': '',
+                        'is_correct': None,
+                        'score': 0,
+                        'primary_score': 0,
+                    },
+                )
+                subs_by_task_id[task.id] = sub
+                continue
+
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
             
             # Нормализация: заменяем запятые на точки для сравнения
@@ -1278,7 +1294,8 @@ def student_solve_assignment(request, assignment_id):
         if action == 'finish':
             missing_part2 = []
             for t in tasks:
-                if int(t.exam_points or 0) > 1:
+                max_points_effective = max(int(t.exam_points or 0), int(getattr(t.task_type, "max_points", 0) or 0))
+                if max_points_effective > 1:
                     sub = subs_by_task_id.get(t.id)
                     if not sub or not sub.image_url:
                         missing_part2.append(t)
@@ -1290,13 +1307,14 @@ def student_solve_assignment(request, assignment_id):
             for t in tasks:
                 record_task_log(request.user, t, subs_by_task_id.get(t.id), assignment, time_spent_per_task)
         # We need to know the total primary score possible for this assignment and the student's primary score
-        total_primary = sum(t.exam_points for t in tasks)
+        total_primary = 0
         student_primary = 0
         for t in tasks:
+            max_points_effective = max(int(t.exam_points or 0), int(getattr(t.task_type, "max_points", 0) or 0))
+            total_primary += max_points_effective
             sub = subs_by_task_id.get(t.id) or Submission.objects.filter(assignment=assignment, task=t, student=request.user).first()
             if sub:
-                # If part 1 (1 point), score is based on is_correct. If part 2, it's based on primary_score field
-                if t.exam_points == 1:
+                if max_points_effective <= 1:
                     student_primary += 1 if sub.is_correct else 0
                 else:
                     student_primary += int(sub.primary_score or 0)
@@ -1345,7 +1363,9 @@ def student_solve_assignment(request, assignment_id):
         task.saved_submission = saved_submissions.get(task.id)
         
         # Определяем, нужен ли черновик / фото
-        is_part2 = task.exam_points > 1
+        max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+        task.exam_points_effective = max_points_effective
+        is_part2 = max_points_effective > 1
         requires_draft = False
         
         if not is_part2 and request.user.draft_check_probability > 0:
@@ -3851,7 +3871,7 @@ def api_verify_with_ai(request, submission_id):
         return JsonResponse({'error': 'Image not found'}, status=400)
 
     task = submission.task
-    max_points = task.exam_points
+    max_points = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
     if int(max_points or 0) <= 1:
         return JsonResponse({'error': 'only_second_part'}, status=400)
     if submission.assignment_id:
