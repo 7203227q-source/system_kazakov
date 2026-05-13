@@ -442,6 +442,26 @@
                     <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider flex items-center mb-6">
                         <i class="fas fa-list-check text-indigo-500 mr-2"></i> Экзамен
                     </h3>
+                    {% if available_subjects %}
+                        <form method="POST" action="{% url 'tutor_add_student_subject' selected_student.id %}" class="bg-gray-50 border border-gray-100 rounded-xl p-4 mb-4">
+                            {% csrf_token %}
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Добавить предмет</label>
+                                    <select name="subject_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                                        {% for s in available_subjects %}
+                                            <option value="{{ s.id }}">{{ s.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="md:col-span-1 flex justify-end">
+                                    <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition w-full md:w-auto">
+                                        Добавить
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    {% endif %}
                     <div class="space-y-3">
                         {% for p in profiles %}
                         <form method="POST" action="{% url 'tutor_update_student_exam_settings' selected_student.id %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-gray-50 border border-gray-100 rounded-xl p-4">

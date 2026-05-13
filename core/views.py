@@ -1834,6 +1834,9 @@ def tutor_dashboard(request):
         for p in profiles:
             p.exam_formats_for_subject = ExamFormat.objects.filter(subject_id=p.subject_id).order_by('-is_active', '-year', 'name')
             p.latest_snapshot = DailySnapshot.objects.filter(student=selected_student, subject=p.subject).order_by('-date').first()
+        all_subjects = list(Subject.objects.all().order_by("name"))
+        profile_subject_ids = {int(p.subject_id) for p in profiles}
+        available_subjects = [s for s in all_subjects if int(s.id) not in profile_subject_ids]
         if profiles:
             chart_subject_id = int(chart_subject_id_raw) if chart_subject_id_raw.isdigit() else profiles[0].subject_id
             chart_range = int(chart_range_raw) if chart_range_raw.isdigit() else 30
@@ -2025,6 +2028,7 @@ def tutor_dashboard(request):
         'student_correct_rate': student_correct_rate,
         'recent_rewards': recent_rewards,
         'profiles': profiles if selected_student else [],
+        'available_subjects': available_subjects if selected_student else [],
     }
     return render(request, 'core/tutor_dashboard.html', context)
 
