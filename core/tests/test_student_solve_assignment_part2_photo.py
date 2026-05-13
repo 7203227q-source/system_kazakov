@@ -25,7 +25,7 @@ class StudentSolveAssignmentPart2PhotoTests(TestCase):
         self.client.login(username="s", password="pass")
         res = self.client.get(reverse("student_solve_assignment", args=[self.assignment.id]))
         self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "Загрузите решение с телефона")
+        self.assertContains(res, "Загрузите решение")
         soup = BeautifulSoup(res.content, "html.parser")
         self.assertIsNone(soup.select_one(f"#answer_{self.task.id}"))
         self.assertIsNotNone(soup.select_one(f"#qr_block_{self.task.id}"))
