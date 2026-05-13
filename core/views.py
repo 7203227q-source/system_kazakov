@@ -3852,6 +3852,8 @@ def api_verify_with_ai(request, submission_id):
 
     task = submission.task
     max_points = task.exam_points
+    if int(max_points or 0) <= 1:
+        return JsonResponse({'error': 'only_second_part'}, status=400)
     if submission.assignment_id:
         unlocked = request.session.get('whiteboard_unlocked', {}) or {}
         unlocked[f"{int(submission.assignment_id)}:{int(task.id)}"] = True
@@ -3867,96 +3869,80 @@ def api_verify_with_ai(request, submission_id):
     except Exception:
         model = ""
 
-    used_openrouter = False
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
+    if not api_key or not model:
+        return JsonResponse({'error': 'ai_not_configured'}, status=400)
+
     feedback = ""
     is_correct = False
     primary_score = 0
 
-    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
-    if api_key and model:
+    try:
+        from .http_headers import require_ascii
+        require_ascii(api_key, "OPENROUTER_API_KEY")
+        import base64
+        import mimetypes
+        import json as pyjson
+
+        file_path = submission.image_url.path
+        mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
+        with open(file_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode("utf-8")
+        data_url = f"data:{mime};base64,{img_b64}"
+
+        from .http_headers import sanitize_header_value
+        referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
+        title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
+
+        prompt = (
+            "Оцени решение по фото как эксперт экзамена.\n"
+            f"Максимум баллов: {max_points}.\n"
+            "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
+        )
+
+        res = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": referer,
+                "X-Title": title,
+            },
+            json={
+                "model": model,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": data_url}},
+                        ],
+                    },
+                ],
+            },
+            timeout=90,
+        )
+
+        if res.status_code != 200:
+            return JsonResponse({'error': 'ai_failed'}, status=400)
+
+        data = res.json()
+        content = data["choices"][0]["message"]["content"]
         try:
-            from .http_headers import require_ascii
-            require_ascii(api_key, "OPENROUTER_API_KEY")
-            import base64
-            import mimetypes
-            import json as pyjson
-
-            file_path = submission.image_url.path
-            mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
-            with open(file_path, "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode("utf-8")
-            data_url = f"data:{mime};base64,{img_b64}"
-
-            from .http_headers import sanitize_header_value
-            referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
-            title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
-
-            prompt = (
-                "Оцени решение по фото как эксперт экзамена.\n"
-                f"Максимум баллов: {max_points}.\n"
-                "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
-            )
-
-            res = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": referer,
-                    "X-Title": title,
-                },
-                json={
-                    "model": model,
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {"type": "image_url", "image_url": {"url": data_url}},
-                            ],
-                        },
-                    ],
-                },
-                timeout=90,
-            )
-
-            if res.status_code != 200:
-                raise ValueError(res.text[:500])
-
-            data = res.json()
-            content = data["choices"][0]["message"]["content"]
-            try:
-                parsed = pyjson.loads(content)
-            except Exception:
-                match = re.search(r"\{[\s\S]*\}", str(content))
-                if not match:
-                    raise ValueError("No JSON found")
-                parsed = pyjson.loads(match.group(0))
-
-            primary_score = int(parsed.get("primary_score") or 0)
-            is_correct = bool(parsed.get("is_correct"))
-            feedback = str(parsed.get("feedback") or "")
-            used_openrouter = True
+            parsed = pyjson.loads(content)
         except Exception:
-            used_openrouter = False
+            match = re.search(r"\{[\s\S]*\}", str(content))
+            if not match:
+                return JsonResponse({'error': 'ai_failed'}, status=400)
+            parsed = pyjson.loads(match.group(0))
 
-    if not used_openrouter:
-        import time
-        time.sleep(1.0)
-        if max_points == 1:
-            primary_score = 1
-            feedback = "Отличный черновик, ход решения понятен. Ответ совпадает с правильным."
-            is_correct = True
-        else:
-            import random
-            primary_score = random.randint(max_points // 2, max_points)
-            is_correct = primary_score == max_points
-            if is_correct:
-                feedback = "Решение полностью верное и обоснованное. Высший балл."
-            else:
-                feedback = f"В решении есть небольшая вычислительная ошибка на промежуточном этапе. Оценено в {primary_score} из {max_points} баллов."
+        primary_score = int(parsed.get("primary_score") or 0)
+        is_correct = bool(parsed.get("is_correct"))
+        feedback = str(parsed.get("feedback") or "")
+    except Exception:
+        return JsonResponse({'error': 'ai_failed'}, status=400)
             
     points_earned = int(primary_score or 0) if int(max_points or 0) > 1 else (1 if is_correct else 0)
     submission.primary_score = primary_score
