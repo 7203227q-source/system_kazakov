@@ -1,5 +1,3 @@
-import uuid
-
 from django.test import TestCase
 from django.urls import reverse
 
@@ -21,15 +19,15 @@ class StudentSolveAssignmentDesktopUploadTests(TestCase):
         self.assignment = Assignment.objects.create(tutor=self.tutor, student=self.student, title="A", is_draft=False, exam_format=ef)
         self.assignment.tasks.add(self.task)
 
-        self.token = uuid.UUID("11111111-1111-1111-1111-111111111111")
-        Submission.objects.create(student=self.student, assignment=self.assignment, task=self.task, upload_token=self.token)
+        Submission.objects.create(student=self.student, assignment=self.assignment, task=self.task)
 
     def test_page_contains_desktop_upload_handler(self):
         self.client.login(username="s", password="pass")
         res = self.client.get(reverse("student_solve_assignment", args=[self.assignment.id]))
         self.assertEqual(res.status_code, 200)
-        self.assertContains(res, f"desktop_file_{self.task.id}")
+        self.assertContains(res, f"camera_file_{self.task.id}")
+        self.assertContains(res, f"gallery_file_{self.task.id}")
         self.assertContains(res, "capture=\"environment\"")
-        self.assertContains(res, str(self.token))
+        self.assertContains(res, "/api/submission/")
         self.assertContains(res, "/upload/")
         self.assertContains(res, "addEventListener('change'")

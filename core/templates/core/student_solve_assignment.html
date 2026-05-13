@@ -87,8 +87,7 @@
                     <div class="bg-indigo-50 border-t border-indigo-100 p-4 sm:p-6">
                         {% if task.needs_photo %}
                         
-                        <!-- Блок для загрузки решения через QR (Развернутая часть или Черновик) -->
-                        <div class="flex flex-col items-center bg-white p-6 rounded-xl border border-dashed border-indigo-300 shadow-sm" id="qr_block_{{ task.id }}">
+                        <div class="flex flex-col items-center bg-white p-6 rounded-xl border border-dashed border-indigo-300 shadow-sm" id="upload_block_{{ task.id }}">
                             {% if task.saved_submission.image_url %}
                                 <!-- Фото уже загружено -->
                                 <div class="text-center w-full">
@@ -112,125 +111,87 @@
                             {% else %}
                                 <!-- Ожидание загрузки -->
                                 <h4 class="font-bold text-indigo-900 mb-2 text-center">Загрузите решение</h4>
-                                <p class="text-xs text-gray-500 mb-4 text-center max-w-sm">Можно загрузить фото прямо здесь (с телефона откроется камера) или через QR-код с другого устройства.</p>
-                                
-                                <div class="bg-white p-2 rounded-xl shadow-sm border border-gray-100 inline-block mb-4 relative">
-                                    <img src="data:image/png;base64,{{ task.qr_code_base64 }}" alt="QR Code" class="w-40 h-40">
-                                    
-                                    <!-- Оверлей загрузки -->
-                                    <div id="qr_loading_{{ task.id }}" class="absolute inset-0 bg-white/80 flex items-center justify-center hidden rounded-xl backdrop-blur-sm">
-                                        <i class="fas fa-circle-notch fa-spin text-primary text-3xl"></i>
+                                <p class="text-xs text-gray-500 mb-4 text-center max-w-sm">С телефона можно сразу сделать фото. С компьютера — выбрать файл.</p>
+                                <div id="upload_loading_{{ task.id }}" class="hidden mb-3">
+                                    <i class="fas fa-circle-notch fa-spin text-primary text-2xl"></i>
+                                </div>
+                                <div class="mt-2 text-center w-full">
+                                    <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                                        <input type="file" id="camera_file_{{ task.id }}" class="hidden" accept="image/*" capture="environment">
+                                        <button type="button" onclick="const el=document.getElementById('camera_file_{{ task.id }}'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Сделать фото</button>
+                                        <input type="file" id="gallery_file_{{ task.id }}" class="hidden" accept="image/*">
+                                        <button type="button" onclick="const el=document.getElementById('gallery_file_{{ task.id }}'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Выбрать файл</button>
+                                    </div>
+                                    <div id="upload_status_{{ task.id }}" class="text-xs text-gray-500 mt-2 hidden"></div>
+                                    <div id="upload_preview_{{ task.id }}" class="hidden mt-3">
+                                        <img id="upload_preview_img_{{ task.id }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 shadow-sm" alt="Предпросмотр">
                                     </div>
                                 </div>
-                                
-                                <div class="flex items-center text-xs text-indigo-600 font-medium animate-pulse">
-                                    <i class="fas fa-sync-alt fa-spin mr-2"></i> Ожидание загрузки фото...
-                                </div>
-                                
-                                <div class="mt-4 text-center w-full">
-                                    <p class="text-xs text-gray-400 mb-2">Загрузить фото:</p>
-                                    <input type="file" id="desktop_file_{{ task.id }}" class="hidden" accept="image/*" capture="environment">
-                                    <button type="button" onclick="document.getElementById('desktop_file_{{ task.id }}').click()" class="text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-medium">Сделать фото / выбрать файл</button>
-                                    <div id="desktop_status_{{ task.id }}" class="text-xs text-gray-500 mt-2 hidden"></div>
-                                    <div id="desktop_preview_{{ task.id }}" class="hidden mt-3">
-                                        <img id="desktop_preview_img_{{ task.id }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 shadow-sm" alt="Предпросмотр">
-                                    </div>
-                                </div>
-                                
+
                                 <script>
                                     document.addEventListener('DOMContentLoaded', () => {
                                         const submissionId = {{ task.saved_submission.id }};
                                         const taskId = {{ task.id }};
-                                        const token = "{{ task.saved_submission.upload_token }}";
-                                        const uploadUrl = `/upload/${token}/`;
-                                        const fileInput = document.getElementById(`desktop_file_${taskId}`);
-                                        const statusEl = document.getElementById(`desktop_status_${taskId}`);
-                                        const previewWrap = document.getElementById(`desktop_preview_${taskId}`);
-                                        const previewImg = document.getElementById(`desktop_preview_img_${taskId}`);
-                                        const loadingEl = document.getElementById(`qr_loading_${taskId}`);
-                                        if (fileInput) {
-                                            fileInput.addEventListener('change', async () => {
-                                                const file = fileInput.files && fileInput.files[0];
-                                                if (!file) return;
-                                                if (statusEl) {
-                                                    statusEl.classList.remove('hidden');
-                                                    statusEl.textContent = 'Загрузка...';
-                                                }
-                                                if (previewImg && previewWrap) {
-                                                    previewImg.src = URL.createObjectURL(file);
-                                                    previewWrap.classList.remove('hidden');
-                                                }
-                                                if (loadingEl) loadingEl.classList.remove('hidden');
-                                                const formData = new FormData();
-                                                formData.append('image', file);
-                                                try {
-                                                    const upRes = await fetch(uploadUrl, {
-                                                        method: 'POST',
-                                                        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-                                                        body: formData
-                                                    });
-                                                    if (!upRes.ok) throw new Error('upload_failed');
-                                                    const stRes = await fetch(`/api/submission/${submissionId}/status/`);
-                                                    if (!stRes.ok) throw new Error('status_failed');
-                                                    const data = await stRes.json();
-                                                    if (data.has_image) {
-                                                        const block = document.getElementById(`qr_block_${taskId}`);
-                                                        block.innerHTML = `
-                                                            <div class="text-center w-full animate-fade-in">
-                                                                <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                                                                    <i class="fas fa-check"></i>
-                                                                </div>
-                                                                <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
-                                                                <img src="${data.image_url || (previewImg ? previewImg.src : '')}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
-                                                                ${Number({{ task.exam_points_effective|default:0 }}) > 1 ? `<button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}">
-                                                                    <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
-                                                                </button>` : ''}
-                                                            </div>
-                                                        `;
-                                                    }
-                                                    if (statusEl) statusEl.textContent = 'Загружено';
-                                                } catch (e) {
-                                                    if (statusEl) statusEl.textContent = 'Ошибка загрузки';
-                                                    alert('Не удалось загрузить фото. Попробуйте ещё раз.');
-                                                } finally {
-                                                    if (loadingEl) loadingEl.classList.add('hidden');
-                                                }
-                                            });
-                                        }
-                                        const interval = setInterval(async () => {
+                                        const uploadUrl = `/api/submission/${submissionId}/upload/`;
+                                        const cameraInput = document.getElementById(`camera_file_${taskId}`);
+                                        const galleryInput = document.getElementById(`gallery_file_${taskId}`);
+                                        const statusEl = document.getElementById(`upload_status_${taskId}`);
+                                        const previewWrap = document.getElementById(`upload_preview_${taskId}`);
+                                        const previewImg = document.getElementById(`upload_preview_img_${taskId}`);
+                                        const loadingEl = document.getElementById(`upload_loading_${taskId}`);
+
+                                        async function handleFile(file) {
+                                            if (!file) return;
+                                            if (statusEl) {
+                                                statusEl.classList.remove('hidden');
+                                                statusEl.textContent = 'Загрузка...';
+                                            }
+                                            if (previewImg && previewWrap) {
+                                                previewImg.src = URL.createObjectURL(file);
+                                                previewWrap.classList.remove('hidden');
+                                            }
+                                            if (loadingEl) loadingEl.classList.remove('hidden');
+
+                                            const formData = new FormData();
+                                            formData.append('image', file);
                                             try {
-                                                const res = await fetch(`/api/submission/${submissionId}/status/`);
-                                                if (res.ok) {
-                                                    const data = await res.json();
-                                                    if (data.has_image) {
-                                                        clearInterval(interval);
-                                                        // Обновляем UI
-                                                        const block = document.getElementById(`qr_block_${taskId}`);
-                                                        block.innerHTML = `
-                                                            <div class="text-center w-full animate-fade-in">
-                                                                <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                                                                    <i class="fas fa-check"></i>
-                                                                </div>
-                                                                <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
-                                                                <img src="${data.image_url}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
-                                                                ${Number({{ task.exam_points_effective|default:0 }}) > 1 ? `<div class="flex flex-col sm:flex-row gap-2 justify-center">
-                                                                <button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}">
-                                                                    <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
-                                                                </button>` : ''}
-                                                                ${Number({{ task.exam_points_effective|default:0 }}) > 1 ? `<button type="button" onclick="verifyWithAICompare(${submissionId}, ${taskId})" class="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_compare_${taskId}">
-                                                                    <i class="fas fa-layer-group mr-2"></i> Проверить 5 моделями
-                                                                </button></div>` : ''}
-                                                            </div>
-                                                        `;
-                                                    }
-                                                }
-                                                                </div>` : ''}
-                                                            </div>
-                                                        `;
-                                                    }
-                                                }
-                                            } catch(e) {}
-                                        }, 3000); // Раз в 3 секунды
+                                                const upRes = await fetch(uploadUrl, {
+                                                    method: 'POST',
+                                                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                                                    body: formData
+                                                });
+                                                const data = await upRes.json();
+                                                if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
+
+                                                const block = document.getElementById(`upload_block_${taskId}`);
+                                                block.innerHTML = `
+                                                    <div class="text-center w-full animate-fade-in">
+                                                        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                                                            <i class="fas fa-check"></i>
+                                                        </div>
+                                                        <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
+                                                        <img src="${data.image_url || (previewImg ? previewImg.src : '')}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
+                                                        ${Number({{ task.exam_points_effective|default:0 }}) > 1 ? `<div class="flex flex-col sm:flex-row gap-2 justify-center">
+                                                            <button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}">
+                                                                <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
+                                                            </button>
+                                                            <button type="button" onclick="verifyWithAICompare(${submissionId}, ${taskId})" class="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-black transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_compare_${taskId}">
+                                                                <i class="fas fa-layer-group mr-2"></i> Проверить 5 моделями
+                                                            </button>
+                                                        </div>` : ''}
+                                                    </div>
+                                                `;
+                                                if (statusEl) statusEl.textContent = 'Загружено';
+                                            } catch (e) {
+                                                if (statusEl) statusEl.textContent = 'Ошибка загрузки';
+                                                alert('Не удалось загрузить фото. Попробуйте ещё раз.');
+                                            } finally {
+                                                if (loadingEl) loadingEl.classList.add('hidden');
+                                            }
+                                        }
+
+                                        if (cameraInput) cameraInput.addEventListener('change', () => handleFile(cameraInput.files && cameraInput.files[0]));
+                                        if (galleryInput) galleryInput.addEventListener('change', () => handleFile(galleryInput.files && galleryInput.files[0]));
                                     });
                                 </script>
                             {% endif %}

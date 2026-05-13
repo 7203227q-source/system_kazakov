@@ -28,5 +28,5 @@ class StudentSolveAssignmentPart2PhotoTests(TestCase):
         self.assertContains(res, "Загрузите решение")
         soup = BeautifulSoup(res.content, "html.parser")
         self.assertIsNone(soup.select_one(f"#answer_{self.task.id}"))
-        self.assertIsNotNone(soup.select_one(f"#qr_block_{self.task.id}"))
+        self.assertIsNotNone(soup.select_one(f"#upload_block_{self.task.id}"))
         self.assertTrue(Submission.objects.filter(student=self.student, assignment=self.assignment, task=self.task).exists())

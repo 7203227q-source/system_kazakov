@@ -3863,6 +3863,19 @@ def api_submission_status(request, submission_id):
     image_url = submission.image_url.url if has_image else None
     return JsonResponse({'has_image': has_image, 'image_url': image_url})
 
+def api_submission_upload(request, submission_id):
+    if request.method != 'POST' or not request.user.is_authenticated:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    submission = get_object_or_404(Submission, id=submission_id, student=request.user)
+    image = request.FILES.get('image')
+    if not image:
+        return JsonResponse({'error': 'Image not found'}, status=400)
+
+    submission.image_url = image
+    submission.save(update_fields=['image_url'])
+    return JsonResponse({'status': 'ok', 'image_url': submission.image_url.url})
+
 import re
 from django.conf import settings
 
