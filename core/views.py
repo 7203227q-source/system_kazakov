@@ -2974,10 +2974,11 @@ def tutor_create_assignment(request):
     part2_max = 20
     if selected_exam_format:
         max_num = TaskType.objects.filter(exam_format=selected_exam_format).aggregate(m=models.Max("number")).get("m") or 0
-        if max_num >= 30:
-            part1_max = 20
-            part2_min = 21
-            part2_max = max_num
+        is_physics_ege = (selected_exam_format.subject and (selected_exam_format.subject.name or "").strip().lower() == "физика") and ("егэ" in (selected_exam_format.name or "").lower())
+        if is_physics_ege:
+            part1_max = min(20, max_num or 20)
+            part2_min = part1_max + 1
+            part2_max = max_num or 26
         else:
             part1_max = min(12, max_num or 12)
             part2_min = part1_max + 1

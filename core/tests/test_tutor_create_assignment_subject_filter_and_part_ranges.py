@@ -23,12 +23,12 @@ class TutorCreateAssignmentSubjectFilterAndPartRangesTests(TestCase):
         self.topic_math = Topic.objects.create(subject=self.subj_math, name="T")
 
         self.tt_phys_1 = TaskType.objects.create(exam_format=self.ef_phys, number=1, name="Физика 1", max_points=1)
-        self.tt_phys_30 = TaskType.objects.create(exam_format=self.ef_phys, number=30, name="Физика 30", max_points=3)
+        self.tt_phys_26 = TaskType.objects.create(exam_format=self.ef_phys, number=26, name="Физика 26", max_points=4)
         self.tt_math_1 = TaskType.objects.create(exam_format=self.ef_math, number=1, name="Математика 1", max_points=1)
         self.tt_math_19 = TaskType.objects.create(exam_format=self.ef_math, number=19, name="Математика 19", max_points=4)
 
         Task.objects.create(topic=self.topic_phys, task_type=self.tt_phys_1, correct_answer="1", difficulty=10, exam_points=1, subtype_tag="A")
-        Task.objects.create(topic=self.topic_phys, task_type=self.tt_phys_30, correct_answer="1", difficulty=10, exam_points=3, subtype_tag="A")
+        Task.objects.create(topic=self.topic_phys, task_type=self.tt_phys_26, correct_answer="1", difficulty=10, exam_points=4, subtype_tag="A")
         Task.objects.create(topic=self.topic_math, task_type=self.tt_math_1, correct_answer="1", difficulty=10, exam_points=1, subtype_tag="A")
 
     def test_get_filters_task_types_by_selected_exam_format(self):
@@ -37,19 +37,22 @@ class TutorCreateAssignmentSubjectFilterAndPartRangesTests(TestCase):
             reverse("tutor_create_assignment") + f"?student_id={self.student.id}&exam_format={self.ef_phys.id}"
         )
         self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "Физика 1")
-        self.assertContains(res, "Физика 30")
-        self.assertNotContains(res, "Математика 1")
+        html = res.content.decode("utf-8")
+        self.assertIn("Физика 1", html)
+        self.assertIn("Физика 26", html)
+        self.assertNotIn("Математика 1", html)
 
     def test_part_ranges_are_derived_from_exam_format(self):
         self.client.login(username="t", password="pass")
         res_phys = self.client.get(
             reverse("tutor_create_assignment") + f"?student_id={self.student.id}&exam_format={self.ef_phys.id}"
         )
-        self.assertContains(res_phys, "Тестовая часть (1-20)")
-        self.assertContains(res_phys, "Развернутая часть (21-30)")
+        html_phys = res_phys.content.decode("utf-8")
+        self.assertIn("Тестовая часть (1-20)", html_phys)
+        self.assertIn("Развернутая часть (21-26)", html_phys)
 
         res_math = self.client.get(
             reverse("tutor_create_assignment") + f"?student_id={self.student.id}&exam_format={self.ef_math.id}"
         )
-        self.assertContains(res_math, "Тестовая часть (1-12)")
+        html_math = res_math.content.decode("utf-8")
+        self.assertIn("Тестовая часть (1-12)", html_math)
