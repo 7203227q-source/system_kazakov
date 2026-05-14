@@ -749,7 +749,34 @@ def student_practice(request):
         request.session.setdefault("practice_results", {})
         request.session.modified = True
 
-    return render(request, 'core/student_practice.html', {'task': task, 'total_xp': total_xp, 'total_level': total_level, 'mode': mode, 'attempt_token': attempt_token})
+    is_extended = bool(task and is_extended_answer_task(task))
+    practice_submission = None
+    if task is not None and mode == 'srs' and is_extended:
+        # Для развёрнутой части в режиме SRS нам нужен Submission, чтобы загрузить фото и проверить ИИ.
+        practice_submission = (
+            Submission.objects.filter(student=request.user, task=task, assignment__isnull=True)
+            .order_by("-created_at")
+            .first()
+        )
+        if practice_submission is None:
+            practice_submission = Submission.objects.create(
+                student=request.user,
+                task=task,
+                user_answer="",
+                is_correct=None,
+                score=0,
+                primary_score=0,
+            )
+
+    return render(request, 'core/student_practice.html', {
+        'task': task,
+        'total_xp': total_xp,
+        'total_level': total_level,
+        'mode': mode,
+        'attempt_token': attempt_token,
+        'is_extended': is_extended,
+        'practice_submission': practice_submission,
+    })
 
 
 @login_required
@@ -4538,11 +4565,17 @@ def api_verify_with_ai(request, submission_id):
             profile.save()
 
         # Обновляем статистику ошибок только если это в рамках варианта
-        if submission.assignment_id and points_earned == 0:
-            try:
-                process_task_submission(request.user, task, 1)
-            except Exception:
-                pass
+        # Интервальное повторение: для развёрнутой части добавляем в SRS, если балл < максимума,
+        # либо обновляем существующую SRS-запись (если она уже была) на основе результата.
+        try:
+            from core.models import SpacedRepetition
+            max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+            srs_exists = SpacedRepetition.objects.filter(student=request.user, task=task).exists()
+            if srs_exists or int(points_earned or 0) < int(max_points_effective or 0):
+                grade = 5 if int(points_earned or 0) >= int(max_points_effective or 0) else 1
+                process_task_submission(request.user, task, grade)
+        except Exception:
+            pass
 
         solution_html = ""
         variant = task.variants.filter(theme='classic').first()
@@ -4803,11 +4836,17 @@ def api_tutor_verify_with_ai(request, submission_id):
             profile.level = (profile.xp // 100) + 1
             profile.save()
 
-        if submission.assignment_id and points_earned == 0:
-            try:
-                process_task_submission(student, task, 1)
-            except Exception:
-                pass
+        # Интервальное повторение: для развёрнутой части добавляем в SRS, если балл < максимума,
+        # либо обновляем существующую SRS-запись (если она уже была) на основе результата.
+        try:
+            from core.models import SpacedRepetition
+            max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+            srs_exists = SpacedRepetition.objects.filter(student=student, task=task).exists()
+            if srs_exists or int(points_earned or 0) < int(max_points_effective or 0):
+                grade = 5 if int(points_earned or 0) >= int(max_points_effective or 0) else 1
+                process_task_submission(student, task, grade)
+        except Exception:
+            pass
 
         solution_html = ""
         variant = task.variants.filter(theme='classic').first()

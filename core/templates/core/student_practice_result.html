@@ -110,7 +110,7 @@
                 <a href="{% url 'student_dashboard' %}" class="px-6 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition">
                     На главную
                 </a>
-                <a href="{% url 'student_practice' %}" class="px-8 py-3 bg-primary text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-md">
+                <a href="{% url 'student_practice' %}{% if mode == 'srs' %}?mode=srs{% endif %}" class="px-8 py-3 bg-primary text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-md">
                     Следующая задача
                 </a>
             </div>

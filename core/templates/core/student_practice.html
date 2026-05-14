@@ -51,9 +51,11 @@
         <div class="p-4 md:p-8 max-w-3xl mx-auto w-full">
             
             <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sm:gap-0">
-                <h1 class="text-xl md:text-2xl font-bold text-gray-800">Тренажер: Адаптивное задание</h1>
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800">
+                    {% if mode == 'srs' %}Тренажер: Повторить сегодня{% else %}Тренажер: Адаптивное задание{% endif %}
+                </h1>
                 <div class="flex items-center gap-2 self-start sm:self-auto">
-                    {% if task %}
+                    {% if task and mode != 'srs' %}
                     <form method="POST" action="{% url 'student_srs_add' task.id %}">
                         {% csrf_token %}
                         <button type="submit" class="text-gray-600 hover:text-gray-900 transition flex items-center text-sm font-bold bg-white border border-gray-200 px-3 py-2 rounded-lg">
@@ -92,32 +94,162 @@
                     {{ task.get_content_for_theme|safe }}
                 </div>
 
-                <!-- Answer Form -->
+                <!-- Answer / Upload -->
                 <div class="p-4 md:p-6 bg-gray-50 border-t border-gray-100">
-                    <form method="POST" action="{% url 'student_practice' %}" class="flex flex-col sm:flex-row gap-4 mb-4">
-                        {% csrf_token %}
-                        <input type="hidden" name="task_id" value="{{ task.id }}">
-                        <input type="hidden" name="mode" value="{{ mode|default:'' }}">
-                        <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
-                        
-                        <div class="flex-1">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Ваш ответ:</label>
-                            <input type="text" name="answer" required autocomplete="off" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Введите число или слово...">
+                    {% if mode == 'srs' and is_extended %}
+                        <div class="flex flex-col items-center bg-white p-6 rounded-xl border border-dashed border-indigo-300 shadow-sm" id="srs_upload_block">
+                            {% if practice_submission and practice_submission.image_url %}
+                                <div class="text-center w-full">
+                                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                    <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
+                                    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                                        <img src="{{ practice_submission.image_url.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение (стр. 1)" onclick="openImageModal('{{ practice_submission.image_url.url }}')">
+                                        {% if practice_submission.image_url_2 %}
+                                        <img src="{{ practice_submission.image_url_2.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение (стр. 2)" onclick="openImageModal('{{ practice_submission.image_url_2.url }}')">
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                                        <button type="button"
+                                                onclick="verifySrsWithAI({{ practice_submission.id }})"
+                                                class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto"
+                                                id="btn_srs_verify_ai"
+                                        >
+                                            <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
+                                        </button>
+                                    </div>
+                                    <div class="mt-2 text-xs text-gray-500">После проверки задача обновит интервальное повторение и появится следующая.</div>
+                                </div>
+                            {% else %}
+                                <h4 class="font-bold text-indigo-900 mb-2 text-center">Загрузите решение</h4>
+                                <p class="text-xs text-gray-500 mb-4 text-center max-w-sm">Это задача 2-й части. Загрузите фото решения (можно 2 страницы), затем нажмите «Проверить решение через ИИ».</p>
+
+                                <div id="srs_upload_loading" class="hidden mb-3">
+                                    <i class="fas fa-circle-notch fa-spin text-primary text-2xl"></i>
+                                </div>
+                                <div class="mt-2 text-center w-full">
+                                    <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                                        <input type="file" id="srs_file_1" class="hidden" accept="image/*">
+                                        <button type="button" onclick="const el=document.getElementById('srs_file_1'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Стр. 1</button>
+                                        <input type="file" id="srs_file_2" class="hidden" accept="image/*">
+                                        <button type="button" onclick="const el=document.getElementById('srs_file_2'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Стр. 2</button>
+                                    </div>
+                                    <div id="srs_upload_status" class="text-xs text-gray-500 mt-2 hidden"></div>
+                                </div>
+
+                                <div class="mt-4 text-center w-full">
+                                    <button type="button"
+                                            onclick="verifySrsWithAI({{ practice_submission.id }})"
+                                            class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm w-full sm:w-auto flex items-center justify-center mx-auto"
+                                            id="btn_srs_verify_ai"
+                                    >
+                                        <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
+                                    </button>
+                                </div>
+                            {% endif %}
                         </div>
+
+                        <script>
+                            document.addEventListener('DOMContentLoaded', () => {
+                                const submissionId = {{ practice_submission.id|default:0 }};
+                                const uploadUrl = `/api/submission/${submissionId}/upload/`;
+                                const file1 = document.getElementById('srs_file_1');
+                                const file2 = document.getElementById('srs_file_2');
+                                const statusEl = document.getElementById('srs_upload_status');
+                                const loadingEl = document.getElementById('srs_upload_loading');
+
+                                async function upload(which, file) {
+                                    if (!submissionId || !file) return;
+                                    if (statusEl) {
+                                        statusEl.classList.remove('hidden');
+                                        statusEl.textContent = `Загрузка ${which}...`;
+                                    }
+                                    if (loadingEl) loadingEl.classList.remove('hidden');
+                                    const formData = new FormData();
+                                    formData.append(which === 'image2' ? 'image2' : 'image', file);
+                                    try {
+                                        const upRes = await fetch(uploadUrl, {
+                                            method: 'POST',
+                                            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                                            body: formData
+                                        });
+                                        const data = await upRes.json();
+                                        if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
+                                        if (statusEl) statusEl.textContent = 'Загружено';
+                                        location.reload();
+                                    } catch (e) {
+                                        if (statusEl) statusEl.textContent = 'Ошибка загрузки';
+                                        alert('Не удалось загрузить фото. Попробуйте ещё раз.');
+                                    } finally {
+                                        if (loadingEl) loadingEl.classList.add('hidden');
+                                    }
+                                }
+
+                                if (file1) file1.addEventListener('change', () => upload('image', file1.files && file1.files[0]));
+                                if (file2) file2.addEventListener('change', () => upload('image2', file2.files && file2.files[0]));
+                            });
+
+                            async function verifySrsWithAI(submissionId) {
+                                const btn = document.getElementById('btn_srs_verify_ai');
+                                if (!submissionId) return;
+                                if (btn) {
+                                    btn.disabled = true;
+                                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Проверка...';
+                                }
+                                try {
+                                    const res = await fetch(`/api/submission/${submissionId}/verify/`, {
+                                        method: 'POST',
+                                        credentials: 'same-origin',
+                                        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                                    });
+                                    const data = await res.json().catch(() => ({}));
+                                    if (!res.ok) {
+                                        const msg = (data && data.error === 'ai_retry_later')
+                                            ? `Повторите через ${data.retry_after || 120} сек.`
+                                            : 'Не удалось проверить через ИИ';
+                                        alert(msg);
+                                        return;
+                                    }
+                                    // После проверки SRS обновлён на сервере — показываем следующую задачу.
+                                    window.location.href = "{% url 'student_practice' %}?mode=srs";
+                                } catch (e) {
+                                    alert('Ошибка соединения с сервером');
+                                } finally {
+                                    if (btn) {
+                                        btn.disabled = false;
+                                        btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить решение через ИИ';
+                                    }
+                                }
+                            }
+                        </script>
+                    {% else %}
+                        <form method="POST" action="{% url 'student_practice' %}" class="flex flex-col sm:flex-row gap-4 mb-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <input type="hidden" name="mode" value="{{ mode|default:'' }}">
+                            <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                            
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Ваш ответ:</label>
+                                <input type="text" name="answer" required autocomplete="off" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Введите число или слово...">
+                            </div>
+                            
+                            <div class="flex items-end">
+                                <button type="submit" class="w-full sm:w-auto bg-primary hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition shadow-sm">
+                                    Проверить
+                                </button>
+                            </div>
+                        </form>
                         
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full sm:w-auto bg-primary hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg transition shadow-sm">
-                                Проверить
-                            </button>
+                        {% if task.fipi_id %}
+                        <div class="text-right">
+                            <a href="https://os.fipi.ru/tasks/1/a" target="_blank" class="text-xs text-gray-400 hover:text-gray-600 transition">
+                                <i class="fas fa-external-link-alt mr-1"></i> Источник: Открытый банк заданий ФИПИ
+                            </a>
                         </div>
-                    </form>
-                    
-                    {% if task.fipi_id %}
-                    <div class="text-right">
-                        <a href="https://os.fipi.ru/tasks/1/a" target="_blank" class="text-xs text-gray-400 hover:text-gray-600 transition">
-                            <i class="fas fa-external-link-alt mr-1"></i> Источник: Открытый банк заданий ФИПИ
-                        </a>
-                    </div>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>
