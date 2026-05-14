@@ -482,6 +482,11 @@ class WhiteboardSession(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='whiteboard_sessions')
     title = models.CharField(max_length=120, blank=True, null=True)
     snapshot_json = models.TextField(blank=True, null=True)
+    ai_score = models.IntegerField(null=True, blank=True)
+    ai_max_score = models.IntegerField(null=True, blank=True)
+    ai_feedback = models.TextField(blank=True, null=True)
+    ai_last_verify_at = models.DateTimeField(null=True, blank=True)
+    ai_verified_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="whiteboard_ai_verified")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
