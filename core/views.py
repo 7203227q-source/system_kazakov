@@ -4195,14 +4195,26 @@ def mobile_upload_draft(request, token):
     submission = get_object_or_404(Submission, upload_token=token)
     if request.method == 'POST':
         image = request.FILES.get('image')
-        if not image:
+        image2 = request.FILES.get('image2')
+        if not image and not image2:
             return JsonResponse({'error': 'Файл не найден'}, status=400)
-            
-        submission.image_url = image
-        # Invalidate the token so it can't be used again
-        submission.upload_token = None
-        submission.save()
-        return JsonResponse({'status': 'ok'})
+
+        update_fields = []
+        if image:
+            submission.image_url = image
+            update_fields.append('image_url')
+        if image2:
+            submission.image_url_2 = image2
+            update_fields.append('image_url_2')
+
+        # Не инвалидируем token после 1-й страницы, чтобы можно было загрузить 2-ю без обновления.
+        # (Token инвалидируется вручную/по бизнес-логике позже, если потребуется.)
+        submission.save(update_fields=update_fields)
+        return JsonResponse({
+            'status': 'ok',
+            'image_url': submission.image_url.url if submission.image_url else None,
+            'image_url_2': submission.image_url_2.url if getattr(submission, "image_url_2", None) else None,
+        })
         
     return render(request, 'core/mobile_upload.html', {'submission': submission, 'token': token})
 
@@ -4210,7 +4222,9 @@ def api_submission_status(request, submission_id):
     submission = get_object_or_404(Submission, id=submission_id)
     has_image = bool(submission.image_url)
     image_url = submission.image_url.url if has_image else None
-    return JsonResponse({'has_image': has_image, 'image_url': image_url})
+    has_image_2 = bool(getattr(submission, "image_url_2", None))
+    image_url_2 = submission.image_url_2.url if has_image_2 else None
+    return JsonResponse({'has_image': has_image, 'image_url': image_url, 'has_image_2': has_image_2, 'image_url_2': image_url_2})
 
 def api_submission_upload(request, submission_id):
     if request.method != 'POST' or not request.user.is_authenticated:

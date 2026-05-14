@@ -20,16 +20,24 @@
         <p class="text-sm text-gray-500 mb-6">Сделайте четкое фото вашей тетради с решением задачи.</p>
         
         <form id="upload-form" enctype="multipart/form-data">
-            <input type="file" id="file-input" name="image" accept="image/*" capture="environment" class="hidden">
-            <button type="button" onclick="document.getElementById('file-input').click()" class="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-md hover:bg-indigo-700 transition flex items-center justify-center">
-                <i class="fas fa-upload mr-2"></i> Выбрать фото
-            </button>
+            <div id="pickers" class="space-y-3">
+                <label class="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-md hover:bg-indigo-700 transition flex items-center justify-center cursor-pointer">
+                    <i class="fas fa-camera mr-2"></i> Стр. 1: сделать фото
+                    <input type="file" id="file-input-1" name="image" accept="image/*" capture="environment" class="sr-only">
+                </label>
+                <label id="btn-pick-2" class="w-full bg-indigo-50 text-indigo-700 py-4 rounded-xl font-bold text-lg shadow-sm hover:bg-indigo-100 transition flex items-center justify-center cursor-pointer hidden border border-indigo-200">
+                    <i class="fas fa-camera mr-2"></i> Стр. 2: сделать фото
+                    <input type="file" id="file-input-2" name="image2" accept="image/*" capture="environment" class="sr-only">
+                </label>
+                <p id="hint-2" class="text-xs text-gray-500 hidden">Если решение не помещается — добавьте вторую страницу.</p>
+            </div>
         </form>
         
         <div id="preview-container" class="hidden mt-6">
+            <div class="text-xs text-gray-500 mb-2" id="preview-title"></div>
             <img id="image-preview" class="w-full h-auto rounded-lg border border-gray-200 mb-4" src="" alt="Предпросмотр">
             <button id="submit-btn" class="w-full bg-green-500 text-white py-3 rounded-xl font-bold text-lg shadow-md hover:bg-green-600 transition">
-                Отправить решение
+                Отправить
             </button>
             <button onclick="resetForm()" class="w-full mt-2 text-gray-500 py-2 font-medium">Переснять</button>
         </div>
@@ -44,49 +52,103 @@
         <div class="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">
             <i class="fas fa-check"></i>
         </div>
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">Отлично!</h1>
-        <p class="text-gray-500 mb-6">Фото успешно загружено. Вы можете вернуться к компьютеру и продолжить решение варианта.</p>
-        <button onclick="window.close()" class="bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-gray-200">Закрыть окно</button>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2" id="success-title">Отлично!</h1>
+        <p class="text-gray-500 mb-6" id="success-text">Фото успешно загружено.</p>
+        <div class="space-y-2">
+            <button id="btn-add-second" class="w-full bg-indigo-600 text-white py-3 px-6 rounded-xl font-bold hover:bg-indigo-700 transition hidden">
+                Добавить 2-ю страницу
+            </button>
+            <button onclick="window.close()" class="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-gray-200">Закрыть окно</button>
+        </div>
     </div>
 
 <script>
-    const fileInput = document.getElementById('file-input');
+    const fileInput1 = document.getElementById('file-input-1');
+    const fileInput2 = document.getElementById('file-input-2');
+    const btnPick2 = document.getElementById('btn-pick-2');
+    const hint2 = document.getElementById('hint-2');
     const previewContainer = document.getElementById('preview-container');
     const imagePreview = document.getElementById('image-preview');
-    const uploadForm = document.getElementById('upload-form');
     const submitBtn = document.getElementById('submit-btn');
     const uploadContainer = document.getElementById('upload-container');
     const successContainer = document.getElementById('success-container');
     const loading = document.getElementById('loading');
+    const previewTitle = document.getElementById('preview-title');
+    const successTitle = document.getElementById('success-title');
+    const successText = document.getElementById('success-text');
+    const btnAddSecond = document.getElementById('btn-add-second');
+
+    let currentField = null; // 'image' | 'image2'
+    let currentFile = null;
     
-    fileInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                imagePreview.src = e.target.result;
-                document.querySelector('#upload-form button').classList.add('hidden');
-                previewContainer.classList.remove('hidden');
-            }
-            reader.readAsDataURL(this.files[0]);
+    function showSecondPicker() {
+        if (btnPick2) btnPick2.classList.remove('hidden');
+        if (hint2) hint2.classList.remove('hidden');
+        if (btnAddSecond) btnAddSecond.classList.remove('hidden');
+    }
+
+    function openPicker2() {
+        // fallback: user can tap on label itself, but button helps after success screen
+        if (btnPick2) btnPick2.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+
+    if (btnAddSecond) {
+        btnAddSecond.addEventListener('click', () => {
+            successContainer.classList.add('hidden');
+            uploadContainer.classList.remove('hidden');
+            showSecondPicker();
+            openPicker2();
+        });
+    }
+
+    function handleFilePicked(field, file) {
+        if (!file) return;
+        currentField = field;
+        currentFile = file;
+        if (previewTitle) previewTitle.textContent = (field === 'image2') ? 'Предпросмотр (страница 2)' : 'Предпросмотр (страница 1)';
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imagePreview.src = e.target.result;
+            document.getElementById('pickers').classList.add('hidden');
+            previewContainer.classList.remove('hidden');
         }
+        reader.readAsDataURL(file);
+    }
+
+    fileInput1.addEventListener('change', function() {
+        if (this.files && this.files[0]) handleFilePicked('image', this.files[0]);
     });
-    
+    fileInput2.addEventListener('change', function() {
+        if (this.files && this.files[0]) handleFilePicked('image2', this.files[0]);
+    });
+
     function resetForm() {
-        fileInput.value = '';
+        if (fileInput1) fileInput1.value = '';
+        if (fileInput2) fileInput2.value = '';
+        currentField = null;
+        currentFile = null;
         imagePreview.src = '';
         previewContainer.classList.add('hidden');
-        document.querySelector('#upload-form button').classList.remove('hidden');
+        document.getElementById('pickers').classList.remove('hidden');
     }
-    
-    submitBtn.addEventListener('click', async () => {
+
+    // Если первая страница уже загружена (например, пользователь вернулся по QR),
+    // сразу показываем возможность добавить вторую.
+    {% if submission.image_url and not submission.image_url_2 %}
+        showSecondPicker();
+    {% endif %}
+    {% if submission.image_url_2 %}
+        showSecondPicker();
+    {% endif %}
+            const reader = new FileReader();
         if (!fileInput.files[0]) return;
-        
+        if (!currentFile || !currentField) return;
         submitBtn.disabled = true;
         loading.classList.remove('hidden');
         
         const formData = new FormData();
         formData.append('image', fileInput.files[0]);
-        
+        formData.append(currentField, currentFile);
         // Disable CSRF for this specific token-based mobile endpoint in view using @csrf_exempt
         try {
             const response = await fetch('/upload/{{ token }}/', {
@@ -96,8 +158,24 @@
             
             if (response.ok) {
                 uploadContainer.classList.add('hidden');
-                successContainer.classList.remove('hidden');
-            } else {
+                const data = await response.json().catch(() => ({}));
+
+                // Если загрузили страницу 1 — не закрываем сценарий, предлагаем страницу 2 без перезагрузки.
+                if (currentField === 'image' && data && data.image_url && !(data.image_url_2)) {
+                    uploadContainer.classList.add('hidden');
+                    successContainer.classList.remove('hidden');
+                    if (successTitle) successTitle.textContent = 'Страница 1 загружена';
+                    if (successText) successText.textContent = 'Если нужно — добавьте 2-ю страницу решения.';
+                    showSecondPicker();
+                } else {
+                    // Страница 2 загружена (или обе уже были) — финальный успех
+                    uploadContainer.classList.add('hidden');
+                    successContainer.classList.remove('hidden');
+                    if (successTitle) successTitle.textContent = 'Отлично!';
+                    if (successText) successText.textContent = 'Фото успешно загружено. Можно вернуться к компьютеру.';
+                    if (btnAddSecond) btnAddSecond.classList.add('hidden');
+                }
+                resetForm();
                 alert('Произошла ошибка при загрузке. Попробуйте еще раз.');
                 resetForm();
             }
@@ -111,4 +189,5 @@
     });
 </script>
 </body>
+</html>
 </html>
