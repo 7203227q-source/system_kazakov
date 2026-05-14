@@ -13,8 +13,8 @@ from core.models import (
 )
 
 
-class TutorDashboardShowsAllAssignmentsAcrossSubjectsTests(TestCase):
-    def test_tutor_dashboard_does_not_hide_assignments_of_other_subjects(self):
+class TutorDashboardAssignmentSubjectFilterTests(TestCase):
+    def test_tutor_dashboard_hides_assignments_of_other_subjects_in_right_panel(self):
         tutor = User.objects.create_user(username="t", password="pass", role="tutor")
         student = User.objects.create_user(username="s", password="pass", role="student")
         tutor.students.add(student)
@@ -40,11 +40,17 @@ class TutorDashboardShowsAllAssignmentsAcrossSubjectsTests(TestCase):
         a2.tasks.add(task2)
 
         self.client.login(username="t", password="pass")
-        url = reverse("tutor_dashboard") + f"?student_id={student.id}&chart_subject_id={subj1.id}"
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200)
-        html = r.content.decode("utf-8")
-        self.assertIn("Матем вариант", html)
-        # критично: физика тоже должна быть видна, даже если выбран график по математике
-        self.assertIn("Физика вариант", html)
 
+        url_math = reverse("tutor_dashboard") + f"?student_id={student.id}&subject_id={subj1.id}"
+        r_math = self.client.get(url_math)
+        self.assertEqual(r_math.status_code, 200)
+        html_math = r_math.content.decode("utf-8")
+        self.assertIn("Матем вариант", html_math)
+        self.assertNotIn("Физика вариант", html_math)
+
+        url_phys = reverse("tutor_dashboard") + f"?student_id={student.id}&subject_id={subj2.id}"
+        r_phys = self.client.get(url_phys)
+        self.assertEqual(r_phys.status_code, 200)
+        html_phys = r_phys.content.decode("utf-8")
+        self.assertIn("Физика вариант", html_phys)
+        self.assertNotIn("Матем вариант", html_phys)
