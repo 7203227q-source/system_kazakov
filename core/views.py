@@ -4058,6 +4058,14 @@ def normalize_tex_in_feedback(text: str) -> str:
             lambda m: f"\\frac{{{m.group(1)}}}{{{m.group(2)}}}",
             body,
         )
+        body = re.sub(
+            r"(?<!\\)frac([A-Za-z][A-Za-z0-9()_+\-*/]*)(\d+)(?=$|[^0-9A-Za-z])",
+            lambda m: f"\\frac{{{m.group(1)}}}{{{m.group(2)}}}",
+            body,
+        )
+        body = re.sub(r"(?<!\\)nu(?=[A-Za-z])", r"\\nu ", body)
+        body = re.sub(r"(?<!\\)\bnu\b", r"\\nu", body)
+        body = re.sub(r"(?<!\\)\bgamma\b", r"\\gamma", body)
         def frac_digits(m: re.Match) -> str:
             digits = m.group(1)
             if not digits:
@@ -4103,8 +4111,18 @@ def normalize_tex_in_feedback(text: str) -> str:
         # remove lone backslashes used as line breaks in some model outputs: "...\"
         s = re.sub(r"\\\s*(\n|$)", r"\1", s)
 
-        token_word = r"\b[A-Za-z0-9]*(?:fracsqrt|fracpi|frac\d+pi\d+|frac\d+|cosx|sinx|tanx|arccos|arcsin|arctan|pm|pi|mathbb|neq|leq|geq)[A-Za-z0-9]*\b"
+        token_frac_expr = r"(?<!\\)\bfrac[0-9A-Za-z()_+\-*/]+\b"
+        frac_tokens = []
+        def _repl_frac_tok(m: re.Match) -> str:
+            frac_tokens.append(f"${fix_body(m.group(0))}$")
+            return f"§§FRAC{len(frac_tokens)-1}§§"
+        s = re.sub(token_frac_expr, _repl_frac_tok, s)
+
+        token_word = r"\b[A-Za-z0-9]*(?:fracsqrt|fracpi|frac\d+pi\d+|frac\d+|cosx|sinx|tanx|arccos|arcsin|arctan|pm|pi|mathbb|neq|leq|geq|nu|gamma|alpha|beta|theta|lambda|mu|sigma|omega|rho|phi|psi|tau|kappa|eta|xi|zeta|epsilon|delta)[A-Za-z0-9]*\b"
         s = re.sub(token_word, lambda m: f"${fix_body(m.group(0))}$", s)
+
+        for i, tok in enumerate(frac_tokens):
+            s = s.replace(f"§§FRAC{i}§§", tok)
 
         return restore_math_blocks(s, blocks)
 
@@ -4356,6 +4374,7 @@ def api_verify_with_ai(request, submission_id):
             if not isinstance(raw, str):
                 return raw
             raw = re.sub(r'\\([bfnrt])(?=[A-Za-z])', r'\\\\\1', raw)
+            raw = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', raw)
             raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
             return raw
         content = _repair_json_for_latex(content)
