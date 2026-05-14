@@ -101,6 +101,23 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Сколько вариантов сгенерировать</label>
+                            <input type="number" name="generate_count" min="1" max="20" value="{{ saved_form.generate_count.0|default:'1' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                            <p class="text-xs text-gray-500 mt-1">Можно назначить сразу несколько вариантов без предпросмотра.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Дата сдачи (для 1-го)</label>
+                            <input type="date" name="due_date" value="{{ saved_form.due_date.0|default:'' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Шаг между датами (дней)</label>
+                            <input type="number" name="due_step_days" min="0" max="365" value="{{ saved_form.due_step_days.0|default:'0' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                            <p class="text-xs text-gray-500 mt-1">Если 0 — у всех вариантов будет одинаковая дата.</p>
+                        </div>
+                    </div>
                     </div>
                 </div>
 
@@ -184,9 +201,12 @@
                     </div>
                 </div>
 
-                <div class="p-6 border-t border-gray-100 flex justify-end">
-                    <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center shadow-sm">
+                <div class="p-6 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3">
+                    <button type="submit" name="submit_action" value="preview" class="bg-primary text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center shadow-sm justify-center">
                         <i class="fas fa-magic mr-2"></i> Сгенерировать предпросмотр
+                    </button>
+                    <button type="submit" name="submit_action" value="publish_bulk" class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center shadow-sm justify-center">
+                        <i class="fas fa-bolt mr-2"></i> Сгенерировать и назначить
                     </button>
                 </div>
             </form>

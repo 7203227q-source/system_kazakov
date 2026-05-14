@@ -49,6 +49,12 @@
                 <a href="{% url 'tutor_student_history' student.id %}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
                     <i class="fas fa-history mr-2"></i> Журнал
                 </a>
+                <form method="POST" action="{% url 'tutor_delete_assignment' assignment.id %}" onsubmit="return confirm('Удалить вариант у ученика? Решения и аналитика сохранятся.');">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex items-center justify-center bg-white border border-red-200 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                        <i class="fas fa-trash mr-2"></i> Удалить
+                    </button>
+                </form>
                 <a href="{% url 'tutor_dashboard' %}?student_id={{ student.id }}" class="inline-flex items-center justify-center bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium transition shadow-sm">
                     <i class="fas fa-arrow-left mr-2"></i> Назад
                 </a>

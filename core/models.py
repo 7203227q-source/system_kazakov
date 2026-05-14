@@ -261,6 +261,16 @@ class Assignment(models.Model):
     is_expired = models.BooleanField(default=False, verbose_name="Просрочено (автозакрыто)")
     expired_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда просрочено")
     exam_format = models.ForeignKey(ExamFormat, on_delete=models.SET_NULL, null=True, blank=True, related_name="assignments")
+    is_deleted = models.BooleanField(default=False, verbose_name="Удалено (скрыто у ученика)")
+    deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда удалено")
+    deleted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deleted_assignments",
+        verbose_name="Кем удалено",
+    )
 
     KIND_CHOICES = [
         ("homework", "Домашняя работа"),

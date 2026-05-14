@@ -848,6 +848,7 @@ def student_dashboard(request):
         student=request.user,
         is_completed=False,
         is_draft=False,
+        is_deleted=False,
         due_date__isnull=False,
         due_date__lt=timezone.now().date(),
     )
@@ -858,7 +859,8 @@ def student_dashboard(request):
     pending_assignments = Assignment.objects.filter(
         student=request.user, 
         is_completed=False, 
-        is_draft=False
+        is_draft=False,
+        is_deleted=False,
     )
     
     if active_subject_id:
@@ -1040,7 +1042,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
     if request.user.role != 'student' or request.method != 'POST':
         return JsonResponse({'error': 'Доступ запрещен'}, status=403)
         
-    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_deleted=False)
     task = get_object_or_404(Task, id=task_id)
     
     if assignment.is_completed:
@@ -1136,7 +1138,7 @@ def student_assignment_summary(request, assignment_id):
     if request.user.role != 'student':
         return redirect('login')
         
-    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_deleted=False)
     
     if not assignment.is_completed:
         return redirect('student_solve_assignment', assignment_id=assignment.id)
@@ -1320,7 +1322,7 @@ def student_solve_assignment(request, assignment_id):
     if request.user.role != 'student':
         return redirect('student_dashboard')
         
-    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user)
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_deleted=False)
 
     auto_expire_assignment_if_needed(assignment)
     
@@ -1551,7 +1553,7 @@ def student_extension_request(request, assignment_id):
     if request.user.role != 'student':
         return redirect('login')
 
-    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_draft=False)
+    assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_draft=False, is_deleted=False)
     days_raw = (request.POST.get('days') or '').strip()
     comment = (request.POST.get('comment') or '').strip()
 
@@ -1585,7 +1587,7 @@ def student_add_submission_comment(request, assignment_id, task_id):
     if request.user.role != "student":
         return JsonResponse({"error": "forbidden"}, status=403)
 
-    assignment = Assignment.objects.filter(id=assignment_id, student=request.user).first()
+    assignment = Assignment.objects.filter(id=assignment_id, student=request.user, is_deleted=False).first()
     if assignment is None:
         return JsonResponse({"error": "forbidden"}, status=403)
 
@@ -1994,7 +1996,7 @@ def tutor_dashboard(request):
         s.list_forecast = best_pred
             
         # Check for active assignments
-        active_assignments_count = Assignment.objects.filter(student=s, is_draft=False, is_completed=False).count()
+        active_assignments_count = Assignment.objects.filter(student=s, is_draft=False, is_completed=False, is_deleted=False).count()
         # Check for pending spaced repetition tasks
         pending_srs_count = SpacedRepetition.objects.filter(student=s, next_review_date__lte=today).count()
         
@@ -2039,7 +2041,7 @@ def tutor_dashboard(request):
 
         assignments = (
             Assignment.objects
-            .filter(tutor=request.user, student=selected_student, is_draft=False)
+            .filter(tutor=request.user, student=selected_student, is_draft=False, is_deleted=False)
             .select_related('exam_format', 'exam_format__subject')
             .prefetch_related('tasks', 'tasks__task_type')
             .order_by('-created_at')
@@ -2264,7 +2266,7 @@ def tutor_dashboard(request):
         recent_rewards = []
     
     # Check if there are draft assignments we might want to resume or delete
-    drafts = Assignment.objects.filter(tutor=request.user, is_draft=True).select_related('student').order_by('-created_at')
+    drafts = Assignment.objects.filter(tutor=request.user, is_draft=True, is_deleted=False).select_related('student').order_by('-created_at')
     
     context = {
         'students': students,
@@ -2302,15 +2304,30 @@ def tutor_delete_draft_assignment(request, assignment_id):
 
 
 @login_required
+@require_POST
+def tutor_delete_assignment(request, assignment_id):
+    """Мягкое удаление варианта: скрыть у ученика, но сохранить решения и аналитику."""
+    if request.user.role != 'tutor':
+        return redirect('login')
+    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=False, is_deleted=False)
+    assignment.is_deleted = True
+    assignment.deleted_at = timezone.now()
+    assignment.deleted_by = request.user
+    assignment.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+    messages.success(request, "Вариант удалён у ученика (данные по решениям сохранены).")
+    return redirect('tutor_dashboard')
+
+
+@login_required
 def tutor_assignment_summary(request, assignment_id):
     if request.user.role not in ['tutor', 'admin']:
         return redirect('login')
 
     qs = Assignment.objects.select_related('student', 'tutor')
     if request.user.role == 'tutor':
-        assignment = get_object_or_404(qs, id=assignment_id, tutor=request.user, is_draft=False)
+        assignment = get_object_or_404(qs, id=assignment_id, tutor=request.user, is_draft=False, is_deleted=False)
     else:
-        assignment = get_object_or_404(qs, id=assignment_id, is_draft=False)
+        assignment = get_object_or_404(qs, id=assignment_id, is_draft=False, is_deleted=False)
 
     student = assignment.student
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
@@ -2448,9 +2465,9 @@ def tutor_assignment_view(request, assignment_id):
 
     qs = Assignment.objects.select_related('student', 'tutor')
     if request.user.role == 'tutor':
-        assignment = get_object_or_404(qs, id=assignment_id, tutor=request.user, is_draft=False)
+        assignment = get_object_or_404(qs, id=assignment_id, tutor=request.user, is_draft=False, is_deleted=False)
     else:
-        assignment = get_object_or_404(qs, id=assignment_id, is_draft=False)
+        assignment = get_object_or_404(qs, id=assignment_id, is_draft=False, is_deleted=False)
 
     auto_expire_assignment_if_needed(assignment)
 
@@ -2526,7 +2543,7 @@ def tutor_assignment_view(request, assignment_id):
 def tutor_extension_approve(request, assignment_id, req_id):
     if request.user.role != 'tutor':
         return redirect('login')
-    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=False)
+    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=False, is_deleted=False)
     req = get_object_or_404(AssignmentExtensionRequest, id=req_id, assignment=assignment, status='pending')
 
     today = timezone.now().date()
@@ -2552,7 +2569,7 @@ def tutor_extension_approve(request, assignment_id, req_id):
 def tutor_extension_reject(request, assignment_id, req_id):
     if request.user.role != 'tutor':
         return redirect('login')
-    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=False)
+    assignment = get_object_or_404(Assignment, id=assignment_id, tutor=request.user, is_draft=False, is_deleted=False)
     req = get_object_or_404(AssignmentExtensionRequest, id=req_id, assignment=assignment, status='pending')
     req.status = 'rejected'
     req.resolved_at = timezone.now()
@@ -2649,7 +2666,7 @@ def whiteboard_list(request):
         return JsonResponse({'error': 'bad_request'}, status=400)
 
     student = get_object_or_404(User, id=student_id, role='student')
-    assignment = get_object_or_404(Assignment, id=assignment_id, is_draft=False)
+    assignment = get_object_or_404(Assignment, id=assignment_id, is_draft=False, is_deleted=False)
     task = get_object_or_404(Task, id=task_id)
 
     if not _can_access_assignment_task(request.user, assignment, task, student):
@@ -2678,7 +2695,7 @@ def whiteboard_list(request):
 @login_required
 @require_POST
 def whiteboard_create(request, assignment_id, task_id):
-    assignment = get_object_or_404(Assignment, id=assignment_id, is_draft=False)
+    assignment = get_object_or_404(Assignment, id=assignment_id, is_draft=False, is_deleted=False)
     task = get_object_or_404(Task, id=task_id)
     student = assignment.student
 
@@ -2807,6 +2824,7 @@ def tutor_create_assignment(request):
         student_id = request.POST.get('student_id')
         exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
         kind = request.POST.get('kind', 'homework')
+        submit_action = (request.POST.get('submit_action') or 'preview').strip()
 
         if not student_id:
             messages.error(request, "Выберите ученика")
@@ -2842,16 +2860,20 @@ def tutor_create_assignment(request):
             request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
 
-        title = request.POST.get('title', '').strip()
-        student_seq = None
-        if not title:
-            max_seq = Assignment.objects.filter(student=student).aggregate(m=models.Max('student_seq'))['m'] or 0
-            student_seq = max_seq + 1
+        title_input = (request.POST.get('title') or '').strip()
+
+        def _auto_title(seq_num: int) -> str:
             student_name = student.get_full_name() or student.username
             kind_labels = {'homework': 'Домашняя работа', 'test': 'Тест', 'control_test': 'Контрольный тест'}
             kind_label = kind_labels.get(kind, 'Домашняя работа')
             format_str = f"{exam_format.name} {exam_format.year}"
-            title = f"{format_str} — {student_name} — {kind_label} №{student_seq}"
+            return f"{format_str} — {student_name} — {kind_label} №{seq_num}"
+
+        def _title_for_seq(seq_num: int, total_count: int) -> str:
+            if title_input:
+                # Если создаём несколько вариантов, обеспечим уникальные названия.
+                return title_input if total_count <= 1 else f"{title_input} №{seq_num}"
+            return _auto_title(seq_num)
 
         selected_tasks = []
 
@@ -2926,27 +2948,137 @@ def tutor_create_assignment(request):
                     )
                     selected_tasks.extend(tasks_of_subtype)
 
-        if not selected_tasks:
-            messages.error(request, "Выберите хотя бы одно задание для варианта")
-            request.session['saved_assignment_form'] = dict(request.POST)
-            return redirect('tutor_create_assignment')
+        def _build_unique_tasks() -> list[Task]:
+            """
+            Собирает список уникальных задач под один вариант.
+            ВАЖНО: логика выбора построена на случайной выборке, поэтому при массовой генерации
+            вызов этой функции несколько раз даст разные варианты.
+            """
+            selected: list[Task] = []
+
+            if bundle_anchor and requested_bundle_count > 0:
+                allowed_subtypes = allowed_subtypes_by_type.get(bundle_anchor.id, [])
+                if allowed_subtypes:
+                    anchor_tasks = (
+                        Task.objects.filter(task_type=bundle_anchor, subtype_tag__in=allowed_subtypes)
+                        .exclude(bundle_code__isnull=True)
+                        .exclude(bundle_code__exact="")
+                        .order_by("?")[: requested_bundle_count * 4]
+                    )
+                    bundle_codes: list[str] = []
+                    for t in anchor_tasks:
+                        if t.bundle_code and t.bundle_code not in bundle_codes:
+                            bundle_codes.append(t.bundle_code)
+                        if len(bundle_codes) >= requested_bundle_count:
+                            break
+                    if bundle_codes:
+                        bundled = Task.objects.filter(bundle_code__in=bundle_codes, task_type__number__in=[1, 2, 3, 4, 5])
+                        selected.extend(list(bundled))
+
+            for t_type in task_types:
+                type_count_str = request.POST.get(f'type_count_{t_type.id}', '0')
+                if type_count_str.isdigit() and int(type_count_str) > 0:
+                    if t_type.id in bundle_type_ids:
+                        continue
+                    count = int(type_count_str)
+                    allowed_subtypes = allowed_subtypes_by_type.get(t_type.id, [])
+                    if not allowed_subtypes:
+                        continue
+                    tasks_qs = Task.objects.filter(task_type=t_type, subtype_tag__in=allowed_subtypes)
+                    tasks_of_type = list(tasks_qs.order_by('?')[:count])
+                    selected.extend(tasks_of_type)
+
+            for key, value in request.POST.items():
+                if key.startswith('subtype_count_') and value.isdigit() and int(value) > 0:
+                    count = int(value)
+                    idx = key.replace('subtype_count_', '')
+                    subtype_tag = request.POST.get(f'subtype_name_{idx}', '')
+                    t_type_id = request.POST.get(f'subtype_type_{idx}')
+                    if t_type_id:
+                        if int(t_type_id) in bundle_type_ids:
+                            continue
+                        tasks_of_subtype = list(
+                            Task.objects.filter(task_type_id=t_type_id, subtype_tag=subtype_tag).order_by('?')[:count]
+                        )
+                        selected.extend(tasks_of_subtype)
+
+            if not selected:
+                return []
+
+            unique: list[Task] = []
+            seen_ids: set[int] = set()
+            for t in selected:
+                if t.id not in seen_ids:
+                    seen_ids.add(t.id)
+                    unique.append(t)
+            return unique
 
         if 'saved_assignment_form' in request.session:
             del request.session['saved_assignment_form']
 
-        unique_tasks = []
-        seen_ids = set()
-        for t in selected_tasks:
-            if t.id not in seen_ids:
-                seen_ids.add(t.id)
-                unique_tasks.append(t)
+        if submit_action == 'publish_bulk':
+            # Массовая генерация без предпросмотра: сразу назначаем ученику N вариантов.
+            count_raw = (request.POST.get("generate_count") or "1").strip()
+            count = int(count_raw) if count_raw.isdigit() else 1
+            count = max(1, min(20, count))
+
+            due_date_raw = (request.POST.get("due_date") or "").strip()
+            due_date_value = None
+            if due_date_raw:
+                try:
+                    due_date_value = date.fromisoformat(due_date_raw)
+                except Exception:
+                    due_date_value = None
+            step_raw = (request.POST.get("due_step_days") or "0").strip()
+            step_days = int(step_raw) if step_raw.lstrip("-").isdigit() else 0
+            step_days = max(0, min(365, step_days))
+
+            max_seq = Assignment.objects.filter(student=student).aggregate(m=models.Max('student_seq'))['m'] or 0
+            created = 0
+            for i in range(count):
+                seq_num = (max_seq or 0) + 1 + i
+                unique_tasks = _build_unique_tasks()
+                if not unique_tasks:
+                    break
+                assignment = Assignment.objects.create(
+                    tutor=request.user,
+                    student=student,
+                    title=_title_for_seq(seq_num, count),
+                    kind=kind,
+                    student_seq=seq_num,
+                    is_draft=False,
+                    is_verified=False,
+                    due_date=(due_date_value + timedelta(days=step_days * i)) if (due_date_value and step_days) else due_date_value,
+                    exam_format=exam_format,
+                )
+                assignment.tasks.add(*unique_tasks)
+                created += 1
+
+            if created <= 0:
+                messages.error(request, "Не удалось собрать вариант: выберите хотя бы одно задание для варианта")
+                request.session['saved_assignment_form'] = dict(request.POST)
+                return redirect('tutor_create_assignment')
+
+            messages.success(request, f"Сгенерировано и назначено вариантов: {created}")
+            return redirect('tutor_dashboard')
+
+        # По умолчанию — создаём один черновик и ведём на предпросмотр
+        unique_tasks = _build_unique_tasks()
+        if not unique_tasks:
+            messages.error(request, "Выберите хотя бы одно задание для варианта")
+            request.session['saved_assignment_form'] = dict(request.POST)
+            return redirect('tutor_create_assignment')
+
+        # Определяем student_seq для автосгенерированного названия (если пользователь не указал title вручную)
+        max_seq = Assignment.objects.filter(student=student).aggregate(m=models.Max('student_seq'))['m'] or 0
+        seq_num = (max_seq or 0) + 1
 
         assignment = Assignment.objects.create(
             tutor=request.user,
             student=student,
-            title=title,
+            title=_title_for_seq(seq_num, 1),
             kind=kind,
-            student_seq=student_seq,
+            student_seq=(seq_num if not title_input else None),
             is_draft=True,
             exam_format=exam_format,
         )
@@ -4982,7 +5114,7 @@ def api_student_pending_assignments(request):
     if request.user.role != "student":
         return JsonResponse({"error": "forbidden"}, status=403)
 
-    qs = Assignment.objects.filter(student=request.user, is_draft=False, is_completed=False)
+    qs = Assignment.objects.filter(student=request.user, is_draft=False, is_completed=False, is_deleted=False)
     subject_id_raw = (request.GET.get("subject_id") or "").strip()
     if subject_id_raw.isdigit():
         qs = qs.filter(tasks__topic__subject_id=int(subject_id_raw)).distinct()
