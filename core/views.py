@@ -1291,7 +1291,10 @@ def student_solve_assignment(request, assignment_id):
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
     
     if request.method == 'POST':
-        action = request.POST.get('action', 'finish')
+        action = (request.POST.get('action') or '').strip()
+        # Защита от неявного сабмита формы (Enter/Space): завершаем/откладываем только при явном action.
+        if action not in {'finish', 'postpone'}:
+            return redirect('student_solve_assignment', assignment_id=assignment.id)
         
         # Calculate time spent per task
         start_time = request.session.get(f'assignment_{assignment.id}_start')
