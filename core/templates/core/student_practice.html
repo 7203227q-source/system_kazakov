@@ -151,6 +151,22 @@
                             {% endif %}
                         </div>
 
+                        <div id="srs_ai_verdict" class="hidden mt-4 bg-white border border-gray-200 rounded-xl p-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="text-sm font-bold text-gray-800">Вердикт ИИ</div>
+                                <div id="srs_ai_score" class="text-xs font-bold text-gray-700"></div>
+                            </div>
+                            <div id="srs_ai_verdict_body" class="mt-3 text-sm text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line"></div>
+                            <div class="mt-4 flex justify-end">
+                                <button type="button"
+                                        id="btn_srs_next"
+                                        class="px-6 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition"
+                                        onclick="window.location.href = '{% url 'student_practice' %}?mode=srs'">
+                                    Следующая задача
+                                </button>
+                            </div>
+                        </div>
+
                         <script>
                             document.addEventListener('DOMContentLoaded', () => {
                                 const submissionId = {{ practice_submission.id|default:0 }};
@@ -191,8 +207,18 @@
                                 if (file2) file2.addEventListener('change', () => upload('image2', file2.files && file2.files[0]));
                             });
 
+                            function escapeHtml(s) {
+                                return String(s || '')
+                                    .replaceAll('&', '&amp;')
+                                    .replaceAll('<', '&lt;')
+                                    .replaceAll('>', '&gt;');
+                            }
+
                             async function verifySrsWithAI(submissionId) {
                                 const btn = document.getElementById('btn_srs_verify_ai');
+                                const verdict = document.getElementById('srs_ai_verdict');
+                                const body = document.getElementById('srs_ai_verdict_body');
+                                const score = document.getElementById('srs_ai_score');
                                 if (!submissionId) return;
                                 if (btn) {
                                     btn.disabled = true;
@@ -212,8 +238,18 @@
                                         alert(msg);
                                         return;
                                     }
-                                    // После проверки SRS обновлён на сервере — показываем следующую задачу.
-                                    window.location.href = "{% url 'student_practice' %}?mode=srs";
+                                    // Всегда показываем вердикт ИИ после проверки.
+                                    if (score) {
+                                        const maxPts = {{ task.task_type.max_points|default:task.exam_points|default:0 }};
+                                        score.textContent = `Оценено: ${(data && data.primary_score != null) ? data.primary_score : 0} / ${maxPts}`;
+                                    }
+                                    if (body) {
+                                        body.innerHTML = (data && data.feedback_html) ? data.feedback_html : escapeHtml(data && data.feedback ? data.feedback : '');
+                                    }
+                                    if (verdict) verdict.classList.remove('hidden');
+                                    // Скроем блок загрузки, чтобы не было двойного UI
+                                    const up = document.getElementById('srs_upload_block');
+                                    if (up) up.classList.add('hidden');
                                 } catch (e) {
                                     alert('Ошибка соединения с сервером');
                                 } finally {

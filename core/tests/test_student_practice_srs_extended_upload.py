@@ -29,4 +29,5 @@ class StudentPracticeSrsExtendedUploadTests(TestCase):
         html = r.content.decode("utf-8")
         self.assertIn("Загрузите решение", html)
         self.assertIn("Проверить решение через ИИ", html)
-
+        # Место для вывода вердикта ИИ после проверки
+        self.assertIn("id=\"srs_ai_verdict\"", html)
