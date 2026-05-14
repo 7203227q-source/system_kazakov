@@ -80,8 +80,11 @@ def record_task_log(student, task, submission, assignment, time_spent):
     score = 0.0
     if submission and submission.is_correct:
         score = float(task.exam_points)
-    elif submission and submission.primary_score:
-        score = float(submission.primary_score)
+    elif submission:
+        if getattr(submission, "tutor_primary_score", None) is not None:
+            score = float(submission.tutor_primary_score)
+        elif submission.primary_score:
+            score = float(submission.primary_score)
         
     is_anomaly = calculate_time_anomaly(task, time_spent, is_verified)
     

@@ -314,6 +314,8 @@ class Submission(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     score = models.IntegerField(null=True, blank=True, verbose_name="Итоговый балл за решение (для 2 части)")
     primary_score = models.IntegerField(null=True, blank=True, verbose_name="Первичный балл (0-4)")
+    tutor_primary_score = models.IntegerField(null=True, blank=True, verbose_name="Итог репетитора (первичный балл)")
+    tutor_scored_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда репетитор выставил итог")
     show_solution_allowed = models.BooleanField(default=False, verbose_name="Разрешено показывать решение ученику")
 
     def __str__(self):
