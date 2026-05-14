@@ -1,9 +1,11 @@
 import json
 import os
+import os.path
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+from django.conf import settings
 
 from core.models import ExamFormat, OpenRouterModel, Subject, SubjectAIConfig, Submission, Task, TaskType, TaskVariant, Topic, User
 
@@ -33,6 +35,10 @@ class AIVerifyPromptIncludesTaskAssetsTests(TestCase):
     def test_prompt_text_and_images_are_attached(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
 
+        os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+        with open(os.path.join(settings.MEDIA_ROOT, "a.png"), "wb") as f:
+            f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+
         dummy = {"choices": [{"message": {"content": json.dumps({"primary_score": 1, "is_correct": False, "feedback": "ok"})}}]}
 
         from unittest.mock import patch
@@ -55,10 +61,9 @@ class AIVerifyPromptIncludesTaskAssetsTests(TestCase):
         self.assertNotIn("\\\\sqrt", text)
 
         imgs = [p["image_url"]["url"] for p in content if p["type"] == "image_url"]
-        self.assertTrue(any("/media/a.png" in u for u in imgs))
         # В OpenRouter отправляем только локальные картинки (/media/), чтобы провайдер не падал на внешних URL
         self.assertFalse(any("math-ege.sdamgia.ru" in u for u in imgs))
         self.assertFalse(any("evil.com" in u for u in imgs))
-        self.assertTrue(any(u.startswith("data:") for u in imgs))
-        task_imgs = [u for u in imgs if not u.startswith("data:")]
-        self.assertFalse(any(u.startswith("data:") for u in task_imgs))
+        self.assertTrue(any(u.startswith("data:image/jpeg;base64,") for u in imgs))
+        self.assertTrue(any(u.startswith("data:image/png;base64,") for u in imgs))
+        self.assertFalse(any("/media/" in u for u in imgs))

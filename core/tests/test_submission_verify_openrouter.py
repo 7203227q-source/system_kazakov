@@ -1,10 +1,12 @@
 import base64
 import json
 import os
+import os.path
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+from django.conf import settings
 
 from core.models import ExamFormat, OpenRouterModel, Subject, SubjectAIConfig, Submission, Task, TaskType, TaskVariant, Topic, User
 
@@ -87,3 +89,73 @@ class SubmissionVerifyOpenRouterTests(TestCase):
         self.assertEqual(payload["primary_score"], 1)
         self.assertTrue(payload["is_correct"])
         self.assertIn("\\pi", payload["feedback"])
+
+    def test_verify_inlines_task_media_images_as_data_urls(self):
+        os.environ["OPENROUTER_API_KEY"] = "test"
+
+        tasks_dir = os.path.join(settings.MEDIA_ROOT, "tasks")
+        os.makedirs(tasks_dir, exist_ok=True)
+        png_bytes = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6X2nGkAAAAASUVORK5CYII="
+        )
+        with open(os.path.join(tasks_dir, "t.png"), "wb") as f:
+            f.write(png_bytes)
+
+        v = self.task.variants.filter(theme="classic").first()
+        v.content = '<p>Q</p><img src="/media/tasks/t.png">'
+        v.save(update_fields=["content"])
+
+        dummy_response = {
+            "choices": [
+                {"message": {"content": json.dumps({"primary_score": 1, "is_correct": True, "feedback": "ok"})}}
+            ]
+        }
+
+        from unittest.mock import patch
+        with patch("core.views.requests.post") as post:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = dummy_response
+
+            self.client.force_login(self.student)
+            res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
+
+        self.assertEqual(res.status_code, 200)
+
+        sent_payload = post.call_args.kwargs["json"]
+        user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
+        urls = [p["image_url"]["url"] for p in user_msg["content"] if p["type"] == "image_url"]
+        self.assertTrue(any(u.startswith("data:image/png;base64,") for u in urls))
+        self.assertFalse(any("/media/tasks/t.png" in u for u in urls))
+
+    def test_verify_skips_svg_task_images(self):
+        os.environ["OPENROUTER_API_KEY"] = "test"
+
+        tasks_dir = os.path.join(settings.MEDIA_ROOT, "tasks")
+        os.makedirs(tasks_dir, exist_ok=True)
+        with open(os.path.join(tasks_dir, "t.svg"), "w", encoding="utf-8") as f:
+            f.write('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>')
+
+        v = self.task.variants.filter(theme="classic").first()
+        v.content = '<p>Q</p><img src="/media/tasks/t.svg">'
+        v.save(update_fields=["content"])
+
+        dummy_response = {
+            "choices": [
+                {"message": {"content": json.dumps({"primary_score": 1, "is_correct": True, "feedback": "ok"})}}
+            ]
+        }
+
+        from unittest.mock import patch
+        with patch("core.views.requests.post") as post:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = dummy_response
+
+            self.client.force_login(self.student)
+            res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
+
+        self.assertEqual(res.status_code, 200)
+
+        sent_payload = post.call_args.kwargs["json"]
+        user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
+        urls = [p["image_url"]["url"] for p in user_msg["content"] if p["type"] == "image_url"]
+        self.assertFalse(any("t.svg" in u for u in urls))

@@ -4239,7 +4239,7 @@ def api_verify_with_ai(request, submission_id):
 
         soup = BeautifulSoup(task_html, "html.parser") if task_html else None
         task_text = ""
-        task_image_urls = []
+        task_image_data_urls = []
         if soup:
             for t in soup(["script", "style", "noscript"]):
                 t.decompose()
@@ -4248,8 +4248,10 @@ def api_verify_with_ai(request, submission_id):
             # Дублируем "\" → "\\" чтобы избежать ошибок вида "Invalid \\escape".
             task_text = task_text.replace("\\", "\\\\")
 
-            allowed_hosts_suffix = "sdamgia.ru"
             seen = set()
+            from django.conf import settings as dj_settings
+            from urllib.parse import unquote
+            allowed_mimes = {"image/png", "image/jpeg", "image/webp", "image/gif"}
             for img in soup.find_all("img"):
                 src = (img.get("src") or img.get("data-src") or img.get("data-original") or "").strip().strip('"').strip("'")
                 if not src:
@@ -4258,21 +4260,25 @@ def api_verify_with_ai(request, submission_id):
                 if low.startswith("data:") or low.startswith("javascript:") or low.startswith("file:"):
                     continue
 
-                resolved = src
-                if src.startswith("/"):
-                    # Для ИИ отправляем только локальные картинки (/media/).
-                    # /proxy-image и внешние URL могут отдавать HTML/ошибку, из-за чего провайдеры (например Gemini) падают.
-                    if not src.startswith("/media/"):
-                        continue
-                    resolved = request.build_absolute_uri(src)
-                else:
-                    # Внешние картинки не прикладываем, чтобы избежать ошибок "URL did not return an image"
+                if not src.startswith("/media/"):
                     continue
-
-                if resolved in seen:
+                clean_src = src.split("?", 1)[0].split("#", 1)[0]
+                rel = unquote(clean_src[len("/media/"):].lstrip("/"))
+                rel_norm = os.path.normpath(rel)
+                if not rel_norm or rel_norm.startswith("..") or rel_norm.startswith("/"):
                     continue
-                seen.add(resolved)
-                task_image_urls.append(resolved)
+                file_full = os.path.join(dj_settings.MEDIA_ROOT, rel_norm)
+                if file_full in seen:
+                    continue
+                seen.add(file_full)
+                if not os.path.exists(file_full) or not os.path.isfile(file_full):
+                    continue
+                mime_img = mimetypes.guess_type(file_full)[0] or ""
+                if mime_img not in allowed_mimes:
+                    continue
+                with open(file_full, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                task_image_data_urls.append(f"data:{mime_img};base64,{b64}")
 
         file_path = submission.image_url.path
         mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
@@ -4305,7 +4311,7 @@ def api_verify_with_ai(request, submission_id):
             prompt = f"{prompt}\n\nУсловие:\n{task_text}"
 
         user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
-        for u in task_image_urls:
+        for u in task_image_data_urls:
             user_content.append({"type": "image_url", "image_url": {"url": u}})
 
         feedback = ""
