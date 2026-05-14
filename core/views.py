@@ -3178,21 +3178,68 @@ def tutor_create_assignment(request):
             subtype['saved_count'] = saved_subtype_counts.get(s_idx, 0)
             subtype['saved_checked'] = saved_subtype_checked.get(s_idx, False) if saved_form else True
 
+    # Границы частей должны соответствовать структуре конкретного экзамена.
+    # Считаем по TaskType.is_extended_answer, чтобы корректно работало для ОГЭ/ЕГЭ и разных предметов.
     part1_min = 1
     part1_max = 12
     part2_min = 13
     part2_max = 20
     if selected_exam_format:
-        max_num = TaskType.objects.filter(exam_format=selected_exam_format).aggregate(m=models.Max("number")).get("m") or 0
-        is_physics_ege = (selected_exam_format.subject and (selected_exam_format.subject.name or "").strip().lower() == "физика") and ("егэ" in (selected_exam_format.name or "").lower())
-        if is_physics_ege:
-            part1_max = min(20, max_num or 20)
-            part2_min = part1_max + 1
-            part2_max = max_num or 26
-        else:
+        rows = list(
+            TaskType.objects.filter(exam_format=selected_exam_format)
+            .values_list("number", "is_extended_answer")
+        )
+        numbers = [int(n or 0) for n, _ in rows if n is not None]
+        max_num = max(numbers) if numbers else 0
+        part1_nums = [int(n) for n, is_ext in rows if n is not None and not bool(is_ext)]
+        part2_nums = [int(n) for n, is_ext in rows if n is not None and bool(is_ext)]
+
+        def _apply_named_fallback():
+            nonlocal part1_max, part2_min, part2_max
+            subj_name = ((getattr(selected_exam_format, "subject", None) and (selected_exam_format.subject.name or "")) or "").strip().lower()
+            fmt_name = (selected_exam_format.name or "").strip().lower()
+
+            # Явные правила для известных форматов, чтобы не ломаться при неполной разметке is_extended_answer.
+            if "физика" in subj_name:
+                part1_max = min(20, max_num or 20)
+                part2_min = part1_max + 1
+                part2_max = max_num or (26 if "егэ" in fmt_name else 24)
+                part2_max = max(part2_min, int(part2_max))
+                return
+
+            if "математика" in subj_name and "огэ" in fmt_name:
+                part1_max = min(19, max_num or 19)
+                part2_min = part1_max + 1
+                part2_max = max_num or 25
+                part2_max = max(part2_min, int(part2_max))
+                return
+
+            # Общий fallback (старое поведение): 1–12 и остальное во 2 часть.
             part1_max = min(12, max_num or 12)
             part2_min = part1_max + 1
-            part2_max = max_num or 20
+            part2_max = max(part2_min, int(max_num or 20))
+
+        # Если разметка есть — используем её, но защищаемся от «дыр» (когда в базе есть только №1 и №26).
+        if part2_nums:
+            guessed_part1_max = max(part1_nums) if part1_nums else max(1, min(part2_nums) - 1)
+            guessed_part2_min = min(part2_nums)
+            guessed_part2_max = max(part2_nums)
+
+            subj_name = ((getattr(selected_exam_format, "subject", None) and (selected_exam_format.subject.name or "")) or "").strip().lower()
+            fmt_name = (selected_exam_format.name or "").strip().lower()
+
+            suspicious_gap = (guessed_part2_min - guessed_part1_max > 2)
+            suspicious_physics = ("физика" in subj_name) and (guessed_part1_max < 20 or guessed_part2_min < 21 or suspicious_gap)
+            suspicious_math_oge = ("математика" in subj_name and "огэ" in fmt_name) and (guessed_part2_min < 20)
+
+            if suspicious_physics or suspicious_math_oge:
+                _apply_named_fallback()
+            else:
+                part1_max = guessed_part1_max
+                part2_min = guessed_part2_min
+                part2_max = guessed_part2_max
+        else:
+            _apply_named_fallback()
 
     return render(request, 'core/tutor_create_assignment.html', {
         'students': students,
