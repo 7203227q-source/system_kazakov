@@ -106,7 +106,8 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <i class="fas fa-envelope text-gray-400"></i>
                         </div>
-                        <input type="text" id="email" name="username" class="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="Логин или Email">
+                        {# iOS Safari увеличивает масштаб на полях < 16px — ставим 16px (text-base) #}
+                        <input type="text" id="email" name="username" class="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-base transition" placeholder="Логин или Email">
                     </div>
                 </div>
 
@@ -120,7 +121,8 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <i class="fas fa-lock text-gray-400"></i>
                         </div>
-                        <input type="password" id="password" name="password" class="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition" placeholder="••••••••">
+                        {# iOS Safari увеличивает масштаб на полях < 16px — ставим 16px (text-base) #}
+                        <input type="password" id="password" name="password" class="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-base transition" placeholder="••••••••">
                         <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
                             <i class="fas fa-eye"></i>
                         </button>
