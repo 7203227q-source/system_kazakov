@@ -179,6 +179,7 @@
                             </div>
                             {% endif %}
 
+                            {% if item.is_extended %}
                             <div class="mt-4 bg-white border border-gray-200 rounded-xl p-4">
                                 <div class="text-sm font-bold text-gray-800 mb-2">Итог репетитора</div>
                                 <div class="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -209,6 +210,7 @@
                                     Ученик продолжает видеть только оценку ИИ. Итог репетитора используется в аналитике.
                                 </div>
                             </div>
+                            {% endif %}
                         {% else %}
                             <div class="text-sm text-gray-600">Нет попыток решения.</div>
                         {% endif %}

@@ -2469,6 +2469,7 @@ def tutor_assignment_view(request, assignment_id):
             'content_html': t.get_content_for_theme(theme),
             'solution_html': t.get_solution_for_theme(theme),
             'submission': sub,
+            'is_extended': is_extended_answer_task(t),
             'unread_student_questions': int(unread_by_submission.get(sub.id, 0) or 0) if sub else 0,
         })
     pending_extension = AssignmentExtensionRequest.objects.filter(assignment=assignment, status='pending').first()
