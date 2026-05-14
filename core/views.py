@@ -2729,21 +2729,17 @@ def tutor_create_assignment(request):
         student_id = request.POST.get('student_id')
         exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
         kind = request.POST.get('kind', 'homework')
-        
+
         if not student_id:
             messages.error(request, "Выберите ученика")
-            # Preserve POST data for the form to reuse
             request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
-            
+
         student = get_object_or_404(User, id=student_id, role='student')
 
         exam_format = None
-        if exam_format_id_raw:
-            try:
-                exam_format = ExamFormat.objects.get(id=int(exam_format_id_raw))
-            except Exception:
-                exam_format = None
+        if exam_format_id_raw and exam_format_id_raw.isdigit():
+            exam_format = ExamFormat.objects.filter(id=int(exam_format_id_raw)).first()
         if exam_format is None:
             profile = StudentSubjectProfile.objects.filter(student=student).select_related("subject", "exam_format").first()
             if profile:
@@ -2767,27 +2763,20 @@ def tutor_create_assignment(request):
             messages.error(request, "Выберите формат экзамена.")
             request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
-            
-        # Генерация дефолтного названия если пустое
+
         title = request.POST.get('title', '').strip()
         student_seq = None
         if not title:
-            # Находим максимальный seq для этого ученика
             max_seq = Assignment.objects.filter(student=student).aggregate(m=models.Max('student_seq'))['m'] or 0
             student_seq = max_seq + 1
-            
-            # Формируем название: Формат — Ученик — Тип №
             student_name = student.get_full_name() or student.username
             kind_labels = {'homework': 'Домашняя работа', 'test': 'Тест', 'control_test': 'Контрольный тест'}
             kind_label = kind_labels.get(kind, 'Домашняя работа')
-            
             format_str = f"{exam_format.name} {exam_format.year}"
             title = f"{format_str} — {student_name} — {kind_label} №{student_seq}"
-        
-        # Collect tasks
+
         selected_tasks = []
-        
-        # We need to find which subtypes of this type are checked
+
         allowed_subtypes_by_type = {}
         for key, value in request.POST.items():
             if key.startswith('subtype_checked_') and value == 'on':
@@ -2797,7 +2786,6 @@ def tutor_create_assignment(request):
                 if t_type_id:
                     allowed_subtypes_by_type.setdefault(int(t_type_id), []).append(subtype_tag)
 
-        # Handle Type-level counts
         task_types = list(TaskType.objects.filter(exam_format=exam_format))
 
         bundle_task_types = [
@@ -2840,42 +2828,34 @@ def tutor_create_assignment(request):
                     continue
                 count = int(type_count_str)
                 allowed_subtypes = allowed_subtypes_by_type.get(t_type.id, [])
-                
-                # If the user selected some count for the type, but unchecked all subtypes, 
-                # we shouldn't pick any tasks for this type.
                 if not allowed_subtypes:
                     continue
-                    
                 tasks_qs = Task.objects.filter(task_type=t_type, subtype_tag__in=allowed_subtypes)
                 tasks_of_type = list(tasks_qs.order_by('?')[:count])
                 selected_tasks.extend(tasks_of_type)
-        
-        # Handle Subtype-level counts
+
         for key, value in request.POST.items():
             if key.startswith('subtype_count_') and value.isdigit() and int(value) > 0:
                 count = int(value)
                 idx = key.replace('subtype_count_', '')
                 subtype_tag = request.POST.get(f'subtype_name_{idx}', '')
                 t_type_id = request.POST.get(f'subtype_type_{idx}')
-                
                 if t_type_id:
                     if int(t_type_id) in bundle_type_ids:
                         continue
-                    tasks_of_subtype = list(Task.objects.filter(
-                        task_type_id=t_type_id, 
-                        subtype_tag=subtype_tag
-                    ).order_by('?')[:count])
+                    tasks_of_subtype = list(
+                        Task.objects.filter(task_type_id=t_type_id, subtype_tag=subtype_tag).order_by('?')[:count]
+                    )
                     selected_tasks.extend(tasks_of_subtype)
-                
+
         if not selected_tasks:
             messages.error(request, "Выберите хотя бы одно задание для варианта")
             request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
-            
-        # Clear saved form if success
+
         if 'saved_assignment_form' in request.session:
             del request.session['saved_assignment_form']
-            
+
         unique_tasks = []
         seen_ids = set()
         for t in selected_tasks:
@@ -2893,7 +2873,7 @@ def tutor_create_assignment(request):
             exam_format=exam_format,
         )
         assignment.tasks.add(*unique_tasks)
-        
+
         return redirect('tutor_preview_assignment', assignment_id=assignment.id)
 
     saved_form = request.session.pop('saved_assignment_form', {})
@@ -2918,8 +2898,8 @@ def tutor_create_assignment(request):
     else:
         exam_formats = base_exam_formats
 
-    # Формируем структуру: Типы -> Подтипы с их количеством
     grouped_data = []
+
     selected_exam_format_id = (request.GET.get("exam_format") or "").strip()
     if not selected_exam_format_id and saved_form:
         selected_exam_format_id = (saved_form.get("exam_format") or [""])[0]
@@ -2933,11 +2913,16 @@ def tutor_create_assignment(request):
             if profile.exam_format_id and exam_formats.filter(id=profile.exam_format_id).exists():
                 selected_exam_format = profile.exam_format
             else:
-                selected_exam_format = exam_formats.filter(subject=profile.subject, is_active=True).first() or exam_formats.filter(subject=profile.subject).first()
+                selected_exam_format = (
+                    exam_formats.filter(subject=profile.subject, is_active=True).first()
+                    or exam_formats.filter(subject=profile.subject).first()
+                )
     if selected_exam_format is None and exam_formats.exists():
         selected_exam_format = exam_formats.filter(is_active=True).first() or exam_formats.first()
 
-    task_types = TaskType.objects.filter(exam_format=selected_exam_format).order_by('number') if selected_exam_format else TaskType.objects.none()
+    task_types = (
+        TaskType.objects.filter(exam_format=selected_exam_format).order_by('number') if selected_exam_format else TaskType.objects.none()
+    )
     idx = 0
     for t_type in task_types:
         subtypes = Task.objects.filter(task_type=t_type).values('subtype_tag').annotate(count=models.Count('id')).order_by('subtype_tag')
@@ -2958,11 +2943,10 @@ def tutor_create_assignment(request):
                 'total_count': sum(s['count'] for s in subtypes)
             })
 
-    # Retrieve saved form data if exists
     saved_type_counts = {}
     saved_subtype_counts = {}
     saved_subtype_checked = {}
-    
+
     if saved_form:
         for key, val_list in saved_form.items():
             if key.startswith('type_count_'):
@@ -2975,23 +2959,40 @@ def tutor_create_assignment(request):
             elif key.startswith('subtype_checked_'):
                 s_idx = key.replace('subtype_checked_', '')
                 saved_subtype_checked[s_idx] = val_list[0] == 'on'
-                
-    # Add saved info to grouped_data
+
     for group in grouped_data:
         t_id = group['type'].id
         group['saved_count'] = saved_type_counts.get(t_id, 0)
         for subtype in group['subtypes']:
             s_idx = str(subtype['idx'])
             subtype['saved_count'] = saved_subtype_counts.get(s_idx, 0)
-            # Default to True if no saved form, else use what's saved
             subtype['saved_checked'] = saved_subtype_checked.get(s_idx, False) if saved_form else True
+
+    part1_min = 1
+    part1_max = 12
+    part2_min = 13
+    part2_max = 20
+    if selected_exam_format:
+        max_num = TaskType.objects.filter(exam_format=selected_exam_format).aggregate(m=models.Max("number")).get("m") or 0
+        if max_num >= 30:
+            part1_max = 20
+            part2_min = 21
+            part2_max = max_num
+        else:
+            part1_max = min(12, max_num or 12)
+            part2_min = part1_max + 1
+            part2_max = max_num or 20
 
     return render(request, 'core/tutor_create_assignment.html', {
         'students': students,
         'exam_formats': exam_formats,
         'selected_exam_format': selected_exam_format,
         'grouped_data': grouped_data,
-        'saved_form': saved_form
+        'saved_form': saved_form,
+        'part1_min': part1_min,
+        'part1_max': part1_max,
+        'part2_min': part2_min,
+        'part2_max': part2_max,
     })
 
 @login_required
