@@ -39,7 +39,7 @@
 
         <!-- Form Content -->
         <div class="p-8">
-            <form action="{% url 'register' %}" method="POST" class="space-y-4">
+            <form id="register-form" action="{% url 'register' %}" method="POST" class="space-y-4">
                 {% csrf_token %}
                 
                 {% if error %}
@@ -103,8 +103,8 @@
                 </div>
 
                 <!-- Submit Button -->
-                <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition mt-2">
-                    Зарегистрироваться
+                <button id="register-submit" type="submit" class="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition mt-2">
+                    <span class="btn-text">Зарегистрироваться</span>
                 </button>
             </form>
             
@@ -129,6 +129,53 @@
             
         </div>
     </div>
+
+    <!-- Loading Overlay (prevents double click) -->
+    <div id="register-loading" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/40 backdrop-blur-[2px] p-6">
+        <div class="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden">
+            <div class="px-6 py-5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
+                        <svg class="animate-spin w-5 h-5 text-white" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="font-extrabold tracking-tight">Создаём аккаунт</div>
+                        <div class="text-indigo-100 text-sm">Пожалуйста, подождите…</div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-5">
+                <div class="text-sm text-gray-600 leading-relaxed">
+                    Сейчас откроется окно выбора роли (ученик/репетитор). Не закрывайте страницу.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const form = document.getElementById('register-form');
+            const btn = document.getElementById('register-submit');
+            const overlay = document.getElementById('register-loading');
+            if (!form || !btn || !overlay) return;
+
+            let locked = false;
+            form.addEventListener('submit', function (e) {
+                if (locked) {
+                    e.preventDefault();
+                    return;
+                }
+                locked = true;
+                btn.disabled = true;
+                btn.classList.add('opacity-80', 'cursor-not-allowed');
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+            });
+        })();
+    </script>
 {% include "core/image_modal.html" %}
 </body>
 </html>

@@ -3928,6 +3928,17 @@ def register_view(request):
     """
     Регистрация ученика по почте.
     """
+    if request.user.is_authenticated:
+        if request.user.role == 'unassigned':
+            return redirect('select_role')
+        if request.user.role == 'student':
+            return redirect('student_dashboard')
+        if request.user.role == 'tutor':
+            return redirect('tutor_dashboard')
+        if request.user.role == 'parent':
+            return redirect('parent_dashboard')
+        return redirect('login')
+
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
         first_name = request.POST.get('first_name', '').strip()
