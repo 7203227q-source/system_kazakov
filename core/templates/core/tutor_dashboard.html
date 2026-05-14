@@ -316,6 +316,17 @@
                         </div>
                     </div>
 
+                    <div class="mt-6 bg-gray-50 rounded-xl border border-gray-100 p-4">
+                        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">За последнюю неделю: правильно / неправильно</div>
+                        {% if weekly_solved_chart_data %}
+                            <div class="relative h-56 w-full">
+                                <canvas id="studentWeeklySolvedChart"></canvas>
+                            </div>
+                        {% else %}
+                            <div class="text-sm text-gray-500">Нет данных за последнюю неделю.</div>
+                        {% endif %}
+                    </div>
+
                     <div class="mt-6">
                         <div class="flex items-center justify-between mb-3">
                             <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Решаемость по номерам</div>
@@ -673,6 +684,32 @@
                             plugins: {
                                 legend: { display: true, position: 'bottom' },
                             },
+                        },
+                    });
+                }
+            } catch (e) {}
+        }
+
+        const weeklyRaw = '{{ weekly_solved_chart_data|default:""|escapejs }}';
+        if (weeklyRaw) {
+            try {
+                const weekly = JSON.parse(weeklyRaw);
+                const wctx = document.getElementById('studentWeeklySolvedChart');
+                if (wctx && weekly && Array.isArray(weekly.labels)) {
+                    new Chart(wctx, {
+                        type: 'bar',
+                        data: {
+                            labels: weekly.labels,
+                            datasets: [
+                                { label: 'Правильно', data: weekly.correct, backgroundColor: '#2563EB' },
+                                { label: 'Неправильно', data: weekly.incorrect, backgroundColor: '#EF4444' },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                            plugins: { legend: { display: true, position: 'bottom' } },
                         },
                     });
                 }

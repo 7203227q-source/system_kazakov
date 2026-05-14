@@ -1923,6 +1923,7 @@ def tutor_dashboard(request):
     active_assignments = []
     completed_assignments = []
     chart_data = None
+    weekly_solved_chart_data = None
     chart_range = None
     chart_subject_id = None
     task_type_rates = []
@@ -2046,8 +2047,11 @@ def tutor_dashboard(request):
             .prefetch_related('tasks', 'tasks__task_type')
             .order_by('-created_at')
         )
-        # Важно: список вариантов ученика не должен зависеть от выбранного предмета графика/аналитики.
-        # Иначе репетитор «иногда не видит» варианты других предметов.
+        if chart_subject_id:
+            assignments = assignments.filter(
+                Q(exam_format__subject_id=chart_subject_id)
+                | Q(exam_format__isnull=True, tasks__topic__subject_id=chart_subject_id)
+            ).distinct()
 
         for a in assignments:
             auto_expire_assignment_if_needed(a)
@@ -2122,6 +2126,45 @@ def tutor_dashboard(request):
 
             chart_data = json.dumps(
                 {'labels': labels, 'mastery': mastery, 'predictions': predictions},
+                ensure_ascii=False,
+            )
+
+        if chart_subject_id:
+            from datetime import timedelta
+
+            start_week = today - timedelta(days=6)
+            day_list = [start_week + timedelta(days=i) for i in range(7)]
+            wd = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+            weekly_labels = [f"{wd[d.weekday()]} {d.strftime('%d.%m')}" for d in day_list]
+
+            qs = (
+                Submission.objects.filter(
+                    student=selected_student,
+                    created_at__date__gte=start_week,
+                    created_at__date__lte=today,
+                    is_correct__isnull=False,
+                )
+                .filter(task__topic__subject_id=chart_subject_id)
+                .order_by("created_at")
+                .values_list("created_at", "task_id", "is_correct")
+            )
+
+            last_by_day_task: dict[tuple, bool] = {}
+            for created_at, task_id, is_correct in qs:
+                last_by_day_task[(created_at.date(), int(task_id))] = bool(is_correct)
+
+            by_day: dict = {}
+            for (d, _tid), v in last_by_day_task.items():
+                cell = by_day.setdefault(d, {"correct": 0, "incorrect": 0})
+                if v:
+                    cell["correct"] = int(cell["correct"]) + 1
+                else:
+                    cell["incorrect"] = int(cell["incorrect"]) + 1
+
+            weekly_correct = [int(by_day.get(d, {}).get("correct", 0)) for d in day_list]
+            weekly_incorrect = [int(by_day.get(d, {}).get("incorrect", 0)) for d in day_list]
+            weekly_solved_chart_data = json.dumps(
+                {"labels": weekly_labels, "correct": weekly_correct, "incorrect": weekly_incorrect},
                 ensure_ascii=False,
             )
 
@@ -2276,6 +2319,7 @@ def tutor_dashboard(request):
         'completed_assignments': completed_assignments,
         'drafts': drafts,
         'chart_data': chart_data,
+        'weekly_solved_chart_data': weekly_solved_chart_data,
         'chart_range': chart_range or 30,
         'chart_subject_id': chart_subject_id,
         'task_type_rates': task_type_rates,
