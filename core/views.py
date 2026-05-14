@@ -1445,6 +1445,10 @@ def student_solve_assignment(request, assignment_id):
                 task.saved_submission.ai_feedback_display = normalize_tex_in_feedback(task.saved_submission.ai_feedback)
             except Exception:
                 task.saved_submission.ai_feedback_display = task.saved_submission.ai_feedback
+            try:
+                task.saved_submission.ai_feedback_display_html = sanitize_ai_feedback_html(task.saved_submission.ai_feedback_display)
+            except Exception:
+                task.saved_submission.ai_feedback_display_html = task.saved_submission.ai_feedback_display
         if task.saved_submission and getattr(task.saved_submission, "ai_last_verify_at", None):
             try:
                 dt = task.saved_submission.ai_last_verify_at
@@ -4104,6 +4108,22 @@ def normalize_tex_in_feedback(text: str) -> str:
     text = re.sub(r"(?<!\$)\$([^\n$]+?)\$(?!\$)", lambda m: f"${fix_body(m.group(1))}$", text)
     return text
 
+def sanitize_ai_feedback_html(text: str) -> str:
+    if not text or not isinstance(text, str):
+        return text or ""
+    soup = BeautifulSoup(text, "html.parser")
+    allowed = {"ul", "ol", "li", "b", "strong", "i", "em", "br", "p", "code", "pre"}
+    for tag in list(soup.find_all(True)):
+        name = (tag.name or "").lower()
+        if name in {"script", "style"}:
+            tag.decompose()
+            continue
+        if name not in allowed:
+            tag.unwrap()
+            continue
+        tag.attrs = {}
+    return str(soup)
+
 def is_extended_answer_task(task) -> bool:
     """
     Определяет, относится ли задание к развёрнутой части (нужно фото/ИИ).
@@ -4383,6 +4403,7 @@ def api_verify_with_ai(request, submission_id):
         'status': 'ok',
         'primary_score': primary_score,
         'feedback': feedback,
+        'feedback_html': sanitize_ai_feedback_html(feedback),
         'is_correct': is_correct,
         'xp_gained': xp_gained,
         'solution_html': solution_html,
