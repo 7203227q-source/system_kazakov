@@ -2002,8 +2002,8 @@ def tutor_dashboard(request):
             .prefetch_related('tasks', 'tasks__task_type')
             .order_by('-created_at')
         )
-        if chart_subject_id:
-            assignments = assignments.filter(exam_format__subject_id=chart_subject_id)
+        # Важно: список вариантов ученика не должен зависеть от выбранного предмета графика/аналитики.
+        # Иначе репетитор «иногда не видит» варианты других предметов.
 
         for a in assignments:
             auto_expire_assignment_if_needed(a)
