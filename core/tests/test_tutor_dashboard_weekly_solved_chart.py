@@ -38,6 +38,7 @@ class TutorDashboardWeeklySolvedChartTests(TestCase):
         self.client.login(username="t", password="pass")
         res = self.client.get(reverse("tutor_dashboard"), {"student_id": student.id, "subject_id": subj.id})
         self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'id="studentWeeklySolvedChart"')
 
         raw = res.context.get("weekly_solved_chart_data")
         self.assertTrue(raw)
@@ -51,4 +52,3 @@ class TutorDashboardWeeklySolvedChartTests(TestCase):
         self.assertEqual(data["incorrect"][idx_d2], 0)
         self.assertEqual(data["correct"][idx_d1], 0)
         self.assertEqual(data["incorrect"][idx_d1], 1)
-
