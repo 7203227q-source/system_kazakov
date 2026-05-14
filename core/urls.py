@@ -36,6 +36,7 @@ urlpatterns = [
     path('board/list/', views.whiteboard_list, name='whiteboard_list'),
     path('board/<int:assignment_id>/<int:task_id>/create/', views.whiteboard_create, name='whiteboard_create'),
     path('board/<int:session_id>/save/', views.whiteboard_save, name='whiteboard_save'),
+    path('board/<int:session_id>/verify-ai/', views.whiteboard_verify_ai, name='whiteboard_verify_ai'),
     
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/contacts/', views.tutor_update_student_contacts, name='tutor_update_student_contacts'),

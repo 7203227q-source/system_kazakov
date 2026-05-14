@@ -2679,6 +2679,7 @@ def whiteboard_page(request, session_id):
         'task_html': task_html,
         'solution_html': solution_html,
         'snapshot_json': snapshot_json,
+        'ai_feedback_html': sanitize_ai_feedback_html(getattr(session, "ai_feedback", "") or ""),
         'back_url': back_url,
     })
 
@@ -2757,6 +2758,207 @@ def whiteboard_save(request, session_id):
     session.snapshot_json = snapshot
     session.save(update_fields=['snapshot_json', 'updated_at'])
     return JsonResponse({'status': 'ok'})
+
+
+@login_required
+@require_POST
+def whiteboard_verify_ai(request, session_id):
+    if request.user.role != "tutor":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    session = get_object_or_404(
+        WhiteboardSession.objects.select_related("tutor", "student", "task", "task__topic", "task__task_type"),
+        id=session_id,
+    )
+    if session.tutor_id != request.user.id:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    # Кулдаун 120 секунд
+    now = timezone.now()
+    last = getattr(session, "ai_last_verify_at", None)
+    cooldown_seconds = 120
+    if last:
+        try:
+            delta = (now - last).total_seconds()
+        except Exception:
+            delta = cooldown_seconds + 1
+        if delta < cooldown_seconds:
+            retry_after = int(max(1, cooldown_seconds - int(delta)))
+            return JsonResponse({"error": "ai_retry_later", "retry_after": retry_after}, status=429)
+
+    # Ставим отметку сразу, чтобы двойной клик тоже попал под кулдаун
+    try:
+        session.ai_last_verify_at = now
+        session.ai_verified_by = request.user
+        session.save(update_fields=["ai_last_verify_at", "ai_verified_by"])
+    except Exception:
+        pass
+
+    task = session.task
+    max_points = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+    if not is_extended_answer_task(task):
+        return JsonResponse({"error": "only_second_part"}, status=400)
+
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except Exception:
+        body = {}
+    image_data_url = (body.get("image_data_url") or "").strip()
+    if not image_data_url.startswith("data:image/"):
+        return JsonResponse({"error": "bad_request"}, status=400)
+
+    # Модель
+    model = ""
+    try:
+        from .models import SubjectAIConfig
+        cfg = (
+            SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id)
+            .select_related("photo_analysis_model")
+            .first()
+        )
+        if cfg and cfg.photo_analysis_model:
+            model = cfg.photo_analysis_model.code
+    except Exception:
+        model = ""
+
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
+    if not api_key or not model:
+        return JsonResponse({"error": "ai_not_configured"}, status=400)
+
+    try:
+        from .http_headers import require_ascii, sanitize_header_value
+        require_ascii(api_key, "OPENROUTER_API_KEY")
+
+        task_html = ""
+        try:
+            task_html = task.get_content_for_theme() or ""
+        except Exception:
+            task_html = ""
+
+        soup = BeautifulSoup(task_html, "html.parser") if task_html else None
+        task_text = ""
+        if soup:
+            for t in soup(["script", "style", "noscript"]):
+                t.decompose()
+            task_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True) or "").strip()
+            task_text = task_text.replace("\\", "\\\\")
+
+        referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
+        title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
+
+        prompt = (
+            "Оцени решение по изображению доски как репетитор-эксперт экзамена.\n"
+            f"Максимум баллов: {max_points}.\n"
+            f"Поставь первичный балл primary_score как целое число от 0 до {int(max_points or 0)}.\n"
+            "Если решение полностью верное — primary_score = максимум.\n"
+            "Если решение частично верное — поставь частичный балл.\n"
+            "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
+            "В feedback обязательно коротко объясни, за что сняты баллы, в формате:\n"
+            "- Что верно:\n"
+            "- Ошибки:\n"
+            "- За что сняты баллы:\n"
+            "- Что исправить:\n"
+            "В поле feedback используй Markdown. Все формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
+            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши LaTeX (используй двойной обратный слэш).\n"
+            "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
+        )
+        if task_text:
+            prompt = f"{prompt}\n\nУсловие:\n{task_text}"
+
+        user_content = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": image_data_url}},
+        ]
+
+        res = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": referer,
+                "X-Title": title,
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                    {"role": "user", "content": user_content},
+                ],
+            },
+            timeout=90,
+        )
+
+        if res.status_code != 200:
+            detail = None
+            try:
+                detail = res.json()
+            except Exception:
+                detail = (res.text or "").strip()[:500]
+            return JsonResponse(
+                {"error": "ai_failed", "upstream_status": res.status_code, "upstream_message": detail},
+                status=400,
+            )
+
+        data = res.json()
+        content = data["choices"][0]["message"]["content"]
+
+        def _repair_json_for_latex(raw: str) -> str:
+            if not isinstance(raw, str):
+                return raw
+            raw = re.sub(r'\\([bfnrt])(?=[A-Za-z])', r'\\\\\1', raw)
+            raw = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', raw)
+            raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
+            return raw
+
+        content = _repair_json_for_latex(content)
+        try:
+            parsed = json.loads(content)
+        except Exception:
+            match = re.search(r"\{[\s\S]*\}", str(content))
+            if not match:
+                parsed = None
+            else:
+                try:
+                    parsed = json.loads(_repair_json_for_latex(match.group(0)))
+                except Exception:
+                    parsed = None
+
+        if not isinstance(parsed, dict):
+            raw = str(content)
+            ps_m = re.search(r'["\']primary_score["\']\s*:\s*(-?\d+)', raw, re.IGNORECASE)
+            ic_m = re.search(r'["\']is_correct["\']\s*:\s*(true|false)', raw, re.IGNORECASE)
+            fb_m = re.search(r'["\']feedback["\']\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw, re.IGNORECASE)
+            if ps_m or ic_m or fb_m:
+                parsed = {
+                    "primary_score": int(ps_m.group(1)) if ps_m else 0,
+                    "is_correct": (ic_m.group(1).lower() == "true") if ic_m else False,
+                    "feedback": fb_m.group(1) if fb_m else raw,
+                }
+            else:
+                return JsonResponse({"error": "ai_failed"}, status=400)
+
+        primary_score = int(parsed.get("primary_score") or 0)
+        feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
+
+        session.ai_score = primary_score
+        session.ai_max_score = int(max_points or 0)
+        session.ai_feedback = feedback
+        session.ai_verified_by = request.user
+        session.ai_last_verify_at = now
+        session.save(update_fields=["ai_score", "ai_max_score", "ai_feedback", "ai_verified_by", "ai_last_verify_at", "updated_at"])
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "primary_score": primary_score,
+                "max_points": int(max_points or 0),
+                "feedback": feedback,
+                "feedback_html": sanitize_ai_feedback_html(feedback),
+                "cooldown_seconds": cooldown_seconds,
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"error": "ai_failed", "upstream_message": str(e)}, status=400)
 
 @login_required
 def tutor_create_assignment(request):

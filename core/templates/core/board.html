@@ -43,6 +43,14 @@
             <button id="save-btn" class="bg-primary text-white hover:bg-indigo-700 px-3 py-2 rounded-lg text-sm font-bold transition">
                 Сохранить
             </button>
+            <button
+                id="ai-verify-btn"
+                class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                {% if user.role != 'tutor' %}disabled{% endif %}
+                title="{% if user.role != 'tutor' %}Проверку ИИ запускает только репетитор{% else %}Проверить доску ИИ{% endif %}"
+            >
+                Проверить ИИ
+            </button>
             {% if user.role == 'tutor' %}
             <button id="toggle-solution-btn" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-bold transition">
                 Решение
@@ -57,6 +65,21 @@
         <div class="prose max-w-none text-base task-solution">{{ solution_html|safe }}</div>
     </div>
     {% endif %}
+
+    <div id="ai-verdict-panel" class="bg-white border-b border-gray-200 p-4 {% if not session.ai_feedback %}hidden{% endif %}">
+        <div class="flex items-center justify-between gap-3">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Вердикт ИИ</div>
+            <div id="ai-verdict-score" class="text-sm font-bold text-gray-800">
+                {% if session.ai_score is not None and session.ai_max_score %}
+                    {{ session.ai_score }}/{{ session.ai_max_score }}
+                {% endif %}
+            </div>
+        </div>
+        <div id="ai-verdict-body" class="prose max-w-none text-base mt-3">
+            {{ ai_feedback_html|safe }}
+        </div>
+        <div id="ai-verdict-status" class="text-xs text-gray-500 mt-2"></div>
+    </div>
 
     <div class="flex-1 flex flex-col">
         <div class="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2">
@@ -380,6 +403,7 @@
     }
 
     let drawing = null;
+    let shapePreview = null;
     let pointsBatch = [];
     let batchTimer = null;
     function flushPoints() {
@@ -411,36 +435,82 @@
             markDirty();
         } else if (tool === 'eraser') {
             const pos = pointerPos(evt);
-            const node = stage.getIntersection(pos);
-            if (node) {
-                const id = node.id();
-                if (id) {
-                    removeObject(id);
-                    sendWs({ type: 'object_delete', payload: { id } });
-                    markDirty();
-                }
+            let node = stage.getIntersection(pos);
+            while (node && (!node.hasName || !node.hasName('wbobj'))) {
+                node = node.getParent ? node.getParent() : null;
+            }
+            const id = node && node.id ? node.id() : '';
+            if (id) {
+                removeObject(id);
+                sendWs({ type: 'object_delete', payload: { id } });
+                markDirty();
+            }
+        } else if (tool === 'table') {
+            const pos = pointerPos(evt);
+            const obj = { id: uid('table'), type: 'table', x: pos.x, y: pos.y, rows: 4, cols: 4, cellW: 80, cellH: 48, stroke: color, width: 2 };
+            upsertStateObject(obj);
+            applyObject(obj);
+            sendWs({ type: 'object_add', payload: { object: obj } });
+            markDirty();
+        } else if (tool === 'line' || tool === 'rect' || tool === 'triangle') {
+            const pos = pointerPos(evt);
+            if (tool === 'line') {
+                shapePreview = { id: uid('line'), type: 'line', x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y, stroke: color, width: baseWidth };
+            } else if (tool === 'rect') {
+                shapePreview = { id: uid('rect'), type: 'rect', x: pos.x, y: pos.y, w: 1, h: 1, stroke: color, width: baseWidth };
+            } else if (tool === 'triangle') {
+                shapePreview = { id: uid('tri'), type: 'triangle', a: { x: pos.x, y: pos.y }, b: { x: pos.x, y: pos.y }, c: { x: pos.x, y: pos.y }, stroke: color, width: baseWidth };
+            }
+            if (shapePreview) {
+                upsertStateObject(shapePreview);
+                applyObject(shapePreview);
             }
         }
     });
     stage.on('contentPointermove', (e) => {
         const evt = e.evt;
-        if (!drawing || tool !== 'pen') return;
-        if (evt.pointerType === 'pen' && (evt.pressure || 0) <= 0) return;
-        const pos = pointerPos(evt);
-        const p = currentPointerPressure(evt);
-        drawing.points.push({ x: pos.x, y: pos.y, p });
-        upsertStateObject(drawing);
-        applyObject(drawing);
-        pointsBatch.push({ x: pos.x, y: pos.y, p });
-        markDirty();
+        if (drawing && tool === 'pen') {
+            if (evt.pointerType === 'pen' && (evt.pressure || 0) <= 0) return;
+            const pos = pointerPos(evt);
+            const p = currentPointerPressure(evt);
+            drawing.points.push({ x: pos.x, y: pos.y, p });
+            upsertStateObject(drawing);
+            applyObject(drawing);
+            pointsBatch.push({ x: pos.x, y: pos.y, p });
+            markDirty();
+            return;
+        }
+        if (shapePreview && (tool === 'line' || tool === 'rect' || tool === 'triangle')) {
+            const pos = pointerPos(evt);
+            if (shapePreview.type === 'line') {
+                shapePreview.x2 = pos.x;
+                shapePreview.y2 = pos.y;
+            } else if (shapePreview.type === 'rect') {
+                shapePreview.w = Math.max(1, pos.x - shapePreview.x);
+                shapePreview.h = Math.max(1, pos.y - shapePreview.y);
+            } else if (shapePreview.type === 'triangle') {
+                shapePreview.b = { x: pos.x, y: shapePreview.a.y };
+                shapePreview.c = { x: Math.round((shapePreview.a.x + pos.x) / 2), y: pos.y };
+            }
+            upsertStateObject(shapePreview);
+            applyObject(shapePreview);
+            markDirty();
+        }
     });
     stage.on('contentPointerup contentPointercancel', () => {
-        if (!drawing) return;
-        flushPoints();
-        sendWs({ type: 'stroke_end', payload: { id: drawing.id } });
-        drawing = null;
-        stopBatchTimer();
-        markDirty();
+        if (drawing) {
+            flushPoints();
+            sendWs({ type: 'stroke_end', payload: { id: drawing.id } });
+            drawing = null;
+            stopBatchTimer();
+            markDirty();
+            return;
+        }
+        if (shapePreview) {
+            sendWs({ type: 'object_add', payload: { object: shapePreview } });
+            shapePreview = null;
+            markDirty();
+        }
     });
 
     async function saveSnapshot() {
@@ -453,6 +523,44 @@
             });
             if (res.ok) clearDirty();
         } catch (e) {}
+    }
+
+    async function verifyAi() {
+        const btn = document.getElementById('ai-verify-btn');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        const statusEl = document.getElementById('ai-verdict-status');
+        if (statusEl) statusEl.textContent = 'Проверяем…';
+        try {
+            const imageDataUrl = stage.toDataURL({ pixelRatio: 2 });
+            const res = await fetch(`/board/${sessionId}/verify-ai/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ image_data_url: imageDataUrl }),
+            });
+            const data = res.ok ? await res.json() : await res.json().catch(() => ({}));
+            if (res.status === 429) {
+                const retry = data.retry_after || 60;
+                if (statusEl) statusEl.textContent = `Повторите через ${retry} сек.`;
+                return;
+            }
+            if (!res.ok || !data || data.status !== 'ok') {
+                if (statusEl) statusEl.textContent = 'Ошибка проверки ИИ';
+                return;
+            }
+            const panel = document.getElementById('ai-verdict-panel');
+            const scoreEl = document.getElementById('ai-verdict-score');
+            const bodyEl = document.getElementById('ai-verdict-body');
+            if (panel) panel.classList.remove('hidden');
+            if (scoreEl) scoreEl.textContent = `${data.primary_score}/${data.max_points}`;
+            if (bodyEl) bodyEl.innerHTML = data.feedback_html || '';
+            if (statusEl) statusEl.textContent = 'Готово';
+        } catch (e) {
+            if (statusEl) statusEl.textContent = 'Ошибка проверки ИИ';
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     async function loadBoards() {
@@ -490,9 +598,9 @@
     }
 
     function setWidth(next) {
-        width = next;
+        baseWidth = Number(next) || 4;
         document.querySelectorAll('.width-btn').forEach((b) => {
-            const is = Number(b.getAttribute('data-width')) === width;
+            const is = Number(b.getAttribute('data-width')) === baseWidth;
             b.className = `width-btn px-3 py-1 rounded-lg border border-gray-200 text-sm font-bold transition ${is ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
         });
     }
@@ -503,6 +611,8 @@
         document.querySelectorAll('.width-btn').forEach((b) => b.addEventListener('click', () => setWidth(Number(b.getAttribute('data-width')))));
         document.getElementById('save-btn').addEventListener('click', saveSnapshot);
         document.getElementById('new-board-btn').addEventListener('click', createBoard);
+        const aiBtn = document.getElementById('ai-verify-btn');
+        if (aiBtn) aiBtn.addEventListener('click', verifyAi);
         const toggle = document.getElementById('toggle-solution-btn');
         if (toggle) {
             toggle.addEventListener('click', () => {
