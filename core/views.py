@@ -4053,6 +4053,11 @@ def normalize_tex_in_feedback(text: str) -> str:
         body = re.sub(r"(?<!\\)cosx", r"\\cos x", body)
         body = re.sub(r"(?<!\\)sinx", r"\\sin x", body)
         body = re.sub(r"(?<!\\)tanx", r"\\tan x", body)
+        body = re.sub(
+            r"(?<!\\)frac(\d{1,4}?)(1000|100|10)(?=[A-Za-z(]|$)",
+            lambda m: f"\\frac{{{m.group(1)}}}{{{m.group(2)}}}",
+            body,
+        )
         def frac_digits(m: re.Match) -> str:
             digits = m.group(1)
             if not digits:
