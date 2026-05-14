@@ -193,12 +193,13 @@
                 <div class="lg:col-span-2">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">Мои задания (Варианты)</h2>
-                    <span class="text-sm font-medium text-primary bg-indigo-50 px-3 py-1 rounded-full">Новых: {{ pending_assignments.count }}</span>
+                    <span id="pending-assignments-count" class="text-sm font-medium text-primary bg-indigo-50 px-3 py-1 rounded-full">Новых: {{ pending_assignments.count }}</span>
                 </div>
                     
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div id="pending-assignments-list">
                         {% for assignment in pending_assignments %}
-                        <div class="p-5 border-b border-gray-100 flex items-center hover:bg-gray-50 transition">
+                        <div class="p-5 border-b border-gray-100 flex items-center hover:bg-gray-50 transition" data-assignment-id="{{ assignment.id }}">
                             <div class="w-12 h-12 {% if assignment.is_verified %}bg-red-100 text-red-600{% else %}bg-indigo-100 text-indigo-600{% endif %} rounded-full flex items-center justify-center text-xl shrink-0 relative">
                                 <i class="fas fa-file-alt"></i>
                                 {% if assignment.is_verified %}
@@ -237,6 +238,7 @@
                             <p>У вас нет нерешенных вариантов. Отличная работа!</p>
                         </div>
                         {% endfor %}
+                        </div>
 
                         <!-- General Practice -->
                         <div class="p-4 md:p-5 flex flex-col md:flex-row md:items-center bg-gray-50 transition border-t border-gray-200">
@@ -544,6 +546,107 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+</script>
+
+<script>
+    (function () {
+        const listEl = document.getElementById('pending-assignments-list');
+        const countEl = document.getElementById('pending-assignments-count');
+        if (!listEl || !countEl) return;
+
+        const subjectId = "{{ active_subject_id|default:'' }}";
+        const buildUrl = () => {
+            const url = new URL('/api/student/pending-assignments/', window.location.origin);
+            if (subjectId) url.searchParams.set('subject_id', String(subjectId));
+            return url.toString();
+        };
+
+        const pad2 = (n) => String(n).padStart(2, '0');
+        const fmtDate = (iso) => {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return '';
+            return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}`;
+        };
+
+        const currentIds = () => Array.from(listEl.querySelectorAll('[data-assignment-id]')).map(el => parseInt(el.getAttribute('data-assignment-id') || '0', 10)).filter(Boolean);
+
+        const render = (assignments) => {
+            listEl.innerHTML = '';
+            countEl.textContent = `Новых: ${assignments.length}`;
+
+            if (!assignments.length) {
+                listEl.innerHTML = `
+                    <div class="p-8 text-center text-gray-500">
+                        <i class="fas fa-check-circle text-4xl text-gray-300 mb-3"></i>
+                        <p>У вас нет нерешенных вариантов. Отличная работа!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            assignments.forEach((a, idx) => {
+                const isVerified = !!a.is_verified;
+                const due = fmtDate(a.due_date);
+                const replies = parseInt(a.unread_tutor_replies_count || 0, 10) || 0;
+
+                const row = document.createElement('div');
+                row.className = 'p-5 border-b border-gray-100 flex items-center hover:bg-gray-50 transition';
+                row.setAttribute('data-assignment-id', String(a.id));
+                row.innerHTML = `
+                    <div class="w-12 h-12 ${isVerified ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'} rounded-full flex items-center justify-center text-xl shrink-0 relative">
+                        <i class="fas fa-file-alt"></i>
+                        ${isVerified ? `
+                            <div class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] border-2 border-white shadow-sm" title="Контрольная работа">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <div class="flex items-center space-x-2">
+                            <h4 class="font-bold text-gray-800">${a.title || ''}</h4>
+                            ${isVerified ? `<span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-red-200">Контрольная</span>` : ''}
+                            ${replies ? `<a href="/student/history/" class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">Ответы: ${replies}</a>` : ''}
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            От репетитора • Задач: ${a.tasks_count || 0}${due ? ` • Срок: ${due}` : ''}
+                        </p>
+                    </div>
+                    <div class="text-right ml-4">
+                        <a href="/student/assignment/${a.id}/" class="inline-block bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                            Начать решение
+                        </a>
+                    </div>
+                `;
+                listEl.appendChild(row);
+            });
+        };
+
+        let inFlight = false;
+        const refresh = async () => {
+            if (inFlight) return;
+            if (document.visibilityState && document.visibilityState !== 'visible') return;
+            inFlight = true;
+            try {
+                const resp = await fetch(buildUrl(), { credentials: 'same-origin' });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const assignments = Array.isArray(data.assignments) ? data.assignments : [];
+                const idsNow = currentIds();
+                const idsNew = assignments.map(x => parseInt(x.id || 0, 10)).filter(Boolean);
+                const changed = idsNow.length !== idsNew.length || idsNow.some((id, i) => id !== idsNew[i]);
+                if (changed) render(assignments);
+            } catch (e) {
+                // silent
+            } finally {
+                inFlight = false;
+            }
+        };
+
+        refresh();
+        setInterval(refresh, 15000);
+        document.addEventListener('visibilitychange', refresh);
+    })();
 </script>
 
 {% include "core/image_modal.html" %}

@@ -4809,3 +4809,39 @@ def logout_view(request):
     """Выход из системы"""
     logout(request)
     return redirect('login')
+
+
+@login_required
+def api_student_pending_assignments(request):
+    if request.user.role != "student":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    qs = Assignment.objects.filter(student=request.user, is_draft=False, is_completed=False)
+    subject_id_raw = (request.GET.get("subject_id") or "").strip()
+    if subject_id_raw.isdigit():
+        qs = qs.filter(tasks__topic__subject_id=int(subject_id_raw)).distinct()
+    qs = qs.order_by("-created_at")[:50]
+
+    assignment_ids = list(qs.values_list("id", flat=True))
+    unread_by_assignment = {
+        row["submission__assignment_id"]: row["c"]
+        for row in SubmissionComment.objects.filter(
+            submission__student=request.user,
+            author_role="tutor",
+            seen_by_student_at__isnull=True,
+            submission__assignment_id__in=assignment_ids,
+        )
+        .values("submission__assignment_id")
+        .annotate(c=models.Count("id"))
+    }
+    items = []
+    for a in qs:
+        items.append({
+            "id": a.id,
+            "title": a.title,
+            "due_date": a.due_date.isoformat() if a.due_date else None,
+            "is_verified": bool(getattr(a, "is_verified", False)),
+            "tasks_count": a.tasks.count(),
+            "unread_tutor_replies_count": int(unread_by_assignment.get(a.id, 0) or 0),
+        })
+    return JsonResponse({"assignments": items})

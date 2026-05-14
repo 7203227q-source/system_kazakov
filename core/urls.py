@@ -5,6 +5,7 @@ urlpatterns = [
     path('', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
     path('student/', views.student_dashboard, name='student_dashboard'),
+    path('api/student/pending-assignments/', views.api_student_pending_assignments, name='api_student_pending_assignments'),
     path('student/practice/', views.student_practice, name='student_practice'),
     path('student/practice/<int:task_id>/submit/', views.student_practice_submit, name='student_practice_submit'),
     path('student/practice/<int:task_id>/srs-add/', views.student_srs_add, name='student_srs_add'),
