@@ -37,6 +37,7 @@ class WhiteboardAccessTests(TestCase):
         self.client.force_login(self.tutor)
         r = self.client.get(reverse('whiteboard_page', args=[self.session.id]))
         self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'id="board-stage"')
 
     def test_other_tutor_cannot_pull_events(self):
         self.client.force_login(self.other_tutor)

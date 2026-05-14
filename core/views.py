@@ -2655,6 +2655,17 @@ def whiteboard_page(request, session_id):
     theme = session.student.preferred_theme or 'classic'
     task_html = session.task.get_content_for_theme(theme)
     solution_html = session.task.get_solution_for_theme(theme) if request.user.role in ['tutor', 'admin'] else ''
+    snapshot_json = session.snapshot_json
+    if not snapshot_json:
+        snapshot_json = json.dumps(
+            {
+                "version": 2,
+                "stage": {"scale": 1.0, "x": 0, "y": 0},
+                "task_card": {"x": 32, "y": 32, "w": 620, "h": 320, "scale": 1.0},
+                "objects": [],
+            },
+            ensure_ascii=False,
+        )
     back_url = ''
     if request.user.role == 'student':
         back_url = reverse('student_solve_assignment', args=[session.assignment_id])
@@ -2667,6 +2678,7 @@ def whiteboard_page(request, session_id):
         'session': session,
         'task_html': task_html,
         'solution_html': solution_html,
+        'snapshot_json': snapshot_json,
         'back_url': back_url,
     })
 

@@ -85,12 +85,19 @@
 
         <div class="flex-1 p-3 sm:p-6 bg-gray-50">
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <svg id="wb-canvas" viewBox="0 0 1600 900" class="w-full h-[70vh] block bg-white touch-none"></svg>
+                <div id="board-wrapper" class="relative w-full h-[70vh] bg-white touch-none">
+                    <div id="board-stage" class="w-full h-full"></div>
+                    <div id="task-card" class="absolute left-0 top-0 bg-white border border-gray-200 rounded-xl shadow-sm overflow-auto p-3 text-gray-800">
+                        <div id="task-card-content" class="prose max-w-none text-base"></div>
+                        <div id="task-card-resizer" class="absolute w-4 h-4 right-1 bottom-1 bg-gray-200 border border-gray-300 rounded cursor-se-resize"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<script src="https://unpkg.com/konva@9.3.18/konva.min.js"></script>
 <script>
     function getCookie(name) {
         const value = `; ${document.cookie}`;
@@ -103,359 +110,338 @@
     const assignmentId = {{ session.assignment_id }};
     const taskId = {{ session.task_id }};
     const studentId = {{ session.student_id }};
-    const initialSnapshot = '{{ session.snapshot_json|default:""|escapejs }}';
+    const initialSnapshot = '{{ snapshot_json|default:""|escapejs }}';
     const taskHtml = '{{ task_html|escapejs }}';
     const csrfToken = getCookie('csrftoken');
 
     let tool = 'pen';
     let color = '#111827';
-    let width = 4;
-    let lastEventId = 0;
+    let baseWidth = 4;
     let dirty = false;
-    let pending = [];
-    let state = { version: 1, objects: [] };
-    let drawing = null;
-    let previewId = null;
-    let erasing = false;
-    let lastEraseAt = 0;
+    let autosaveTimer = null;
 
-    function uid(prefix) {
-        return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
-    }
-
-    function findObj(id) {
-        return state.objects.find(o => o.id === id);
-    }
-
-    function upsertObj(obj) {
-        const idx = state.objects.findIndex(o => o.id === obj.id);
-        if (idx >= 0) state.objects[idx] = obj;
-        else state.objects.push(obj);
-    }
-
-    function removeObj(id) {
-        state.objects = state.objects.filter(o => o.id !== id);
-    }
+    function uid(prefix) { return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`; }
+    function safeJsonParse(s, fallback) { try { return JSON.parse(s); } catch (e) { return fallback; } }
 
     function markDirty() {
         dirty = true;
         const el = document.getElementById('save-state');
         if (el) el.textContent = 'Есть несохранённые изменения';
+        if (autosaveTimer) clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => { if (dirty) saveSnapshot(); }, 15000);
     }
-
     function clearDirty() {
         dirty = false;
         const el = document.getElementById('save-state');
         if (el) el.textContent = 'Сохранено';
     }
 
-    function toPath(points) {
-        if (!points || points.length < 2) return '';
-        let d = `M ${points[0][0]} ${points[0][1]}`;
-        for (let i = 1; i < points.length; i++) d += ` L ${points[i][0]} ${points[i][1]}`;
-        return d;
+    const fallbackState = { version: 2, stage: { scale: 1.0, x: 0, y: 0 }, task_card: { x: 32, y: 32, w: 620, h: 320, scale: 1.0 }, objects: [] };
+    let state = safeJsonParse(initialSnapshot || '', fallbackState);
+    if (!state || state.version !== 2) state = fallbackState;
+    if (!state.task_card) state.task_card = fallbackState.task_card;
+    if (!Array.isArray(state.objects)) state.objects = [];
+
+    const clientId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid('client');
+    const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/board/${sessionId}/`;
+    let ws = null;
+    let seq = 0;
+
+    const wrapper = document.getElementById('board-wrapper');
+    const stageEl = document.getElementById('board-stage');
+
+    const stage = new Konva.Stage({ container: stageEl, width: wrapper.clientWidth, height: wrapper.clientHeight });
+    const layer = new Konva.Layer();
+    stage.add(layer);
+    const nodes = new Map();
+
+    function resizeStage() {
+        stage.width(wrapper.clientWidth);
+        stage.height(wrapper.clientHeight);
+        layer.batchDraw();
+        updateTaskCardDom();
     }
+    new ResizeObserver(() => resizeStage()).observe(wrapper);
 
-    function svgEl(name, attrs) {
-        const el = document.createElementNS('http://www.w3.org/2000/svg', name);
-        Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, String(v)));
-        return el;
-    }
-
-    function render() {
-        const svg = document.getElementById('wb-canvas');
-        while (svg.firstChild) svg.removeChild(svg.firstChild);
-
-        for (const obj of state.objects) {
-            if (obj.type === 'pen') {
-                const path = svgEl('path', {
-                    d: toPath(obj.points),
-                    fill: 'none',
-                    stroke: obj.color,
-                    'stroke-width': obj.width,
-                    'stroke-linecap': 'round',
-                    'stroke-linejoin': 'round',
-                    'data-obj-id': obj.id
-                });
-                svg.appendChild(path);
-            } else if (obj.type === 'line') {
-                const line = svgEl('line', {
-                    x1: obj.x1, y1: obj.y1, x2: obj.x2, y2: obj.y2,
-                    stroke: obj.stroke, 'stroke-width': obj.width, 'stroke-linecap': 'round',
-                    'data-obj-id': obj.id
-                });
-                svg.appendChild(line);
-            } else if (obj.type === 'rect') {
-                const r = svgEl('rect', {
-                    x: obj.x, y: obj.y, width: obj.w, height: obj.h,
-                    fill: 'none', stroke: obj.stroke, 'stroke-width': obj.width,
-                    'data-obj-id': obj.id
-                });
-                svg.appendChild(r);
-            } else if (obj.type === 'triangle') {
-                const p = svgEl('path', {
-                    d: `M ${obj.a[0]} ${obj.a[1]} L ${obj.b[0]} ${obj.b[1]} L ${obj.c[0]} ${obj.c[1]} Z`,
-                    fill: 'none', stroke: obj.stroke, 'stroke-width': obj.width,
-                    'data-obj-id': obj.id
-                });
-                svg.appendChild(p);
-            } else if (obj.type === 'table') {
-                const g = svgEl('g', { 'data-obj-id': obj.id });
-                const w = obj.cols * obj.cellW;
-                const h = obj.rows * obj.cellH;
-                const border = svgEl('rect', { x: obj.x, y: obj.y, width: w, height: h, fill: 'none', stroke: obj.stroke, 'stroke-width': obj.width });
-                g.appendChild(border);
-                for (let c = 1; c < obj.cols; c++) {
-                    const x = obj.x + c * obj.cellW;
-                    g.appendChild(svgEl('line', { x1: x, y1: obj.y, x2: x, y2: obj.y + h, stroke: obj.stroke, 'stroke-width': obj.width }));
-                }
-                for (let r = 1; r < obj.rows; r++) {
-                    const y = obj.y + r * obj.cellH;
-                    g.appendChild(svgEl('line', { x1: obj.x, y1: y, x2: obj.x + w, y2: y, stroke: obj.stroke, 'stroke-width': obj.width }));
-                }
-                svg.appendChild(g);
-            } else if (obj.type === 'task_card') {
-                const fo = svgEl('foreignObject', { x: obj.x, y: obj.y, width: obj.w, height: obj.h, 'data-obj-id': obj.id });
-                const wrapper = document.createElement('div');
-                wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-                wrapper.className = 'h-full w-full overflow-auto bg-white border border-gray-200 rounded-xl p-3 text-gray-800';
-                wrapper.innerHTML = obj.content_html || '';
-                fo.appendChild(wrapper);
-                svg.appendChild(fo);
-            }
+    function strokeSceneFunc(ctx, shape) {
+        const pts = shape.getAttr('points') || [];
+        const baseW = shape.getAttr('baseWidth') || 4;
+        if (pts.length < 2) return;
+        ctx.save();
+        ctx.strokeStyle = shape.getAttr('color') || '#111827';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (let i = 1; i < pts.length; i++) {
+            const a = pts[i - 1];
+            const b = pts[i];
+            const p = Math.max(0.05, Math.min(1.0, (b.p ?? a.p ?? 0.5)));
+            ctx.lineWidth = baseW * (0.35 + p);
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
         }
-
-        if (window.MathJax && window.MathJax.typesetPromise) {
-            window.MathJax.typesetPromise();
-        }
+        ctx.restore();
     }
 
-    function applyEvent(kind, payload) {
-        if (kind === 'set_object') {
-            upsertObj(payload.object);
-        } else if (kind === 'delete_object') {
-            removeObj(payload.id);
-        }
-        render();
-    }
+    function ensureNodeForObject(obj) {
+        if (!obj || !obj.id) return null;
+        const existing = nodes.get(obj.id);
+        if (existing) return existing;
 
-    async function pullLoop() {
-        try {
-            const res = await fetch(`/board/${sessionId}/events/pull/?after=${lastEventId}`, { credentials: 'same-origin' });
-            if (res.ok) {
-                const data = await res.json();
-                for (const e of (data.events || [])) {
-                    lastEventId = Math.max(lastEventId, e.id);
-                    try {
-                        applyEvent(e.kind, JSON.parse(e.payload || '{}'));
-                    } catch (err) {}
-                }
-            }
-        } catch (e) {}
-    }
-
-    async function flushLoop() {
-        if (!pending.length) return;
-        const batch = pending.splice(0, 100);
-        try {
-            await fetch(`/board/${sessionId}/events/append/`, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ events: batch }),
+        let node = null;
+        if (obj.type === 'stroke') {
+            node = new Konva.Shape({
+                id: obj.id,
+                name: 'wbobj',
+                color: obj.color || '#111827',
+                baseWidth: obj.baseWidth || 4,
+                points: obj.points || [],
+                sceneFunc: strokeSceneFunc,
             });
-        } catch (e) {
-            pending.unshift(...batch);
-        }
-    }
-
-    function queue(kind, payload) {
-        pending.push({ kind, payload });
-        markDirty();
-    }
-
-    function canvasPoint(evt) {
-        const svg = document.getElementById('wb-canvas');
-        const pt = svg.createSVGPoint();
-        pt.x = evt.clientX;
-        pt.y = evt.clientY;
-        const ctm = svg.getScreenCTM();
-        if (!ctm) return [0, 0];
-        const r = pt.matrixTransform(ctm.inverse());
-        return [Math.round(r.x), Math.round(r.y)];
-    }
-
-    function startPen(evt) {
-        if (!isPointerDownIntent(evt)) return;
-        const [x, y] = canvasPoint(evt);
-        drawing = { id: uid('pen'), type: 'pen', points: [[x, y]], color, width };
-        upsertObj(drawing);
-        queue('set_object', { object: drawing });
-        render();
-    }
-
-    function movePen(evt) {
-        if (!drawing) return;
-        if (!isPointerMoveDrawing(evt)) return;
-        const [x, y] = canvasPoint(evt);
-        drawing.points.push([x, y]);
-        upsertObj(drawing);
-        queue('set_object', { object: drawing });
-        render();
-    }
-
-    function endPen() {
-        drawing = null;
-    }
-
-    function startShape(evt) {
-        const [x, y] = canvasPoint(evt);
-        previewId = uid('shape');
-        if (tool === 'line') {
-            upsertObj({ id: previewId, type: 'line', x1: x, y1: y, x2: x, y2: y, stroke: color, width });
-        } else if (tool === 'rect') {
-            upsertObj({ id: previewId, type: 'rect', x, y, w: 1, h: 1, stroke: color, width });
-        } else if (tool === 'triangle') {
-            upsertObj({ id: previewId, type: 'triangle', a: [x, y], b: [x, y], c: [x, y], stroke: color, width });
-        }
-        render();
-    }
-
-    function moveShape(evt) {
-        if (!previewId) return;
-        const obj = findObj(previewId);
-        if (!obj) return;
-        const [x, y] = canvasPoint(evt);
-        if (obj.type === 'line') {
-            obj.x2 = x; obj.y2 = y;
+        } else if (obj.type === 'line') {
+            node = new Konva.Line({ id: obj.id, name: 'wbobj', points: [obj.x1, obj.y1, obj.x2, obj.y2], stroke: obj.stroke || '#111827', strokeWidth: obj.width || 4, lineCap: 'round' });
         } else if (obj.type === 'rect') {
-            obj.w = Math.max(1, x - obj.x);
-            obj.h = Math.max(1, y - obj.y);
+            node = new Konva.Rect({ id: obj.id, name: 'wbobj', x: obj.x, y: obj.y, width: obj.w, height: obj.h, stroke: obj.stroke || '#111827', strokeWidth: obj.width || 4 });
         } else if (obj.type === 'triangle') {
-            obj.b = [x, obj.a[1]];
-            obj.c = [Math.round((obj.a[0] + x) / 2), y];
-        }
-        upsertObj(obj);
-        render();
-    }
-
-    function endShape() {
-        if (!previewId) return;
-        const obj = findObj(previewId);
-        if (obj) queue('set_object', { object: obj });
-        previewId = null;
-    }
-
-    function distToSeg(px, py, x1, y1, x2, y2) {
-        const vx = x2 - x1, vy = y2 - y1;
-        const wx = px - x1, wy = py - y1;
-        const c1 = vx * wx + vy * wy;
-        if (c1 <= 0) return Math.hypot(px - x1, py - y1);
-        const c2 = vx * vx + vy * vy;
-        if (c2 <= c1) return Math.hypot(px - x2, py - y2);
-        const t = c1 / c2;
-        const bx = x1 + t * vx, by = y1 + t * vy;
-        return Math.hypot(px - bx, py - by);
-    }
-
-    function hitTestObject(obj, px, py) {
-        const base = 10;
-        const th = Math.max(base, (obj.width || 2) + 6);
-        if (obj.type === 'task_card') return false;
-
-        if (obj.type === 'pen' && obj.points && obj.points.length >= 2) {
-            for (let i = 1; i < obj.points.length; i++) {
-                const [x1, y1] = obj.points[i - 1];
-                const [x2, y2] = obj.points[i];
-                if (distToSeg(px, py, x1, y1, x2, y2) <= th) return true;
-            }
-        }
-        if (obj.type === 'line') {
-            return distToSeg(px, py, obj.x1, obj.y1, obj.x2, obj.y2) <= th;
-        }
-        if (obj.type === 'rect') {
-            const x = obj.x, y = obj.y, w = obj.w, h = obj.h;
-            return (
-                distToSeg(px, py, x, y, x + w, y) <= th ||
-                distToSeg(px, py, x + w, y, x + w, y + h) <= th ||
-                distToSeg(px, py, x + w, y + h, x, y + h) <= th ||
-                distToSeg(px, py, x, y + h, x, y) <= th
-            );
-        }
-        if (obj.type === 'triangle' && obj.a && obj.b && obj.c) {
-            return (
-                distToSeg(px, py, obj.a[0], obj.a[1], obj.b[0], obj.b[1]) <= th ||
-                distToSeg(px, py, obj.b[0], obj.b[1], obj.c[0], obj.c[1]) <= th ||
-                distToSeg(px, py, obj.c[0], obj.c[1], obj.a[0], obj.a[1]) <= th
-            );
-        }
-        if (obj.type === 'table') {
-            // Стираем таблицу при попадании по любой линии сетки (упрощённо: по границам и внутренним линиям)
+            node = new Konva.Line({ id: obj.id, name: 'wbobj', points: [obj.a.x, obj.a.y, obj.b.x, obj.b.y, obj.c.x, obj.c.y], stroke: obj.stroke || '#111827', strokeWidth: obj.width || 4, closed: true, lineJoin: 'round' });
+        } else if (obj.type === 'table') {
+            node = new Konva.Group({ id: obj.id, name: 'wbobj' });
             const w = obj.cols * obj.cellW;
             const h = obj.rows * obj.cellH;
-            const x0 = obj.x, y0 = obj.y;
-            if (
-                distToSeg(px, py, x0, y0, x0 + w, y0) <= th ||
-                distToSeg(px, py, x0 + w, y0, x0 + w, y0 + h) <= th ||
-                distToSeg(px, py, x0 + w, y0 + h, x0, y0 + h) <= th ||
-                distToSeg(px, py, x0, y0 + h, x0, y0) <= th
-            ) return true;
+            node.add(new Konva.Rect({ x: obj.x, y: obj.y, width: w, height: h, stroke: obj.stroke, strokeWidth: obj.width }));
             for (let c = 1; c < obj.cols; c++) {
-                const x = x0 + c * obj.cellW;
-                if (distToSeg(px, py, x, y0, x, y0 + h) <= th) return true;
+                const x = obj.x + c * obj.cellW;
+                node.add(new Konva.Line({ points: [x, obj.y, x, obj.y + h], stroke: obj.stroke, strokeWidth: obj.width }));
             }
             for (let r = 1; r < obj.rows; r++) {
-                const y = y0 + r * obj.cellH;
-                if (distToSeg(px, py, x0, y, x0 + w, y) <= th) return true;
+                const y = obj.y + r * obj.cellH;
+                node.add(new Konva.Line({ points: [obj.x, y, obj.x + w, y], stroke: obj.stroke, strokeWidth: obj.width }));
             }
         }
-        return false;
+
+        if (!node) return null;
+        nodes.set(obj.id, node);
+        layer.add(node);
+        return node;
     }
 
-    function eraseAtPoint(evt) {
-        const now = Date.now();
-        if (now - lastEraseAt < 16) return; // ~60fps
-        lastEraseAt = now;
+    function applyObject(obj) {
+        const node = ensureNodeForObject(obj);
+        if (!node) return;
+        if (obj.type === 'stroke') {
+            node.setAttr('color', obj.color || '#111827');
+            node.setAttr('baseWidth', obj.baseWidth || 4);
+            node.setAttr('points', obj.points || []);
+        } else if (obj.type === 'line') {
+            node.points([obj.x1, obj.y1, obj.x2, obj.y2]);
+            node.stroke(obj.stroke || '#111827');
+            node.strokeWidth(obj.width || 4);
+        } else if (obj.type === 'rect') {
+            node.x(obj.x); node.y(obj.y); node.width(obj.w); node.height(obj.h);
+            node.stroke(obj.stroke || '#111827');
+            node.strokeWidth(obj.width || 4);
+        } else if (obj.type === 'triangle') {
+            node.points([obj.a.x, obj.a.y, obj.b.x, obj.b.y, obj.c.x, obj.c.y]);
+            node.stroke(obj.stroke || '#111827');
+            node.strokeWidth(obj.width || 4);
+        } else if (obj.type === 'table') {
+            node.destroy();
+            nodes.delete(obj.id);
+            ensureNodeForObject(obj);
+        }
+        layer.batchDraw();
+    }
 
-        const [x, y] = canvasPoint(evt);
-        for (let i = state.objects.length - 1; i >= 0; i--) {
-            const obj = state.objects[i];
-            if (hitTestObject(obj, x, y)) {
-                removeObj(obj.id);
-                queue('delete_object', { id: obj.id });
-                render();
-                return;
+    function removeObject(id) {
+        const node = nodes.get(id);
+        if (node) node.destroy();
+        nodes.delete(id);
+        state.objects = state.objects.filter(o => o.id !== id);
+        layer.batchDraw();
+    }
+
+    function upsertStateObject(obj) {
+        const idx = state.objects.findIndex(o => o.id === obj.id);
+        if (idx >= 0) state.objects[idx] = obj;
+        else state.objects.push(obj);
+    }
+
+    // --- Task card overlay ---
+    const taskCard = document.getElementById('task-card');
+    const taskCardContent = document.getElementById('task-card-content');
+    const taskCardResizer = document.getElementById('task-card-resizer');
+    taskCardContent.innerHTML = taskHtml || '';
+
+    function updateTaskCardDom() {
+        const tc = state.task_card || fallbackState.task_card;
+        taskCard.style.transform = `translate(${tc.x}px, ${tc.y}px)`;
+        taskCard.style.width = `${tc.w}px`;
+        taskCard.style.height = `${tc.h}px`;
+        if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise();
+    }
+    updateTaskCardDom();
+
+    function sendWs(data) {
+        if (!ws || ws.readyState !== 1) return;
+        seq += 1;
+        ws.send(JSON.stringify({ ...data, client_id: clientId, seq }, null, 0));
+    }
+
+    function applyRemoteEvent(msg) {
+        const t = msg.type;
+        const p = msg.payload || {};
+        if (t === 'stroke_start') {
+            const obj = { id: p.id, type: 'stroke', color: p.color, baseWidth: p.baseWidth, points: [{ x: p.x, y: p.y, p: p.p ?? 0.5 }] };
+            upsertStateObject(obj);
+            applyObject(obj);
+        } else if (t === 'stroke_points') {
+            const obj = state.objects.find(o => o.id === p.id);
+            if (obj && obj.type === 'stroke') {
+                obj.points = obj.points.concat(p.points || []);
+                upsertStateObject(obj);
+                applyObject(obj);
+            }
+        } else if (t === 'object_add' || t === 'object_update') {
+            upsertStateObject(p.object);
+            applyObject(p.object);
+        } else if (t === 'object_delete') {
+            removeObject(p.id);
+        } else if (t === 'task_card_set') {
+            if (p && typeof p.x === 'number') {
+                state.task_card = { ...state.task_card, ...p };
+                updateTaskCardDom();
+                markDirty();
             }
         }
     }
 
-    function isPointerDownIntent(evt) {
-        // Для пера "hover" часто даёт pointermove/pressure=0. Мы начинаем рисовать только при реальном нажатии.
-        if (evt.pointerType === 'pen') return (evt.pressure || 0) > 0.1;
-        return (evt.buttons & 1) === 1;
+    function connectWs() {
+        ws = new WebSocket(wsUrl);
+        ws.onmessage = (ev) => {
+            const msg = safeJsonParse(ev.data, null);
+            if (!msg || msg.client_id === clientId) return; // echo suppression
+            applyRemoteEvent(msg);
+        };
+        ws.onclose = () => setTimeout(() => connectWs(), 1500);
+    }
+    connectWs();
+
+    // initial render from snapshot
+    for (const obj of state.objects) applyObject(obj);
+
+    // drag/resize card (broadcast on end)
+    let dragMode = null;
+    let dragStart = null;
+    taskCard.addEventListener('pointerdown', (e) => {
+        if (e.target === taskCardResizer) return;
+        dragMode = 'move';
+        dragStart = { x: e.clientX, y: e.clientY, ox: state.task_card.x, oy: state.task_card.y };
+        taskCard.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    taskCardResizer.addEventListener('pointerdown', (e) => {
+        dragMode = 'resize';
+        dragStart = { x: e.clientX, y: e.clientY, ow: state.task_card.w, oh: state.task_card.h };
+        taskCardResizer.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    wrapper.addEventListener('pointermove', (e) => {
+        if (!dragMode || !dragStart) return;
+        if (dragMode === 'move') {
+            const dx = e.clientX - dragStart.x;
+            const dy = e.clientY - dragStart.y;
+            state.task_card = { ...state.task_card, x: Math.max(0, dragStart.ox + dx), y: Math.max(0, dragStart.oy + dy) };
+            updateTaskCardDom();
+            markDirty();
+        } else if (dragMode === 'resize') {
+            const dx = e.clientX - dragStart.x;
+            const dy = e.clientY - dragStart.y;
+            state.task_card = { ...state.task_card, w: Math.max(240, dragStart.ow + dx), h: Math.max(160, dragStart.oh + dy) };
+            updateTaskCardDom();
+            markDirty();
+        }
+    });
+    wrapper.addEventListener('pointerup', () => {
+        if (!dragMode) return;
+        sendWs({ type: 'task_card_set', payload: { ...state.task_card } });
+        dragMode = null;
+        dragStart = null;
+    });
+
+    // drawing (pen + eraser)
+    function currentPointerPressure(evt) {
+        const p = (evt.pointerType === 'pen') ? (evt.pressure || 0) : 0.5;
+        return Math.max(0.05, Math.min(1.0, p));
+    }
+    function pointerPos(evt) {
+        const rect = wrapper.getBoundingClientRect();
+        return { x: Math.round(evt.clientX - rect.left), y: Math.round(evt.clientY - rect.top) };
     }
 
-    function isPointerMoveDrawing(evt) {
-        if (evt.pointerType === 'pen') return (evt.pressure || 0) > 0.05;
-        return (evt.buttons & 1) === 1;
+    let drawing = null;
+    let pointsBatch = [];
+    let batchTimer = null;
+    function flushPoints() {
+        if (!drawing || !pointsBatch.length) return;
+        const batch = pointsBatch.splice(0, pointsBatch.length);
+        sendWs({ type: 'stroke_points', payload: { id: drawing.id, points: batch } });
+    }
+    function startBatchTimer() {
+        if (batchTimer) return;
+        batchTimer = setInterval(() => flushPoints(), 40);
+    }
+    function stopBatchTimer() {
+        if (batchTimer) clearInterval(batchTimer);
+        batchTimer = null;
     }
 
-    function addTable(evt) {
-        const [x, y] = canvasPoint(evt);
-        const obj = { id: uid('table'), type: 'table', x, y, rows: 4, cols: 4, cellW: 80, cellH: 48, stroke: color, width: 2 };
-        upsertObj(obj);
-        queue('set_object', { object: obj });
-        render();
-    }
-
-    function ensureTaskCard() {
-        const exists = state.objects.some(o => o.type === 'task_card');
-        if (exists) return;
-        const obj = { id: 'task_card', type: 'task_card', x: 32, y: 32, w: 620, h: 320, content_html: taskHtml };
-        upsertObj(obj);
-        queue('set_object', { object: obj });
-        render();
-    }
+    stage.on('contentPointerdown', (e) => {
+        const evt = e.evt;
+        if (evt.target && evt.target.closest && evt.target.closest('#task-card')) return;
+        if (tool === 'pen') {
+            const pos = pointerPos(evt);
+            const p = currentPointerPressure(evt);
+            drawing = { id: uid('stroke'), type: 'stroke', color, baseWidth, points: [{ x: pos.x, y: pos.y, p }] };
+            upsertStateObject(drawing);
+            applyObject(drawing);
+            sendWs({ type: 'stroke_start', payload: { id: drawing.id, color, baseWidth, x: pos.x, y: pos.y, p } });
+            pointsBatch = [];
+            startBatchTimer();
+            markDirty();
+        } else if (tool === 'eraser') {
+            const pos = pointerPos(evt);
+            const node = stage.getIntersection(pos);
+            if (node) {
+                const id = node.id();
+                if (id) {
+                    removeObject(id);
+                    sendWs({ type: 'object_delete', payload: { id } });
+                    markDirty();
+                }
+            }
+        }
+    });
+    stage.on('contentPointermove', (e) => {
+        const evt = e.evt;
+        if (!drawing || tool !== 'pen') return;
+        if (evt.pointerType === 'pen' && (evt.pressure || 0) <= 0) return;
+        const pos = pointerPos(evt);
+        const p = currentPointerPressure(evt);
+        drawing.points.push({ x: pos.x, y: pos.y, p });
+        upsertStateObject(drawing);
+        applyObject(drawing);
+        pointsBatch.push({ x: pos.x, y: pos.y, p });
+        markDirty();
+    });
+    stage.on('contentPointerup contentPointercancel', () => {
+        if (!drawing) return;
+        flushPoints();
+        sendWs({ type: 'stroke_end', payload: { id: drawing.id } });
+        drawing = null;
+        stopBatchTimer();
+        markDirty();
+    });
 
     async function saveSnapshot() {
         try {
@@ -528,41 +514,11 @@
     }
 
     function initCanvas() {
-        const svg = document.getElementById('wb-canvas');
-        svg.addEventListener('pointerdown', (evt) => {
-            svg.setPointerCapture(evt.pointerId);
-            if (tool === 'eraser') {
-                erasing = true;
-                return eraseAtPoint(evt);
-            }
-            if (tool === 'table') return addTable(evt);
-            if (tool === 'pen') return startPen(evt);
-            if (tool === 'line' || tool === 'rect' || tool === 'triangle') return startShape(evt);
-        });
-        svg.addEventListener('pointermove', (evt) => {
-            if (tool === 'eraser' && erasing) return eraseAtPoint(evt);
-            if (tool === 'pen') return movePen(evt);
-            if (tool === 'line' || tool === 'rect' || tool === 'triangle') return moveShape(evt);
-        });
-        svg.addEventListener('pointerup', () => {
-            erasing = false;
-            if (tool === 'pen') return endPen();
-            if (tool === 'line' || tool === 'rect' || tool === 'triangle') return endShape();
-        });
-        svg.addEventListener('pointercancel', () => { erasing = false; drawing = null; previewId = null; });
+        // Konva already bound pointer events above.
     }
 
     function initState() {
-        let hadSnapshot = false;
-        if (initialSnapshot) {
-            try {
-                state = JSON.parse(initialSnapshot);
-                hadSnapshot = true;
-            } catch (e) {}
-        }
-        ensureTaskCard();
-        render();
-        if (hadSnapshot) clearDirty();
+        if (initialSnapshot) clearDirty();
     }
 
     initUI();
@@ -572,10 +528,6 @@
 
     setTool('pen');
     setWidth(4);
-
-    setInterval(pullLoop, 500);
-    setInterval(flushLoop, 250);
-    setInterval(() => { if (dirty) saveSnapshot(); }, 60000);
 
     window.addEventListener('beforeunload', (e) => {
         if (!dirty) return;
