@@ -25,9 +25,6 @@ class WhiteboardAccessTests(TestCase):
 
     def test_student_can_open_own_board_page(self):
         self.client.force_login(self.student)
-        s = self.client.session
-        s['whiteboard_unlocked'] = {f"{self.assignment.id}:{self.task.id}": True}
-        s.save()
         r = self.client.get(reverse('whiteboard_page', args=[self.session.id]))
         self.assertEqual(r.status_code, 200)
 
@@ -43,8 +40,9 @@ class WhiteboardAccessTests(TestCase):
 
     def test_other_tutor_cannot_pull_events(self):
         self.client.force_login(self.other_tutor)
-        r = self.client.get(reverse('whiteboard_events_pull', args=[self.session.id]), {'after': 0})
-        self.assertEqual(r.status_code, 403)
+        # Доступ к странице доски для другого репетитора запрещён
+        r = self.client.get(reverse('whiteboard_page', args=[self.session.id]))
+        self.assertIn(r.status_code, (302, 403))
 
     def test_list_requires_correct_student(self):
         self.client.force_login(self.student)
