@@ -131,6 +131,74 @@
                                     <span class="font-bold text-gray-600">не проверено</span>
                                 {% endif %}
                             </div>
+
+                            {% if item.submission.image_url %}
+                            <div class="mt-4">
+                                <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Загруженное решение</div>
+                                <img
+                                    src="{{ item.submission.image_url.url }}"
+                                    alt="Решение ученика"
+                                    class="max-w-full sm:max-w-md rounded-lg border border-gray-200 shadow-sm"
+                                    onclick="openImageModal('{{ item.submission.image_url.url }}')"
+                                >
+                            </div>
+                            {% endif %}
+
+                            {% if item.submission.ai_feedback %}
+                            <div class="mt-4 bg-white border border-gray-200 rounded-xl p-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div class="text-sm font-bold text-gray-800">Вердикт ИИ</div>
+                                    <div class="text-xs font-bold text-gray-700">
+                                        Оценено: {{ item.submission.primary_score|default:0 }} баллов
+                                    </div>
+                                </div>
+                                <div class="mt-3 text-sm text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line">
+                                    {{ item.submission.ai_feedback_display_html|default:item.submission.ai_feedback|safe }}
+                                </div>
+                                <div class="mt-3 flex justify-end">
+                                    <button
+                                        id="btn_tutor_ai_verify_{{ item.submission.id }}"
+                                        type="button"
+                                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                        onclick="tutorVerifyAI({{ item.submission.id }})"
+                                        data-retry-after="{{ item.submission.ai_retry_after_seconds|default:0 }}"
+                                    >
+                                        <i class="fas fa-robot mr-2"></i> Перепроверить ИИ
+                                    </button>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <div class="mt-4 bg-white border border-gray-200 rounded-xl p-4">
+                                <div class="text-sm font-bold text-gray-800 mb-2">Итог репетитора</div>
+                                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                                    <div class="text-xs text-gray-500 shrink-0">
+                                        0…{{ item.task.exam_points_effective }}
+                                    </div>
+                                    <input
+                                        id="tutor_score_{{ item.submission.id }}"
+                                        type="number"
+                                        min="0"
+                                        max="{{ item.task.exam_points_effective }}"
+                                        value="{% if item.submission.tutor_primary_score != None %}{{ item.submission.tutor_primary_score }}{% endif %}"
+                                        placeholder="—"
+                                        class="w-full sm:w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                    >
+                                    <button
+                                        type="button"
+                                        class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition"
+                                        onclick="tutorSaveScore({{ item.submission.id }}, {{ item.task.exam_points_effective }})"
+                                    >
+                                        Сохранить
+                                    </button>
+                                    <div id="tutor_score_saved_{{ item.submission.id }}" class="text-xs text-green-700 font-bold hidden">
+                                        Сохранено
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-500">
+                                    Ученик продолжает видеть только оценку ИИ. Итог репетитора используется в аналитике.
+                                </div>
+                            </div>
                         {% else %}
                             <div class="text-sm text-gray-600">Нет попыток решения.</div>
                         {% endif %}
@@ -305,6 +373,116 @@
             alert('Ошибка соединения с сервером');
         }
     }
+
+    function startCooldown(btn, seconds, readyText) {
+        let remain = Math.max(0, parseInt(seconds || "0", 10));
+        if (!btn) return;
+        btn.disabled = true;
+        const base = readyText || 'Перепроверить ИИ';
+
+        const tick = () => {
+            if (remain <= 0) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-robot mr-2"></i> ' + base;
+                return false;
+            }
+            btn.innerHTML = `<i class="fas fa-clock mr-2"></i> Через ${remain}s`;
+            remain -= 1;
+            return true;
+        };
+
+        tick();
+        const timer = setInterval(() => {
+            const cont = tick();
+            if (!cont) clearInterval(timer);
+        }, 1000);
+    }
+
+    async function tutorVerifyAI(submissionId) {
+        const btn = document.getElementById(`btn_tutor_ai_verify_${submissionId}`);
+        const csrfToken = getCookie('csrftoken');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Проверка...';
+        }
+        try {
+            const response = await fetch(`/api/tutor/submission/${submissionId}/verify-ai/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrfToken },
+            });
+            let data = {};
+            try { data = await response.json(); } catch (e) {}
+
+            if (!response.ok) {
+                if (data && data.error === 'ai_retry_later') {
+                    const retryAfter = parseInt(data.retry_after || "120", 10);
+                    if (btn) startCooldown(btn, retryAfter, 'Перепроверить ИИ');
+                    return;
+                }
+                const msg = (data && data.error === 'ai_not_configured')
+                    ? 'ИИ не настроен: выберите модель для проверки фото и задайте ключ OpenRouter.'
+                    : 'Ошибка при перепроверке ИИ';
+                alert(msg);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Перепроверить ИИ';
+                }
+                return;
+            }
+
+            // проще и надёжнее: перерисовать сервером (нормализация/MathJax)
+            location.reload();
+        } catch (e) {
+            console.error(e);
+            alert('Ошибка соединения с сервером');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Перепроверить ИИ';
+            }
+        }
+    }
+
+    async function tutorSaveScore(submissionId, maxPoints) {
+        const input = document.getElementById(`tutor_score_${submissionId}`);
+        const saved = document.getElementById(`tutor_score_saved_${submissionId}`);
+        const csrfToken = getCookie('csrftoken');
+        const raw = (input?.value || '').trim();
+        if (!raw) return;
+        const val = parseInt(raw, 10);
+        if (Number.isNaN(val) || val < 0 || val > parseInt(maxPoints || "0", 10)) {
+            alert('Введите корректный балл');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('tutor_primary_score', String(val));
+        try {
+            const response = await fetch(`/api/tutor/submission/${submissionId}/override-score/`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData,
+            });
+            if (!response.ok) {
+                alert('Не удалось сохранить балл');
+                return;
+            }
+            if (saved) {
+                saved.classList.remove('hidden');
+                setTimeout(() => saved.classList.add('hidden'), 1200);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Ошибка соединения с сервером');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('button[id^="btn_tutor_ai_verify_"]').forEach((btn) => {
+            const remain = parseInt(btn.getAttribute('data-retry-after') || "0", 10);
+            if (remain > 0) startCooldown(btn, remain, 'Перепроверить ИИ');
+        });
+    });
 </script>
 
 {% include "core/image_modal.html" %}

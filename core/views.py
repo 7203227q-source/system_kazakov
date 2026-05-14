@@ -2425,7 +2425,31 @@ def tutor_assignment_view(request, assignment_id):
 
     tasks_view = []
     for t in tasks:
+        try:
+            t.exam_points_effective = max(int(t.exam_points or 0), int(getattr(t.task_type, "max_points", 0) or 0))
+        except Exception:
+            t.exam_points_effective = int(getattr(t, "exam_points", 0) or 0)
         sub = subs_by_task_id.get(t.id)
+        if sub and getattr(sub, "ai_feedback", None):
+            try:
+                sub.ai_feedback_display = normalize_tex_in_feedback(sub.ai_feedback)
+            except Exception:
+                sub.ai_feedback_display = sub.ai_feedback
+            try:
+                sub.ai_feedback_display_html = sanitize_ai_feedback_html(sub.ai_feedback_display)
+            except Exception:
+                sub.ai_feedback_display_html = sub.ai_feedback_display
+        if sub and getattr(sub, "ai_last_verify_at", None):
+            try:
+                dt = sub.ai_last_verify_at
+                if dt:
+                    from django.utils import timezone as _tz
+                    now = _tz.now()
+                    delta = (now - dt).total_seconds()
+                    remain = int(max(0, 120 - int(delta)))
+                    sub.ai_retry_after_seconds = remain
+            except Exception:
+                pass
         tasks_view.append({
             'task': t,
             'content_html': t.get_content_for_theme(theme),
