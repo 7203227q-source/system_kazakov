@@ -4429,6 +4429,258 @@ def api_verify_with_ai(request, submission_id):
 
 @login_required
 @require_POST
+def api_tutor_verify_with_ai(request, submission_id):
+    """
+    Перепроверка решения ИИ по фото от лица репетитора.
+    Кулдаун: 120 секунд (используем Submission.ai_last_verify_at как и у ученика).
+    """
+    if request.user.role != "tutor":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    submission = get_object_or_404(
+        Submission.objects.select_related("assignment", "student", "task", "task__topic", "task__task_type"),
+        id=submission_id,
+    )
+
+    # Права: репетитор этого варианта, либо репетитор этого ученика (если submission вне варианта)
+    if submission.assignment_id:
+        if submission.assignment.tutor_id != request.user.id:
+            return JsonResponse({"error": "forbidden"}, status=403)
+    else:
+        if not request.user.students.filter(id=submission.student_id).exists():
+            return JsonResponse({"error": "forbidden"}, status=403)
+
+    if not submission.image_url:
+        return JsonResponse({'error': 'Image not found'}, status=400)
+
+    student = submission.student
+    task = submission.task
+
+    # Ограничение повторных запросов: не чаще 1 раза в 2 минуты
+    from django.utils import timezone
+    now = timezone.now()
+    last = getattr(submission, "ai_last_verify_at", None)
+    cooldown_seconds = 120
+    if last:
+        try:
+            delta = (now - last).total_seconds()
+        except Exception:
+            delta = cooldown_seconds + 1
+        if delta < cooldown_seconds:
+            retry_after = int(max(1, cooldown_seconds - int(delta)))
+            return JsonResponse({'error': 'ai_retry_later', 'retry_after': retry_after}, status=429)
+
+    # Ставим отметку сразу, чтобы на двойной клик тоже сработал кулдаун
+    try:
+        submission.ai_last_verify_at = now
+        submission.save(update_fields=["ai_last_verify_at"])
+    except Exception:
+        pass
+
+    max_points = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+    if not is_extended_answer_task(task):
+        return JsonResponse({'error': 'only_second_part'}, status=400)
+
+    model = ""
+    try:
+        from .models import SubjectAIConfig
+        cfg = (
+            SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id)
+            .select_related('photo_analysis_model')
+            .first()
+        )
+        if cfg and cfg.photo_analysis_model:
+            model = cfg.photo_analysis_model.code
+    except Exception:
+        model = ""
+
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
+    if not api_key or not model:
+        return JsonResponse({'error': 'ai_not_configured'}, status=400)
+
+    try:
+        from .http_headers import require_ascii
+        require_ascii(api_key, "OPENROUTER_API_KEY")
+        import base64
+        import mimetypes
+        import json as pyjson
+
+        task_html = ""
+        try:
+            task_html = task.get_content_for_theme() or ""
+        except Exception:
+            task_html = ""
+
+        soup = BeautifulSoup(task_html, "html.parser") if task_html else None
+        task_text = ""
+        task_image_data_urls = []
+        if soup:
+            for t in soup(["script", "style", "noscript"]):
+                t.decompose()
+            task_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True) or "").strip()
+            task_text = task_text.replace("\\", "\\\\")
+
+        file_path = submission.image_url.path
+        mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
+        with open(file_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode("utf-8")
+        data_url = f"data:{mime};base64,{img_b64}"
+
+        from .http_headers import sanitize_header_value
+        referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
+        title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
+
+        prompt = (
+            "Оцени решение по фото как репетитор-эксперт экзамена.\n"
+            f"Максимум баллов: {max_points}.\n"
+            f"Поставь первичный балл primary_score как целое число от 0 до {int(max_points or 0)}.\n"
+            "Если решение полностью верное — primary_score = максимум.\n"
+            "Если решение частично верное — поставь частичный балл.\n"
+            "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
+            "В feedback обязательно коротко объясни, за что сняты баллы, в формате:\n"
+            "- Что верно:\n"
+            "- Ошибки:\n"
+            "- За что сняты баллы:\n"
+            "- Что исправить:\n"
+            "В поле feedback используй Markdown. Все формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
+            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши LaTeX (используй двойной обратный слэш).\n"
+            "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
+        )
+
+        if task_text:
+            prompt = f"{prompt}\n\nУсловие:\n{task_text}"
+
+        user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
+        for u in task_image_data_urls:
+            user_content.append({"type": "image_url", "image_url": {"url": u}})
+
+        res = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": referer,
+                "X-Title": title,
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                    {"role": "user", "content": user_content},
+                ],
+            },
+            timeout=90,
+        )
+
+        if res.status_code != 200:
+            detail = None
+            try:
+                detail = res.json()
+            except Exception:
+                detail = (res.text or "").strip()[:500]
+            return JsonResponse(
+                {'error': 'ai_failed', 'upstream_status': res.status_code, 'upstream_message': detail},
+                status=400,
+            )
+
+        data = res.json()
+        content = data["choices"][0]["message"]["content"]
+
+        def _repair_json_for_latex(raw: str) -> str:
+            if not isinstance(raw, str):
+                return raw
+            raw = re.sub(r'\\([bfnrt])(?=[A-Za-z])', r'\\\\\1', raw)
+            raw = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', raw)
+            raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
+            return raw
+
+        content = _repair_json_for_latex(content)
+        try:
+            parsed = pyjson.loads(content)
+        except Exception:
+            match = re.search(r"\{[\s\S]*\}", str(content))
+            if not match:
+                parsed = None
+            else:
+                try:
+                    parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
+                except Exception:
+                    parsed = None
+
+        if not isinstance(parsed, dict):
+            raw = str(content)
+            ps_m = re.search(r'["\']primary_score["\']\s*:\s*(-?\d+)', raw, re.IGNORECASE)
+            ic_m = re.search(r'["\']is_correct["\']\s*:\s*(true|false)', raw, re.IGNORECASE)
+            fb_m = re.search(r'["\']feedback["\']\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw, re.IGNORECASE)
+            if ps_m or ic_m or fb_m:
+                parsed = {
+                    "primary_score": int(ps_m.group(1)) if ps_m else 0,
+                    "is_correct": (ic_m.group(1).lower() == "true") if ic_m else False,
+                    "feedback": fb_m.group(1) if fb_m else raw,
+                }
+            else:
+                return JsonResponse({'error': 'ai_failed'}, status=400)
+
+        primary_score = int(parsed.get("primary_score") or 0)
+        ic_val = parsed.get("is_correct")
+        if isinstance(ic_val, str):
+            ic_val = ic_val.strip().lower() in {"true", "1", "yes"}
+        is_correct = bool(ic_val)
+        feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
+
+        # Обновляем submission (ИИ-оценка)
+        submission.primary_score = primary_score
+        submission.is_correct = is_correct
+        submission.ai_feedback = feedback
+        submission.save(update_fields=["primary_score", "is_correct", "ai_feedback"])
+
+        # XP и аналитика — только ученику
+        points_earned = primary_score
+        xp_gained = 0
+        if is_correct:
+            xp_gained = max(1, int(task.difficulty / 5))
+            profile, _ = StudentSubjectProfile.objects.get_or_create(
+                student=student,
+                subject=task.topic.subject,
+                defaults={
+                    'target_score': 80,
+                    'level': 1,
+                    'xp': 0,
+                    'exam_format': ExamFormat.objects.filter(subject=task.topic.subject, is_active=True).order_by("-year", "name").first(),
+                },
+            )
+            profile.xp += xp_gained
+            profile.level = (profile.xp // 100) + 1
+            profile.save()
+
+        if submission.assignment_id and points_earned == 0:
+            try:
+                process_task_submission(student, task, 1)
+            except Exception:
+                pass
+
+        solution_html = ""
+        variant = task.variants.filter(theme='classic').first()
+        if variant and variant.solution:
+            solution_html = variant.solution
+
+        return JsonResponse({
+            'status': 'ok',
+            'primary_score': primary_score,
+            'feedback': feedback,
+            'feedback_html': sanitize_ai_feedback_html(feedback),
+            'is_correct': is_correct,
+            'xp_gained': xp_gained,
+            'solution_html': solution_html,
+            'model': model,
+            'cooldown_seconds': cooldown_seconds,
+        })
+    except Exception as e:
+        return JsonResponse({'error': 'ai_failed', 'upstream_message': str(e)}, status=400)
+
+
+@login_required
+@require_POST
 def api_tutor_override_score(request, submission_id):
     if request.user.role != "tutor":
         return JsonResponse({"error": "forbidden"}, status=403)
