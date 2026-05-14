@@ -110,6 +110,26 @@ class SubmissionVerifyOpenRouterTests(TestCase):
         self.assertTrue(payload["is_correct"])
         self.assertIn("\\underline", payload["feedback"])
 
+    def test_verify_handles_non_json_response_missing_comma(self):
+        os.environ["OPENROUTER_API_KEY"] = "test"
+
+        content = '{"primary_score": 1 "is_correct": true, "feedback": "ok"}'
+        dummy_response = {"choices": [{"message": {"content": content}}]}
+
+        from unittest.mock import patch
+        with patch("core.views.requests.post") as post:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = dummy_response
+
+            self.client.force_login(self.student)
+            res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
+
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["primary_score"], 1)
+        self.assertTrue(payload["is_correct"])
+        self.assertIn("ok", payload["feedback"])
+
     def test_verify_inlines_task_media_images_as_data_urls(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
 

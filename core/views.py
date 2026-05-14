@@ -4383,11 +4383,32 @@ def api_verify_with_ai(request, submission_id):
         except Exception:
             match = re.search(r"\{[\s\S]*\}", str(content))
             if not match:
+                parsed = None
+            else:
+                try:
+                    parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
+                except Exception:
+                    parsed = None
+
+        if not isinstance(parsed, dict):
+            raw = str(content)
+            ps_m = re.search(r'["\']primary_score["\']\s*:\s*(-?\d+)', raw, re.IGNORECASE)
+            ic_m = re.search(r'["\']is_correct["\']\s*:\s*(true|false)', raw, re.IGNORECASE)
+            fb_m = re.search(r'["\']feedback["\']\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw, re.IGNORECASE)
+            if ps_m or ic_m or fb_m:
+                parsed = {
+                    "primary_score": int(ps_m.group(1)) if ps_m else 0,
+                    "is_correct": (ic_m.group(1).lower() == "true") if ic_m else False,
+                    "feedback": fb_m.group(1) if fb_m else raw,
+                }
+            else:
                 return JsonResponse({'error': 'ai_failed'}, status=400)
-            parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
 
         primary_score = int(parsed.get("primary_score") or 0)
-        is_correct = bool(parsed.get("is_correct"))
+        ic_val = parsed.get("is_correct")
+        if isinstance(ic_val, str):
+            ic_val = ic_val.strip().lower() in {"true", "1", "yes"}
+        is_correct = bool(ic_val)
         feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
     except Exception as e:
         return JsonResponse({'error': 'ai_failed', 'upstream_message': str(e)}, status=400)
