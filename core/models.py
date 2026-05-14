@@ -305,7 +305,8 @@ class Submission(models.Model):
     is_correct = models.BooleanField(null=True, blank=True, verbose_name="Правильно ли решено")
     user_answer = models.TextField(blank=True, null=True, verbose_name="Текстовый ответ ученика")
     
-    image_url = models.ImageField(upload_to='submissions/', blank=True, null=True, verbose_name="Фото решения/черновика")
+    image_url = models.ImageField(upload_to='submissions/', blank=True, null=True, verbose_name="Фото решения/черновика (стр. 1)")
+    image_url_2 = models.ImageField(upload_to='submissions/', blank=True, null=True, verbose_name="Фото решения/черновика (стр. 2)")
     
     # Поля для QR-загрузки и проверки черновиков
     upload_token = models.UUIDField(default=uuid.uuid4, null=True, blank=True, verbose_name="Токен для загрузки фото")

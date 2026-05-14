@@ -96,7 +96,22 @@
                                         <i class="fas fa-check"></i>
                                     </div>
                                     <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
-                                    <img src="{{ task.saved_submission.image_url.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
+                                    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                                        <img src="{{ task.saved_submission.image_url.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение (стр. 1)" onclick="openImageModal('{{ task.saved_submission.image_url.url }}')">
+                                        {% if task.saved_submission.image_url_2 %}
+                                        <img src="{{ task.saved_submission.image_url_2.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение (стр. 2)" onclick="openImageModal('{{ task.saved_submission.image_url_2.url }}')">
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="mt-2">
+                                        <input type="file" id="gallery_file2_{{ task.id }}" class="hidden" accept="image/*">
+                                        <button type="button"
+                                                onclick="const el=document.getElementById('gallery_file2_{{ task.id }}'); if(el){ el.value=''; el.click(); }"
+                                                class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">
+                                            {% if task.saved_submission.image_url_2 %}Заменить 2-ю страницу{% else %}Добавить 2-ю страницу{% endif %}
+                                        </button>
+                                        <div id="upload2_status_{{ task.id }}" class="text-xs text-gray-500 mt-2 hidden"></div>
+                                    </div>
                                     
                                     <div class="flex flex-col sm:flex-row gap-2 justify-center">
                                          <button type="button"
@@ -127,6 +142,43 @@
                                     </div>
                                     {% endif %}
                                 </div>
+
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', () => {
+                                        const submissionId = {{ task.saved_submission.id }};
+                                        const taskId = {{ task.id }};
+                                        const uploadUrl = `/api/submission/${submissionId}/upload/`;
+                                        const input2 = document.getElementById(`gallery_file2_${taskId}`);
+                                        const statusEl2 = document.getElementById(`upload2_status_${taskId}`);
+
+                                        async function handleSecond(file) {
+                                            if (!file) return;
+                                            if (statusEl2) {
+                                                statusEl2.classList.remove('hidden');
+                                                statusEl2.textContent = 'Загрузка 2-й страницы...';
+                                            }
+                                            const formData = new FormData();
+                                            formData.append('image2', file);
+                                            try {
+                                                const upRes = await fetch(uploadUrl, {
+                                                    method: 'POST',
+                                                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                                                    body: formData
+                                                });
+                                                const data = await upRes.json();
+                                                if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
+                                                if (statusEl2) statusEl2.textContent = '2-я страница загружена';
+                                                // проще и надёжнее: обновим страницу, чтобы ИИ видел оба фото и UI отрисовался корректно
+                                                location.reload();
+                                            } catch (e) {
+                                                if (statusEl2) statusEl2.textContent = 'Ошибка загрузки 2-й страницы';
+                                                alert('Не удалось загрузить 2-ю страницу. Попробуйте ещё раз.');
+                                            }
+                                        }
+
+                                        if (input2) input2.addEventListener('change', () => handleSecond(input2.files && input2.files[0]));
+                                    });
+                                </script>
                             {% else %}
                                 <!-- Ожидание загрузки -->
                                 <h4 class="font-bold text-indigo-900 mb-2 text-center">Загрузите решение</h4>
@@ -136,7 +188,7 @@
                                     <ul class="text-xs text-gray-600 space-y-1 list-disc pl-5">
                                         <li>Сфотографируйте ближе: решение должно занимать большую часть кадра.</li>
                                         <li>Без бликов и теней, лист ровно, текст читаемый.</li>
-                                        <li>Если решение на нескольких страницах — объедините на одном фото или загрузите самый важный лист.</li>
+                                        <li>Если решение на нескольких страницах — загрузите 1-ю страницу, затем добавьте 2-ю (кнопка появится после загрузки).</li>
                                         <li>Если на листе несколько задач — лучше выделить в кадре только нужную.</li>
                                     </ul>
                                 </div>

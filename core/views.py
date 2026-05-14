@@ -4043,13 +4043,27 @@ def api_submission_upload(request, submission_id):
 
     submission = get_object_or_404(Submission, id=submission_id, student=request.user)
     image = request.FILES.get('image')
-    if not image:
+    image2 = request.FILES.get('image2')
+    if not image and not image2:
         return JsonResponse({'error': 'Image not found'}, status=400)
 
-    submission.image_url = image
+    update_fields = []
+    if image:
+        submission.image_url = image
+        update_fields.append('image_url')
+    if image2:
+        submission.image_url_2 = image2
+        update_fields.append('image_url_2')
+
     submission.show_solution_allowed = True
-    submission.save(update_fields=['image_url', 'show_solution_allowed'])
-    return JsonResponse({'status': 'ok', 'image_url': submission.image_url.url})
+    update_fields.append('show_solution_allowed')
+    submission.save(update_fields=update_fields)
+
+    return JsonResponse({
+        'status': 'ok',
+        'image_url': submission.image_url.url if submission.image_url else None,
+        'image_url_2': submission.image_url_2.url if getattr(submission, "image_url_2", None) else None,
+    })
 
 def api_submission_reveal_solution(request, submission_id):
     if request.method != 'POST' or not request.user.is_authenticated:
@@ -4352,6 +4366,39 @@ def api_verify_with_ai(request, submission_id):
             img_b64 = base64.b64encode(f.read()).decode("utf-8")
         data_url = f"data:{mime};base64,{img_b64}"
 
+        data_url_2 = None
+        if getattr(submission, "image_url_2", None):
+            try:
+                file_path2 = submission.image_url_2.path
+                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
+                with open(file_path2, "rb") as f:
+                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
+                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
+            except Exception:
+                data_url_2 = None
+
+        data_url_2 = None
+        if getattr(submission, "image_url_2", None):
+            try:
+                file_path2 = submission.image_url_2.path
+                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
+                with open(file_path2, "rb") as f:
+                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
+                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
+            except Exception:
+                data_url_2 = None
+
+        data_url_2 = None
+        if getattr(submission, "image_url_2", None):
+            try:
+                file_path2 = submission.image_url_2.path
+                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
+                with open(file_path2, "rb") as f:
+                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
+                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
+            except Exception:
+                data_url_2 = None
+
         from .http_headers import sanitize_header_value
         referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
         title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
@@ -4377,6 +4424,8 @@ def api_verify_with_ai(request, submission_id):
             prompt = f"{prompt}\n\nУсловие:\n{task_text}"
 
         user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
+        if data_url_2:
+            user_content.append({"type": "image_url", "image_url": {"url": data_url_2}})
         for u in task_image_data_urls:
             user_content.append({"type": "image_url", "image_url": {"url": u}})
 
@@ -4610,6 +4659,17 @@ def api_tutor_verify_with_ai(request, submission_id):
             img_b64 = base64.b64encode(f.read()).decode("utf-8")
         data_url = f"data:{mime};base64,{img_b64}"
 
+        data_url_2 = None
+        if getattr(submission, "image_url_2", None):
+            try:
+                file_path2 = submission.image_url_2.path
+                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
+                with open(file_path2, "rb") as f:
+                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
+                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
+            except Exception:
+                data_url_2 = None
+
         from .http_headers import sanitize_header_value
         referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
         title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
@@ -4635,6 +4695,8 @@ def api_tutor_verify_with_ai(request, submission_id):
             prompt = f"{prompt}\n\nУсловие:\n{task_text}"
 
         user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
+        if data_url_2:
+            user_content.append({"type": "image_url", "image_url": {"url": data_url_2}})
         for u in task_image_data_urls:
             user_content.append({"type": "image_url", "image_url": {"url": u}})
 
