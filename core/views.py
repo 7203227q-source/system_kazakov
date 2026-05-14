@@ -4458,6 +4458,55 @@ def api_verify_with_ai(request, submission_id):
             ic_val = ic_val.strip().lower() in {"true", "1", "yes"}
         is_correct = bool(ic_val)
         feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
+
+        # Обновляем submission (ИИ-оценка)
+        submission.primary_score = primary_score
+        submission.is_correct = is_correct
+        submission.ai_feedback = feedback
+        submission.save(update_fields=["primary_score", "is_correct", "ai_feedback"])
+
+        # XP и аналитика ученика
+        points_earned = primary_score
+        xp_gained = 0
+        if is_correct:
+            xp_gained = max(1, int(task.difficulty / 5))
+            profile, _ = StudentSubjectProfile.objects.get_or_create(
+                student=request.user,
+                subject=task.topic.subject,
+                defaults={
+                    'target_score': 80,
+                    'level': 1,
+                    'xp': 0,
+                    'exam_format': ExamFormat.objects.filter(subject=task.topic.subject, is_active=True).order_by("-year", "name").first(),
+                },
+            )
+            profile.xp += xp_gained
+            profile.level = (profile.xp // 100) + 1
+            profile.save()
+
+        # Обновляем статистику ошибок только если это в рамках варианта
+        if submission.assignment_id and points_earned == 0:
+            try:
+                process_task_submission(request.user, task, 1)
+            except Exception:
+                pass
+
+        solution_html = ""
+        variant = task.variants.filter(theme='classic').first()
+        if variant and variant.solution:
+            solution_html = variant.solution
+
+        return JsonResponse({
+            'status': 'ok',
+            'primary_score': primary_score,
+            'feedback': feedback,
+            'feedback_html': sanitize_ai_feedback_html(feedback),
+            'is_correct': is_correct,
+            'xp_gained': xp_gained,
+            'solution_html': solution_html,
+            'model': model,
+            'cooldown_seconds': cooldown_seconds,
+        })
     except Exception as e:
         return JsonResponse({'error': 'ai_failed', 'upstream_message': str(e)}, status=400)
 
