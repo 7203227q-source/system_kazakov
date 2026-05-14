@@ -26,6 +26,13 @@ class OgeMathTaskTypeNamesMigrationTests(TransactionTestCase):
         for n in range(1, 26):
             TaskType.objects.create(exam_format=self.ef, number=n, name=f"N{n}", max_points=1)
 
+    def tearDown(self):
+        # ВАЖНО: этот тест откатывает миграции назад, поэтому в конце возвращаем БД в актуальное состояние,
+        # иначе последующие тесты будут выполняться на старой схеме.
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
     def test_names_are_updated(self):
         executor = MigrationExecutor(connection)
         executor.migrate([self.migrate_to])
