@@ -630,6 +630,16 @@ def student_practice(request):
     total_xp = StudentSubjectProfile.objects.filter(student=request.user).aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
     mode = (request.POST.get('mode') or request.GET.get('mode') or '').strip()
+    subject_id_raw = (request.POST.get("subject_id") or request.GET.get("subject_id") or "").strip()
+    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related("subject", "exam_format")
+    active_subject_id = None
+    if subject_id_raw.isdigit():
+        active_subject_id = int(subject_id_raw)
+    if active_subject_id is None and profiles.exists():
+        active_subject_id = int(profiles.first().subject_id)
+    if active_subject_id is not None and not profiles.filter(subject_id=active_subject_id).exists():
+        active_subject_id = int(profiles.first().subject_id) if profiles.exists() else None
+    active_profile = next((p for p in profiles if int(p.subject_id) == int(active_subject_id or 0)), None) if active_subject_id else None
 
     if request.method == 'POST':
         task_id = request.POST.get('task_id')
@@ -740,7 +750,7 @@ def student_practice(request):
         task = due.task if due else None
     else:
         # Обычный тренажёр (адаптивный)
-        task = get_adaptive_task_for_student(request.user)
+        task = get_adaptive_task_for_student(request.user, subject_id=active_subject_id, exam_format_id=getattr(active_profile, "exam_format_id", None))
 
     attempt_token = None
     if task is not None:
@@ -776,6 +786,8 @@ def student_practice(request):
         'attempt_token': attempt_token,
         'is_extended': is_extended,
         'practice_submission': practice_submission,
+        'profiles': profiles,
+        'active_subject_id': active_subject_id,
     })
 
 

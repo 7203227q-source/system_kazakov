@@ -232,19 +232,49 @@ def update_student_analytics(student, subject):
     
     return snapshot
 
-def get_adaptive_task_for_student(student):
+def get_adaptive_task_for_student(student, subject_id: int | None = None, exam_format_id: int | None = None):
     """
     Алгоритм интервального повторения (Адаптивный Тренажер).
     Детализированный уровень: Topic + task_type + конкретные затыки.
     """
-    active_subjects = student.subject_profiles.values_list('subject_id', flat=True)
+    active_subjects = list(student.subject_profiles.values_list('subject_id', flat=True))
     
     if not active_subjects:
         return Task.objects.order_by('?').first()
+
+    # Явный выбор предмета (из UI тренажёра)
+    if subject_id is not None:
+        try:
+            subject_id = int(subject_id)
+        except Exception:
+            subject_id = None
+    if subject_id is None or subject_id not in active_subjects:
+        subject_id = active_subjects[0]
+
+    # Ограничиваем по формату экзамена, выбранному в профиле ученика (если есть)
+    if exam_format_id is None:
+        try:
+            prof = student.subject_profiles.filter(subject_id=subject_id).select_related("exam_format").first()
+            if prof and prof.exam_format_id:
+                exam_format_id = int(prof.exam_format_id)
+        except Exception:
+            exam_format_id = None
+    if exam_format_id is None:
+        try:
+            from core.models import ExamFormat
+            ef = ExamFormat.objects.filter(subject_id=subject_id, is_active=True).order_by("-year", "name").first()
+            if ef:
+                exam_format_id = int(ef.id)
+        except Exception:
+            exam_format_id = None
+
+    base_tasks_all = Task.objects.filter(topic__subject_id=subject_id)
+    if exam_format_id is not None:
+        base_tasks_all = base_tasks_all.filter(task_type__exam_format_id=exam_format_id)
         
     # 1. Группируем по уникальным парам (topic_id, task_type)
     # Используем модель Task как базовую для агрегации
-    subtopics = Task.objects.filter(topic__subject_id__in=active_subjects).values('topic_id', 'task_type').annotate(
+    subtopics = base_tasks_all.values('topic_id', 'task_type').annotate(
         last_practiced=Max('task_logs__created_at', filter=Q(task_logs__student=student)),
         total_attempts=Count('task_logs', filter=Q(task_logs__student=student)),
         correct_attempts=Count('task_logs', filter=Q(task_logs__student=student, task_logs__score__gt=0))
@@ -287,7 +317,7 @@ def get_adaptive_task_for_student(student):
     selected_subtopic = random.choice(top_subtopics)
     
     # 4. Выбор задачи внутри подтипа (Spaced Repetition для конкретной задачи)
-    base_query = Task.objects.filter(
+    base_query = base_tasks_all.filter(
         topic_id=selected_subtopic['topic_id'], 
         task_type=selected_subtopic['task_type']
     )
