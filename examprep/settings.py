@@ -14,6 +14,7 @@ import os
 import dj_database_url
 from pathlib import Path
 from dotenv import load_dotenv
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites", # Для allauth
+    "channels",
     
     # Allauth
     "allauth",
@@ -117,6 +119,20 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "examprep.wsgi.application"
+ASGI_APPLICATION = "examprep.asgi.application"
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
+
+if "test" in sys.argv:
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [(REDIS_HOST, REDIS_PORT)]},
+        }
+    }
 
 
 # Database
