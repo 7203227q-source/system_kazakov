@@ -4297,7 +4297,6 @@ def api_verify_with_ai(request, submission_id):
             },
             json={
                 "model": model,
-                "response_format": {"type": "json_object"},
                 "messages": [
                     {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
                     {

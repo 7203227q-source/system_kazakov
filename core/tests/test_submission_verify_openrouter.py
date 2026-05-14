@@ -54,6 +54,7 @@ class SubmissionVerifyOpenRouterTests(TestCase):
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
         sent_payload = post.call_args.kwargs["json"]
+        self.assertNotIn("response_format", sent_payload)
         user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
         prompt_text = next(p["text"] for p in user_msg["content"] if p["type"] == "text")
         self.assertIn("0 до", prompt_text)
@@ -66,3 +67,23 @@ class SubmissionVerifyOpenRouterTests(TestCase):
         self.assertEqual(payload["primary_score"], 1)
         self.assertTrue(payload["is_correct"])
         self.assertEqual(payload["model"], "google/gemini-2.0-flash")
+
+    def test_verify_repairs_invalid_json_backslashes_in_feedback(self):
+        os.environ["OPENROUTER_API_KEY"] = "test"
+
+        content = '{"primary_score": 1, "is_correct": true, "feedback": "$\\pi$"}'
+        dummy_response = {"choices": [{"message": {"content": content}}]}
+
+        from unittest.mock import patch
+        with patch("core.views.requests.post") as post:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = dummy_response
+
+            self.client.force_login(self.student)
+            res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
+
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["primary_score"], 1)
+        self.assertTrue(payload["is_correct"])
+        self.assertIn("\\pi", payload["feedback"])
