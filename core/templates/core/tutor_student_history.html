@@ -267,6 +267,37 @@
                 }
             });
         });
+
+        // Deep-link: ?submission_id=<id> → раскрыть нужный день + задачу и проскроллить
+        try {
+            const sid = new URLSearchParams(window.location.search).get('submission_id');
+            if (sid) {
+                const targetId1 = `task_${sid}`;
+                const targetId2 = `prac_task_${sid}`;
+                const detail = document.getElementById(targetId1) || document.getElementById(targetId2);
+                if (detail) {
+                    // Найдём day-content (div.hidden), у которого previousElementSibling = .group-header
+                    let dayContent = detail.parentElement;
+                    while (dayContent && !(dayContent.previousElementSibling && dayContent.previousElementSibling.classList && dayContent.previousElementSibling.classList.contains('group-header'))) {
+                        dayContent = dayContent.parentElement;
+                    }
+                    if (dayContent && dayContent.classList.contains('hidden')) {
+                        dayContent.classList.remove('hidden');
+                        const header = dayContent.previousElementSibling;
+                        const chevron = header ? header.querySelector('.group-chevron') : null;
+                        if (chevron) chevron.classList.remove('-rotate-90');
+                    }
+
+                    // Раскрываем саму задачу
+                    detail.classList.remove('hidden');
+                    detail.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    detail.classList.add('ring-2', 'ring-yellow-300');
+                    setTimeout(() => {
+                        detail.classList.remove('ring-2', 'ring-yellow-300');
+                    }, 2500);
+                }
+            }
+        } catch (e) {}
     });
 
     function toggleTaskDetail(id) {

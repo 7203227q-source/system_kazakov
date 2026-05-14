@@ -1853,11 +1853,22 @@ def tutor_dashboard(request):
         .annotate(c=Count("id"))
         .values("c")[:1]
     )
+    latest_unread_submission_qs = (
+        SubmissionComment.objects.filter(
+            submission__student_id=OuterRef("pk"),
+            author_role="student",
+            seen_by_tutor_at__isnull=True,
+            submission__assignment__tutor=request.user,
+        )
+        .order_by("-created_at")
+        .values("submission_id")[:1]
+    )
     students = (
         request.user.students.all()
         .prefetch_related('subject_profiles', 'subject_profiles__subject')
         .annotate(
-            unread_student_questions=Coalesce(Subquery(unresolved_qs, output_field=IntegerField()), 0)
+            unread_student_questions=Coalesce(Subquery(unresolved_qs, output_field=IntegerField()), 0),
+            latest_unread_submission_id=Subquery(latest_unread_submission_qs, output_field=IntegerField()),
         )
     )
     selected_student_id = request.GET.get('student_id')

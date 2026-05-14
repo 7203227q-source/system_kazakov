@@ -104,7 +104,7 @@
                                  <div class="mt-0.5 text-[10px] font-bold text-gray-500">Сегодня: +{{ student.today_xp|default:0 }} XP</div>
                                 {% if student.unread_student_questions %}
                                 <div class="mt-1">
-                                    <a href="{% url 'tutor_student_history' student.id %}" class="inline-flex items-center bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">
+                                    <a href="{% url 'tutor_student_history' student.id %}{% if student.latest_unread_submission_id %}?submission_id={{ student.latest_unread_submission_id }}{% endif %}" class="inline-flex items-center bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">
                                         Вопросы: {{ student.unread_student_questions }}
                                     </a>
                                 </div>
