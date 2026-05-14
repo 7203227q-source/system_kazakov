@@ -2046,8 +2046,11 @@ def tutor_dashboard(request):
             .prefetch_related('tasks', 'tasks__task_type')
             .order_by('-created_at')
         )
-        # Важно: список вариантов ученика не должен зависеть от выбранного предмета графика/аналитики.
-        # Иначе репетитор «иногда не видит» варианты других предметов.
+        if chart_subject_id:
+            assignments = assignments.filter(
+                Q(exam_format__subject_id=chart_subject_id)
+                | Q(exam_format__isnull=True, tasks__topic__subject_id=chart_subject_id)
+            ).distinct()
 
         for a in assignments:
             auto_expire_assignment_if_needed(a)
