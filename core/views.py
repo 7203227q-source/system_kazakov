@@ -4425,6 +4425,48 @@ def api_verify_with_ai(request, submission_id):
         feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
     except Exception as e:
         return JsonResponse({'error': 'ai_failed', 'upstream_message': str(e)}, status=400)
+
+
+@login_required
+@require_POST
+def api_tutor_override_score(request, submission_id):
+    if request.user.role != "tutor":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    submission = get_object_or_404(
+        Submission.objects.select_related("assignment", "student", "task", "task__task_type"),
+        id=submission_id,
+    )
+
+    # Права: репетитор этого варианта, либо репетитор этого ученика (если submission вне варианта)
+    if submission.assignment_id:
+        if submission.assignment.tutor_id != request.user.id:
+            return JsonResponse({"error": "forbidden"}, status=403)
+    else:
+        if not request.user.students.filter(id=submission.student_id).exists():
+            return JsonResponse({"error": "forbidden"}, status=403)
+
+    if not is_extended_answer_task(submission.task):
+        return JsonResponse({"error": "only_second_part"}, status=400)
+
+    raw = (request.POST.get("tutor_primary_score") or "").strip()
+    if not raw.lstrip("-").isdigit():
+        return JsonResponse({"error": "bad_score"}, status=400)
+    val = int(raw)
+
+    max_points = max(
+        int(getattr(submission.task, "exam_points", 0) or 0),
+        int(getattr(getattr(submission.task, "task_type", None), "max_points", 0) or 0),
+    )
+    if val < 0 or val > max_points:
+        return JsonResponse({"error": "out_of_range"}, status=400)
+
+    from django.utils import timezone
+    submission.tutor_primary_score = val
+    submission.tutor_scored_at = timezone.now()
+    submission.save(update_fields=["tutor_primary_score", "tutor_scored_at"])
+
+    return JsonResponse({"status": "ok", "tutor_primary_score": submission.tutor_primary_score})
             
     points_earned = int(primary_score or 0) if int(max_points or 0) > 1 else (1 if is_correct else 0)
     submission.primary_score = primary_score
