@@ -110,6 +110,21 @@
                             {% endif %}
                         </div>
 
+                        <div class="mt-4">
+                            <button type="button" onclick="toggleSolution('solution_sub_{{ sub.id }}'); event.stopPropagation();" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
+                                Показать решение
+                            </button>
+                            <div id="solution_sub_{{ sub.id }}" class="hidden mt-3 bg-indigo-50 border border-indigo-100 rounded-lg p-4 prose max-w-none text-sm text-gray-800">
+                                {% with sol=sub.task.get_solution_for_theme %}
+                                    {% if sol %}
+                                        {{ sol|safe }}
+                                    {% else %}
+                                        <p class="text-gray-500 italic">Решение для этой задачи пока не добавлено.</p>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </div>
+
                         {% if sub.comments.count %}
                         <div class="mt-4">
                             <button type="button" onclick="toggleComments('sub_{{ sub.id }}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
@@ -205,6 +220,15 @@
     function toggleComments(id) {
         const el = document.getElementById(`comments_${id}`);
         if (el) el.classList.toggle('hidden');
+    }
+
+    function toggleSolution(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('hidden');
+        if (!el.classList.contains('hidden') && window.MathJax && MathJax.typesetPromise) {
+            MathJax.typesetPromise([el]);
+        }
     }
 
     function toggleTaskDetail(id) {
