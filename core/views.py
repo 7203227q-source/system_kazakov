@@ -947,6 +947,23 @@ def student_dashboard(request):
         seen_by_student_at__isnull=True,
     ).count()
 
+    dashboard_comments_qs = (
+        SubmissionComment.objects
+        .filter(submission__student=request.user)
+        .select_related(
+            "author",
+            "submission",
+            "submission__assignment",
+            "submission__task",
+            "submission__task__task_type",
+        )
+        .order_by("-created_at")
+    )
+    dashboard_comments_total = dashboard_comments_qs.count()
+    dashboard_comments = list(dashboard_comments_qs[:20])
+    for c in dashboard_comments:
+        c.is_unread_for_student = (c.author_role == "tutor") and (c.seen_by_student_at is None)
+
     # Награды XP от репетитора (видно ученику)
     try:
         from core.models import TutorReward
@@ -991,6 +1008,8 @@ def student_dashboard(request):
         'chart_data': chart_data,
         'due_srs_count': due_srs_count,
         'unread_tutor_replies_total': unread_tutor_replies_total,
+        'dashboard_comments': dashboard_comments,
+        'dashboard_comments_total': dashboard_comments_total,
         'recent_rewards': recent_rewards,
         'exam_formats_for_subject': exam_formats_for_subject,
     })
