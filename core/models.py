@@ -335,6 +335,11 @@ class Submission(models.Model):
     recognized_text = models.TextField(blank=True, null=True, verbose_name="Распознанный текст (ИИ)")
     ai_feedback = models.TextField(blank=True, null=True, verbose_name="Вердикт ИИ")
     ai_last_verify_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя попытка ИИ-проверки")
+
+    # Структурированный результат проверки по фото (ИИ)
+    ai_recognized_solution = models.TextField(blank=True, null=True, verbose_name="ИИ: распознанное решение (текст)")
+    ai_mistakes_json = models.TextField(blank=True, null=True, verbose_name="ИИ: ошибки (JSON-массив строк)")
+    ai_verdict_json = models.TextField(blank=True, null=True, verbose_name="ИИ: вердикт (JSON-массив абзацев)")
     
     tutor_comment = models.TextField(blank=True, null=True, verbose_name="Комментарий репетитора")
 
