@@ -3618,7 +3618,12 @@ def tutor_task_bank(request):
         request.user.invite_code = generate_invite_code()
         request.user.save(update_fields=['invite_code'])
 
-    tasks = Task.objects.select_related('topic', 'task_type', 'task_type__exam_format').all().order_by('id')
+    tasks = (
+        Task.objects.select_related('topic', 'task_type', 'task_type__exam_format')
+        .prefetch_related('ai_tags')
+        .all()
+        .order_by('id')
+    )
 
     search_query = request.GET.get('q', '')
     subject_filter = request.GET.get('subject', '')
@@ -3626,6 +3631,14 @@ def tutor_task_bank(request):
     type_filter = request.GET.get('type', '')
     subtype_filter = request.GET.get('subtype', '')
     student_id_filter = request.GET.get('student_id', '')
+
+    ai_raw_min = (request.GET.get("ai_raw_min") or "").strip()
+    ai_raw_max = (request.GET.get("ai_raw_max") or "").strip()
+    ai_exam_min = (request.GET.get("ai_exam_min") or "").strip()
+    ai_exam_max = (request.GET.get("ai_exam_max") or "").strip()
+    ai_type_min = (request.GET.get("ai_type_min") or "").strip()
+    ai_type_max = (request.GET.get("ai_type_max") or "").strip()
+    tag_q = (request.GET.get("tag_q") or "").strip()
 
     allowed_subject_ids = None
     allowed_exam_format_ids = None
@@ -3660,6 +3673,23 @@ def tutor_task_bank(request):
         
     if subtype_filter:
         tasks = tasks.filter(subtype_tag=subtype_filter)
+
+    # AI filters
+    if ai_raw_min.isdigit():
+        tasks = tasks.filter(ai_difficulty_raw__gte=int(ai_raw_min))
+    if ai_raw_max.isdigit():
+        tasks = tasks.filter(ai_difficulty_raw__lte=int(ai_raw_max))
+    if ai_exam_min.isdigit():
+        tasks = tasks.filter(ai_difficulty_exam_percentile__gte=int(ai_exam_min))
+    if ai_exam_max.isdigit():
+        tasks = tasks.filter(ai_difficulty_exam_percentile__lte=int(ai_exam_max))
+    if ai_type_min.isdigit():
+        tasks = tasks.filter(ai_difficulty_type_percentile__gte=int(ai_type_min))
+    if ai_type_max.isdigit():
+        tasks = tasks.filter(ai_difficulty_type_percentile__lte=int(ai_type_max))
+
+    if tag_q:
+        tasks = tasks.filter(ai_tags__name__icontains=tag_q.lower()).distinct()
 
     base_query = request.GET.copy()
     base_query.pop('page', None)
@@ -3727,6 +3757,13 @@ def tutor_task_bank(request):
         'base_query_prefix': base_query_prefix,
         'base_query_items': base_query_items,
         'search_query': search_query,
+        'ai_raw_min': ai_raw_min,
+        'ai_raw_max': ai_raw_max,
+        'ai_exam_min': ai_exam_min,
+        'ai_exam_max': ai_exam_max,
+        'ai_type_min': ai_type_min,
+        'ai_type_max': ai_type_max,
+        'tag_q': tag_q,
         'subjects': subjects,
         'exam_formats': exam_formats,
         'subject_filter': subject_filter,
