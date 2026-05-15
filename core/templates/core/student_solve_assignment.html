@@ -540,6 +540,37 @@
         tick();
     }
 
+    function splitToParagraphs(text) {
+        if (!text) return [];
+        return String(text)
+            .split(/\n\s*\n/g)
+            .map(s => s.trim())
+            .filter(Boolean);
+    }
+
+    function renderParagraphs(container, paragraphs) {
+        (paragraphs || []).forEach(p => {
+            const el = document.createElement('p');
+            el.className = 'mt-2 whitespace-pre-wrap';
+            el.textContent = p;
+            container.appendChild(el);
+        });
+    }
+
+    function renderSection(root, titleText, renderFn) {
+        const title = document.createElement('div');
+        title.className = 'font-bold text-gray-800';
+        title.textContent = titleText;
+        root.appendChild(title);
+
+        const body = document.createElement('div');
+        body.className = 'mt-2 text-gray-700';
+        root.appendChild(body);
+
+        renderFn(body);
+    }
+
+
     async function verifyWithAI(submissionId, taskId) {
         const btn = document.getElementById(`btn_verify_${taskId}`);
         if (btn) {
@@ -611,10 +642,70 @@
                 title.innerHTML = `<i class="fas fa-times-circle mr-2 text-lg"></i> Оценено: ${data.primary_score} баллов`;
             }
 
-            const fbHtml = (typeof data.feedback_html === 'string' && data.feedback_html.trim())
-                ? data.feedback_html
-                : escapeHtml(data.feedback || '');
-            correctText.parentElement.innerHTML = `<strong>Вердикт ИИ:</strong><div class="mt-2 text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line">${fbHtml}</div>`;
+            const host = correctText.parentElement;
+            host.innerHTML = '<strong>Вердикт ИИ:</strong>';
+
+            const hasStructured =
+                (typeof data.recognized_solution === 'string' && data.recognized_solution.trim().length > 0) ||
+                (Array.isArray(data.mistakes) && data.mistakes.length > 0) ||
+                (Array.isArray(data.verdict) && data.verdict.length > 0);
+
+            if (hasStructured) {
+                const wrap = document.createElement('div');
+                wrap.className = 'mt-2 text-gray-700 bg-white p-3 rounded border border-gray-200 space-y-4';
+
+                renderSection(wrap, 'Решение (как распознано):', (body) => {
+                    const paragraphs = splitToParagraphs(data.recognized_solution || '');
+                    if (!paragraphs.length) {
+                        const p = document.createElement('p');
+                        p.className = 'text-gray-500 italic whitespace-pre-wrap';
+                        p.textContent = 'Не удалось уверенно распознать ход решения.';
+                        body.appendChild(p);
+                        return;
+                    }
+                    renderParagraphs(body, paragraphs);
+                });
+
+                renderSection(wrap, 'Ошибки и замечания:', (body) => {
+                    const ms = Array.isArray(data.mistakes) ? data.mistakes : [];
+                    if (!ms.length) {
+                        const p = document.createElement('p');
+                        p.className = 'text-gray-500 italic';
+                        p.textContent = 'Не найдено явных ошибок (или не удалось выделить).';
+                        body.appendChild(p);
+                        return;
+                    }
+                    const ul = document.createElement('ul');
+                    ul.className = 'list-disc pl-5 space-y-1';
+                    ms.forEach(m => {
+                        const li = document.createElement('li');
+                        li.textContent = m;
+                        ul.appendChild(li);
+                    });
+                    body.appendChild(ul);
+                });
+
+                renderSection(wrap, 'Итоговый вердикт:', (body) => {
+                    const vs = Array.isArray(data.verdict) && data.verdict.length
+                        ? data.verdict
+                        : splitToParagraphs(data.feedback || '');
+                    if (!vs.length) {
+                        const p = document.createElement('p');
+                        p.className = 'text-gray-500 italic';
+                        p.textContent = 'Вердикт не получен.';
+                        body.appendChild(p);
+                        return;
+                    }
+                    renderParagraphs(body, vs);
+                });
+
+                host.appendChild(wrap);
+            } else {
+                const fbHtml = (typeof data.feedback_html === 'string' && data.feedback_html.trim())
+                    ? data.feedback_html
+                    : escapeHtml(data.feedback || '');
+                host.innerHTML += `<div class="mt-2 text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line">${fbHtml}</div>`;
+            }
             
             if (data.solution_html) {
                 solutionDiv.innerHTML = data.solution_html;
