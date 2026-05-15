@@ -309,7 +309,11 @@
                                     <span class="text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1">
                                         Баллы:
                                         {% if sub.task.exam_points|default:1 > 1 %}
-                                            {{ sub.primary_score|default:0 }}/{{ sub.task.exam_points|default:0 }}
+                                            {% if sub.tutor_primary_score != None %}
+                                                {{ sub.tutor_primary_score }}/{{ sub.task.exam_points|default:0 }}
+                                            {% else %}
+                                                {{ sub.primary_score|default:0 }}/{{ sub.task.exam_points|default:0 }}
+                                            {% endif %}
                                         {% else %}
                                             {% if sub.is_correct %}1{% else %}0{% endif %}/{{ sub.task.exam_points|default:1 }}
                                         {% endif %}
