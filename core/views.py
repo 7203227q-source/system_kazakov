@@ -3815,6 +3815,8 @@ def tutor_student_history(request, student_id):
     """История решений конкретного ученика для репетитора (группировка по дням)"""
     if request.user.role not in ['tutor', 'admin']:
         return redirect('login')
+
+    import json as pyjson
         
     student = get_object_or_404(User, id=student_id, role='student')
     
@@ -3831,6 +3833,17 @@ def tutor_student_history(request, student_id):
     days_data = {}
     
     for sub in submissions:
+        # Подготавливаем поля для шаблона (JSON-массивы -> списки)
+        try:
+            sub.ai_mistakes = pyjson.loads(sub.ai_mistakes_json) if sub.ai_mistakes_json else []
+        except Exception:
+            sub.ai_mistakes = []
+
+        try:
+            sub.ai_verdict = pyjson.loads(sub.ai_verdict_json) if sub.ai_verdict_json else []
+        except Exception:
+            sub.ai_verdict = []
+
         # Get local date for grouping
         date_obj = localtime(sub.created_at).date()
         
