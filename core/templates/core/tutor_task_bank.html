@@ -116,6 +116,35 @@
                             </option>
                             {% endfor %}
                         </select>
+
+                        <!-- AI Difficulty Filters -->
+                        <div class="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2">
+                            <span class="text-xs font-bold text-gray-500 whitespace-nowrap">AI (raw)</span>
+                            <input name="ai_raw_min" value="{{ ai_raw_min|default:'' }}" inputmode="numeric" placeholder="min" class="w-16 text-sm outline-none">
+                            <span class="text-xs text-gray-400">–</span>
+                            <input name="ai_raw_max" value="{{ ai_raw_max|default:'' }}" inputmode="numeric" placeholder="max" class="w-16 text-sm outline-none">
+                        </div>
+
+                        <div class="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2">
+                            <span class="text-xs font-bold text-gray-500 whitespace-nowrap">AI %</span>
+                            <input name="ai_exam_min" value="{{ ai_exam_min|default:'' }}" inputmode="numeric" placeholder="экз min" class="w-20 text-sm outline-none">
+                            <span class="text-xs text-gray-400">–</span>
+                            <input name="ai_exam_max" value="{{ ai_exam_max|default:'' }}" inputmode="numeric" placeholder="экз max" class="w-20 text-sm outline-none">
+                        </div>
+
+                        <div class="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2">
+                            <span class="text-xs font-bold text-gray-500 whitespace-nowrap">AI % тип</span>
+                            <input name="ai_type_min" value="{{ ai_type_min|default:'' }}" inputmode="numeric" placeholder="min" class="w-16 text-sm outline-none">
+                            <span class="text-xs text-gray-400">–</span>
+                            <input name="ai_type_max" value="{{ ai_type_max|default:'' }}" inputmode="numeric" placeholder="max" class="w-16 text-sm outline-none">
+                        </div>
+
+                        <div class="relative w-56">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-hashtag text-gray-400"></i>
+                            </div>
+                            <input type="text" name="tag_q" value="{{ tag_q|default:'' }}" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Тег (например: логар)">
+                        </div>
                         
                         <div class="relative w-64">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -126,7 +155,7 @@
                         <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
                             Найти
                         </button>
-                        {% if search_query or subject_filter or exam_format_filter or type_filter or subtype_filter %}
+                        {% if search_query or subject_filter or exam_format_filter or type_filter or subtype_filter or ai_raw_min or ai_raw_max or ai_exam_min or ai_exam_max or ai_type_min or ai_type_max or tag_q %}
                         <a href="{% url 'tutor_task_bank' %}" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center">
                             <i class="fas fa-times"></i>
                         </a>
@@ -272,6 +301,27 @@
                         </span>
                         {% endif %}
                         <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full">Сложность: {{ task.difficulty }}</span>
+                        <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
+                            AI сложность: {{ task.ai_difficulty_raw|default:"—" }}/100
+                        </span>
+                        <span class="bg-emerald-50 text-emerald-900 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
+                            Экзамен: {{ task.ai_difficulty_exam_percentile|default:"—" }}%
+                        </span>
+                        <span class="bg-emerald-50 text-emerald-900 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
+                            Тип: {{ task.ai_difficulty_type_percentile|default:"—" }}%
+                        </span>
+                        {% if task.ai_tags.all %}
+                        <div class="flex flex-wrap items-center gap-2">
+                            {% for tag in task.ai_tags.all|slice:":6" %}
+                                <span class="bg-gray-100 text-gray-700 text-[11px] font-bold px-2 py-1 rounded-full border border-gray-200">
+                                    {{ tag.name }}
+                                </span>
+                            {% endfor %}
+                            {% if task.ai_tags.count > 6 %}
+                                <span class="text-[11px] text-gray-400 font-bold">+{{ task.ai_tags.count|add:"-6" }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                         </div>
                     </div>
 
