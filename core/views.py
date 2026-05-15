@@ -2102,7 +2102,7 @@ def tutor_dashboard(request):
         for a in assignments:
             auto_expire_assignment_if_needed(a)
             tasks = list(a.tasks.all())
-            max_primary_possible = sum(int(t.exam_points or 0) for t in tasks)
+            max_primary_possible = sum(int(get_max_points_effective(t) or 0) for t in tasks)
             subs = Submission.objects.filter(assignment=a, student=selected_student).select_related('task')
             sub_map = {s.task_id: s for s in subs}
             solved_count = len(sub_map)
@@ -2112,10 +2112,16 @@ def tutor_dashboard(request):
                 sub = sub_map.get(t.id)
                 if not sub:
                     continue
-                if int(t.exam_points or 0) <= 1:
-                    total_primary_earned += 1 if sub.is_correct else 0
-                else:
+                if is_extended_answer_task(t):
                     total_primary_earned += int(sub.primary_score or 0)
+                else:
+                    saved_score = getattr(sub, "score", None)
+                    saved_score = int(saved_score or 0)
+                    if saved_score > 0:
+                        total_primary_earned += saved_score
+                    else:
+                        mp = int(get_max_points_effective(t) or 0)
+                        total_primary_earned += mp if bool(getattr(sub, "is_correct", False)) else 0
 
             if max_primary_possible > 0:
                 if max_primary_possible <= 32:
@@ -2136,6 +2142,28 @@ def tutor_dashboard(request):
                 completed_assignments.append(a)
             else:
                 active_assignments.append(a)
+
+        completed_assignments_total = len(completed_assignments)
+        completed_assignments = completed_assignments[:10]
+
+        dashboard_comments = []
+        dashboard_comments_total = 0
+        comments_qs = (
+            SubmissionComment.objects
+            .filter(submission__student=selected_student, submission__assignment__tutor=request.user)
+            .select_related(
+                "author",
+                "submission",
+                "submission__assignment",
+                "submission__task",
+                "submission__task__task_type",
+            )
+            .order_by("-created_at")
+        )
+        dashboard_comments_total = comments_qs.count()
+        dashboard_comments = list(comments_qs[:20])
+        for c in dashboard_comments:
+            c.is_unread_for_tutor = (c.author_role == "student") and (c.seen_by_tutor_at is None)
 
         if active_profile:
 
@@ -2363,6 +2391,9 @@ def tutor_dashboard(request):
         'recent_payment': recent_payment,
         'active_assignments': active_assignments,
         'completed_assignments': completed_assignments,
+        'completed_assignments_total': completed_assignments_total if selected_student else 0,
+        'dashboard_comments': dashboard_comments if selected_student else [],
+        'dashboard_comments_total': dashboard_comments_total if selected_student else 0,
         'drafts': drafts,
         'chart_data': chart_data,
         'weekly_solved_chart_data': weekly_solved_chart_data,
