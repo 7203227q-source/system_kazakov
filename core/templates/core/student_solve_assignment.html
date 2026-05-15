@@ -217,7 +217,7 @@
                                         {% elif task.saved_submission.ai_feedback %}
                                             <div class="mb-2">
                                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Коротко:</p>
-                                                <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_feedback }}</div>
+                                                <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_feedback_display_html|default:task.saved_submission.ai_feedback|safe }}</div>
                                             </div>
                                         {% endif %}
                                     </div>
@@ -338,7 +338,7 @@
                                     {% elif task.saved_submission.ai_feedback %}
                                         <div class="mb-2">
                                             <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Коротко:</p>
-                                            <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_feedback }}</div>
+                                            <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_feedback_display_html|default:task.saved_submission.ai_feedback|safe }}</div>
                                         </div>
                                     {% endif %}
                                 </div>
