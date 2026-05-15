@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock — Tutor dashboard comments</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .chip { @apply text-xs font-bold px-2 py-1 rounded-full; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-5xl mx-auto p-6 space-y-6">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-black">Дашборд репетитора · Ученик: Иван П.</h1>
+        <p class="text-sm text-gray-500">Ниже — макет «Варианты ученика» + новый блок комментариев.</p>
+      </div>
+      <div class="text-xs text-gray-400">Mock</div>
+    </div>
+
+    <!-- Existing: assignments -->
+    <section class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div class="flex items-center justify-between">
+        <h2 class="font-extrabold text-gray-800 flex items-center">
+          <span class="inline-flex w-9 h-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 mr-3">
+            <span class="font-black">≡</span>
+          </span>
+          Варианты ученика
+        </h2>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Активные: 2</span>
+          <span class="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Завершённые: 10</span>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <div class="flex items-center justify-between">
+            <div class="font-bold">Активные</div>
+            <a class="text-xs font-bold text-indigo-600 hover:underline" href="#">Создать новый</a>
+          </div>
+          <div class="mt-3 space-y-2">
+            <div class="bg-white rounded-xl border border-gray-100 p-3 flex justify-between">
+              <div>
+                <div class="font-bold">Вариант №12</div>
+                <div class="text-xs text-gray-500">Срок: 18.05 · Предмет: Физика</div>
+              </div>
+              <span class="text-xs font-bold bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">в работе</span>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-100 p-3 flex justify-between">
+              <div>
+                <div class="font-bold">Вариант №13</div>
+                <div class="text-xs text-gray-500">Срок: 20.05 · Предмет: Математика</div>
+              </div>
+              <span class="text-xs font-bold bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">в работе</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <div class="flex items-center justify-between">
+            <div class="font-bold">Завершённые</div>
+            <a class="text-xs font-bold text-gray-600 hover:underline" href="#">Показать все</a>
+          </div>
+          <div class="mt-3 space-y-2">
+            <div class="bg-white rounded-xl border border-gray-100 p-3 flex justify-between">
+              <div>
+                <div class="font-bold">Вариант №11</div>
+                <div class="text-xs text-gray-500">Завершён: 12.05 · 31/39</div>
+              </div>
+              <span class="text-xs font-bold bg-green-100 text-green-800 px-2 py-1 rounded-full">готов</span>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-100 p-3 flex justify-between">
+              <div>
+                <div class="font-bold">Вариант №10</div>
+                <div class="text-xs text-gray-500">Завершён: 09.05 · 27/39</div>
+              </div>
+              <span class="text-xs font-bold bg-green-100 text-green-800 px-2 py-1 rounded-full">готов</span>
+            </div>
+            <div class="text-xs text-gray-400 pt-1">…ещё 8 (скрыты по лимиту)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- New: comments -->
+    <section class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <h2 class="font-extrabold text-gray-800 flex items-center">
+          <span class="inline-flex w-9 h-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 mr-3">
+            <span class="font-black">💬</span>
+          </span>
+          Комментарии по решениям
+        </h2>
+
+        <div class="flex flex-wrap gap-2">
+          <label class="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-2 rounded-full border border-gray-200">
+            <input type="checkbox" checked class="mr-2 align-middle" />
+            Только непрочитанные
+          </label>
+          <button class="text-xs font-bold bg-white border border-gray-200 px-3 py-2 rounded-full hover:bg-gray-50">
+            Отметить всё прочитанным
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-4 overflow-hidden rounded-xl border border-gray-100">
+        <div class="divide-y divide-gray-100">
+          <div class="p-4 bg-yellow-50">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded-full">новое</span>
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Физика · ЕГЭ</span>
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Вариант №12</span>
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">№17</span>
+                </div>
+                <div class="mt-2 text-sm font-bold">Ученик:</div>
+                <div class="text-sm text-gray-700 line-clamp-2">
+                  «Почему тут берём проекцию силы именно по оси? Я запутался…»
+                </div>
+                <div class="mt-2 text-xs text-gray-400">15.05 18:40</div>
+              </div>
+              <div class="shrink-0 flex flex-col gap-2">
+                <a href="#" class="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700">Открыть</a>
+                <a href="#" class="text-xs font-bold bg-white border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50">Ответить</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Математика · ОГЭ</span>
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Вариант №10</span>
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">№14</span>
+                </div>
+                <div class="mt-2 text-sm font-bold">Репетитор:</div>
+                <div class="text-sm text-gray-700 line-clamp-2">
+                  «Отлично! Но в конце обязательно подпиши единицы и проверь округление.»
+                </div>
+                <div class="mt-2 text-xs text-gray-400">13.05 09:12</div>
+              </div>
+              <div class="shrink-0">
+                <a href="#" class="text-xs font-bold bg-white border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50">Открыть</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Физика · ОГЭ</span>
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">Вариант №11</span>
+                  <span class="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">№16</span>
+                </div>
+                <div class="mt-2 text-sm font-bold">Ученик:</div>
+                <div class="text-sm text-gray-700 line-clamp-2">
+                  «Я не понял, почему порядок цифр в ответе не важен…»
+                </div>
+                <div class="mt-2 text-xs text-gray-400">12.05 20:31</div>
+              </div>
+              <div class="shrink-0">
+                <a href="#" class="text-xs font-bold bg-white border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50">Открыть</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between">
+        <div class="text-xs text-gray-500">Показано: 3 из 20</div>
+        <button class="text-sm font-bold bg-white border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50">
+          Показать ещё
+        </button>
+      </div>
+    </section>
+
+    <section class="text-xs text-gray-500">
+      <p><b>Что обсуждаем:</b> (1) лимит завершённых вариантов на дашборде, (2) фильтр комментариев (все/непрочитанные), (3) какие поля показать в строке комментария.</p>
+    </section>
+  </div>
+</body>
+</html>
+
