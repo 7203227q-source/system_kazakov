@@ -3916,19 +3916,58 @@ def tutor_student_history(request, student_id):
     import json as pyjson
         
     student = get_object_or_404(User, id=student_id, role='student')
-    
-    # Get all submissions ordered by date
-    submissions = (
+
+    submission_id_raw = (request.GET.get("submission_id") or "").strip()
+    page_raw = (request.GET.get("page") or "").strip()
+
+    from django.db.models.functions import TruncDate
+
+    submissions_qs = (
         Submission.objects.filter(student=student)
         .select_related('task', 'task__task_type', 'assignment')
         .prefetch_related('comments', 'comments__author')
-        .order_by('-created_at')
+    )
+
+    tz = timezone.get_current_timezone()
+    days_list = list(
+        submissions_qs
+        .annotate(day=TruncDate("created_at", tzinfo=tz))
+        .values_list("day", flat=True)
+        .distinct()
+        .order_by("-day")
+    )
+
+    # Deep-link: если пришли с ?submission_id=<id>, отправляем на страницу, где лежит нужный день
+    if submission_id_raw.isdigit():
+        target = Submission.objects.filter(
+            id=int(submission_id_raw),
+            student=student,
+        ).only("id", "created_at").first()
+        if target:
+            target_day = localtime(target.created_at).date()
+            idx_map = {d: i for i, d in enumerate(days_list)}
+            if target_day in idx_map:
+                target_page = (idx_map[target_day] // 14) + 1
+                if (not page_raw) or (page_raw.isdigit() and int(page_raw) != target_page):
+                    return redirect(
+                        f"{reverse('tutor_student_history', args=[student.id])}?page={target_page}&submission_id={target.id}"
+                    )
+
+    page_number = (request.GET.get("page") or "1").strip()
+    page_obj = Paginator(days_list, 14).get_page(page_number)
+    page_days = list(page_obj.object_list)
+
+    submissions = (
+        submissions_qs
+        .annotate(day=TruncDate("created_at", tzinfo=tz))
+        .filter(day__in=page_days)
+        .order_by("-created_at")
     )
     if request.user.role == 'tutor':
         _mark_tutor_questions_seen(request.user, submissions.filter(assignment__tutor=request.user))
-    
+
     days_data = {}
-    
+
     for sub in submissions:
         # Подготавливаем поля для шаблона (JSON-массивы -> списки)
         try:
@@ -3969,15 +4008,16 @@ def tutor_student_history(request, student_id):
             # It's practice/spaced repetition
             days_data[date_obj]['practice_submissions'].append(sub)
             
-    # Convert to a list of days and sort (newest first)
+    # Convert to a list of days (keep order of page_days: newest -> oldest)
     history_days = []
-    for d in sorted(days_data.keys(), reverse=True):
-        day_info = days_data[d]
-        
-        # Calculate practice stats
+    for d in page_days:
+        day_info = days_data.get(d)
+        if not day_info:
+            continue
+
         prac_total = len(day_info['practice_submissions'])
         prac_correct = sum(1 for s in day_info['practice_submissions'] if s.is_correct)
-        
+
         history_days.append({
             'date': d,
             'assignments': list(day_info['assignments'].values()),
@@ -3990,7 +4030,9 @@ def tutor_student_history(request, student_id):
 
     return render(request, 'core/tutor_student_history.html', {
         'student': student,
-        'history_days': history_days
+        'history_days': history_days,
+        'page_obj': page_obj,
+        'submission_id': submission_id_raw,
     })
 
 

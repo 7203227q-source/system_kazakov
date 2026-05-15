@@ -340,6 +340,26 @@
                 {% endfor %}
             </div>
 
+            {% if page_obj and page_obj.paginator.num_pages > 1 %}
+              <div class="mt-6 flex items-center justify-between">
+                <div class="text-xs text-gray-500">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</div>
+                <div class="flex gap-2">
+                  {% if page_obj.has_previous %}
+                    <a class="px-3 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                       href="?page={{ page_obj.previous_page_number }}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}">Назад</a>
+                  {% else %}
+                    <span class="px-3 py-2 text-sm font-bold bg-gray-100 border border-gray-200 rounded-lg text-gray-400">Назад</span>
+                  {% endif %}
+                  {% if page_obj.has_next %}
+                    <a class="px-3 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                       href="?page={{ page_obj.next_page_number }}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}">Вперёд</a>
+                  {% else %}
+                    <span class="px-3 py-2 text-sm font-bold bg-gray-100 border border-gray-200 rounded-lg text-gray-400">Вперёд</span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+
         </div>
     </main>
 
