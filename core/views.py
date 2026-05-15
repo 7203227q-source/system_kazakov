@@ -1519,6 +1519,8 @@ def student_solve_assignment(request, assignment_id):
                 pass
         
         # Определяем, нужен ли черновик / фото
+        # Важно: в ОГЭ встречаются задания с кратким ответом на 2 балла, поэтому
+        # "часть 2" определяем по признаку типа задания, а не по exam_points.
         max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
         task.exam_points_effective = max_points_effective
         is_part2 = is_extended_answer_task(task)
