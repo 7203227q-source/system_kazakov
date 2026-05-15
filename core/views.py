@@ -1649,12 +1649,18 @@ def student_history(request):
     """История решений (Журнал) ученика"""
     import json as pyjson
 
-    submissions = (
+    submissions_qs = (
         Submission.objects.filter(student=request.user)
         .select_related('task', 'assignment')
         .prefetch_related('comments', 'comments__author')
         .order_by('-created_at')
     )
+
+    per_page = 20
+    page_number = (request.GET.get("page") or "1").strip()
+    page_obj = Paginator(submissions_qs, per_page).get_page(page_number)
+    submissions = list(page_obj.object_list)
+
     _mark_student_replies_seen(request.user, submissions)
     unread_tutor_replies_total = SubmissionComment.objects.filter(
         submission__student=request.user,
@@ -1681,6 +1687,7 @@ def student_history(request):
         'core/student_history.html',
         {
             'submissions': submissions,
+            'page_obj': page_obj,
             'total_xp': total_xp,
             'total_level': total_level,
             'unread_tutor_replies_total': unread_tutor_replies_total,
