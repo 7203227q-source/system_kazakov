@@ -14,19 +14,25 @@ def get_user_dialogs(user):
     dialogs = []
     
     if user.role == 'student':
-        # Ученик видит своих репетиторов
-        for link in user.linked_tutors.all():
-            dialogs.append(link.tutor)
+        tutors = set(user.tutors.all())
+        for link in user.linked_tutors.select_related('tutor').all():
+            tutors.add(link.tutor)
+        dialogs.extend(list(tutors))
     elif user.role == 'parent':
         # Родитель видит репетиторов своих детей
         tutors = set()
         for child in user.children.all():
-            for link in child.linked_tutors.all():
+            for tutor in child.tutors.all():
+                tutors.add(tutor)
+            for link in child.linked_tutors.select_related('tutor').all():
                 tutors.add(link.tutor)
         dialogs.extend(list(tutors))
     elif user.role == 'tutor':
         # Репетитор видит своих учеников и их родителей
-        students = user.students.all()
+        students = set(user.students.all())
+        for link in user.linked_students.select_related('student').all():
+            students.add(link.student)
+
         dialogs.extend(list(students))
         for student in students:
             parents = student.parents.all()
@@ -52,7 +58,7 @@ def get_user_dialogs(user):
             'user': other_user,
             'last_message': last_msg,
             'unread_count': unread_count,
-            'sort_date': last_msg.created_at if last_msg else timezone.datetime.min.replace(tzinfo=timezone.utc)
+            'sort_date': last_msg.created_at if last_msg else timezone.datetime.min.replace(tzinfo=timezone.UTC)
         })
         
     # Сортируем по дате последнего сообщения (сначала новые)
