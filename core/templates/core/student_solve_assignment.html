@@ -156,6 +156,72 @@
                                         <div class="text-sm text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line">{{ task.saved_submission.ai_feedback_display_html|default:''|safe }}</div>
                                     </div>
                                     {% endif %}
+
+                                    {% if task.saved_submission.image_url or task.saved_submission.ai_recognized_solution or task.saved_submission.ai_mistakes or task.saved_submission.ai_verdict or task.saved_submission.ai_feedback %}
+                                    <div class="mt-4">
+                                        <button type="button" onclick="toggleAiDetail({{ task.id }})" class="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg transition font-bold">
+                                            <i class="fas fa-robot mr-2 text-primary"></i> Фото и вердикт ИИ
+                                        </button>
+                                    </div>
+
+                                    <div id="ai_detail_{{ task.id }}" class="hidden mt-3 bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-800">
+                                        {% if task.saved_submission.image_url %}
+                                            <div class="mb-4">
+                                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Фото решения:</p>
+                                                <div class="flex flex-col sm:flex-row gap-3">
+                                                    <img
+                                                        src="{{ task.saved_submission.image_url.url }}"
+                                                        class="rounded-lg max-w-[260px] border border-gray-200 shadow-sm cursor-pointer hover:opacity-95"
+                                                        onclick="openImageModal(this.src)"
+                                                        alt="Фото решения (стр. 1)"
+                                                    >
+                                                    {% if task.saved_submission.image_url_2 %}
+                                                    <img
+                                                        src="{{ task.saved_submission.image_url_2.url }}"
+                                                        class="rounded-lg max-w-[260px] border border-gray-200 shadow-sm cursor-pointer hover:opacity-95"
+                                                        onclick="openImageModal(this.src)"
+                                                        alt="Фото решения (стр. 2)"
+                                                    >
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% endif %}
+
+                                        {% if task.saved_submission.ai_recognized_solution %}
+                                            <div class="mb-4">
+                                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Решение (как распознано):</p>
+                                                <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_recognized_solution }}</div>
+                                            </div>
+                                        {% endif %}
+
+                                        {% if task.saved_submission.ai_mistakes %}
+                                            <div class="mb-4">
+                                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Ошибки и замечания:</p>
+                                                <ul class="list-disc pl-5 space-y-1">
+                                                    {% for m in task.saved_submission.ai_mistakes %}
+                                                        <li>{{ m }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        {% endif %}
+
+                                        {% if task.saved_submission.ai_verdict %}
+                                            <div class="mb-2">
+                                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Итоговый вердикт:</p>
+                                                <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                                                    {% for p in task.saved_submission.ai_verdict %}
+                                                        <p class="mt-2 first:mt-0">{{ p }}</p>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% elif task.saved_submission.ai_feedback %}
+                                            <div class="mb-2">
+                                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Коротко:</p>
+                                                <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_feedback }}</div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
                                 </div>
 
                                 <script>
@@ -233,6 +299,50 @@
                                         </button>
                                     {% endif %}
                                 </div>
+
+                                {% if task.saved_submission.ai_recognized_solution or task.saved_submission.ai_mistakes or task.saved_submission.ai_verdict or task.saved_submission.ai_feedback %}
+                                <div class="mt-4">
+                                    <button type="button" onclick="toggleAiDetail({{ task.id }})" class="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg transition font-bold">
+                                        <i class="fas fa-robot mr-2 text-primary"></i> Фото и вердикт ИИ
+                                    </button>
+                                </div>
+
+                                <div id="ai_detail_{{ task.id }}" class="hidden mt-3 bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-800">
+                                    {% if task.saved_submission.ai_recognized_solution %}
+                                        <div class="mb-4">
+                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Решение (как распознано):</p>
+                                            <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_recognized_solution }}</div>
+                                        </div>
+                                    {% endif %}
+
+                                    {% if task.saved_submission.ai_mistakes %}
+                                        <div class="mb-4">
+                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Ошибки и замечания:</p>
+                                            <ul class="list-disc pl-5 space-y-1">
+                                                {% for m in task.saved_submission.ai_mistakes %}
+                                                    <li>{{ m }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    {% endif %}
+
+                                    {% if task.saved_submission.ai_verdict %}
+                                        <div class="mb-2">
+                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Итоговый вердикт:</p>
+                                            <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                                                {% for p in task.saved_submission.ai_verdict %}
+                                                    <p class="mt-2 first:mt-0">{{ p }}</p>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    {% elif task.saved_submission.ai_feedback %}
+                                        <div class="mb-2">
+                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Коротко:</p>
+                                            <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ task.saved_submission.ai_feedback }}</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
 
                                 <script>
                                     document.addEventListener('DOMContentLoaded', () => {
@@ -485,6 +595,15 @@
         if (!body) return;
         body.classList.toggle('hidden');
         if (chev) chev.classList.toggle('rotate-180');
+    }
+
+    function toggleAiDetail(taskId) {
+        const el = document.getElementById(`ai_detail_${taskId}`);
+        if (!el) return;
+        el.classList.toggle('hidden');
+        if (!el.classList.contains('hidden') && window.MathJax && MathJax.typesetPromise) {
+            try { MathJax.typesetPromise([el]); } catch (e) {}
+        }
     }
 
     function unlockTaskChat(taskId, commentsCount) {

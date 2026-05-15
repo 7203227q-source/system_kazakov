@@ -1523,6 +1523,7 @@ def student_solve_assignment(request, assignment_id):
     
     tasks_list = list(tasks)
     domain = request.build_absolute_uri('/')[:-1]
+    import json as pyjson
     
     for task in tasks_list:
         task.saved_submission = saved_submissions.get(task.id)
@@ -1535,6 +1536,16 @@ def student_solve_assignment(request, assignment_id):
                 task.saved_submission.ai_feedback_display_html = sanitize_ai_feedback_html(task.saved_submission.ai_feedback_display)
             except Exception:
                 task.saved_submission.ai_feedback_display_html = task.saved_submission.ai_feedback_display
+        if task.saved_submission:
+            # Структурные поля ИИ (могут быть null)
+            try:
+                task.saved_submission.ai_mistakes = pyjson.loads(task.saved_submission.ai_mistakes_json) if task.saved_submission.ai_mistakes_json else []
+            except Exception:
+                task.saved_submission.ai_mistakes = []
+            try:
+                task.saved_submission.ai_verdict = pyjson.loads(task.saved_submission.ai_verdict_json) if task.saved_submission.ai_verdict_json else []
+            except Exception:
+                task.saved_submission.ai_verdict = []
         if task.saved_submission and getattr(task.saved_submission, "ai_last_verify_at", None):
             try:
                 dt = task.saved_submission.ai_last_verify_at
