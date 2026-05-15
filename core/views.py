@@ -677,12 +677,13 @@ def student_practice(request):
         grade = 5 if is_correct else 1
         
         # Сохраняем попытку в TaskLog через аналитику (чтобы учелся EMA и статистика)
+        max_points_effective = max(int(task.exam_points or 0), int(getattr(getattr(task, "task_type", None), "max_points", 0) or 0))
         submission = Submission.objects.create(
             student=request.user,
             task=task,
             user_answer=user_answer,
             is_correct=is_correct,
-            score=task.exam_points if is_correct else 0
+            score=max_points_effective if is_correct else 0
         )
         
         # Время решения в тренажере не замеряем строго, ставим заглушку 60с для избежания аномалии
@@ -708,7 +709,7 @@ def student_practice(request):
             profile.level = (profile.xp // 100) + 1
             profile.save()
 
-        points_max = int(task.exam_points or 0)
+        points_max = int(max_points_effective or 0)
         points_earned = points_max if is_correct else 0
 
         # Store result so refresh/resubmit can't change it
@@ -1074,6 +1075,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
     norm_user_answer = user_answer.lower().replace(',', '.')
     norm_correct_answer = task.correct_answer.lower().replace(',', '.')
     is_correct = (norm_user_answer == norm_correct_answer)
+    max_points_effective = max(int(task.exam_points or 0), int(getattr(getattr(task, "task_type", None), "max_points", 0) or 0))
     
     # Ищем старое решение или создаем новое
     submission, created = Submission.objects.get_or_create(
@@ -1083,7 +1085,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
         defaults={
             'user_answer': user_answer,
             'is_correct': is_correct,
-            'score': task.exam_points if is_correct else 0
+            'score': max_points_effective if is_correct else 0
         }
     )
     
@@ -1094,7 +1096,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
     elif not created:
         submission.user_answer = user_answer
         submission.is_correct = is_correct
-        submission.score = task.exam_points if is_correct else 0
+        submission.score = max_points_effective if is_correct else 0
         submission.save()
 
     # Автодобавление в интервальное повторение: только из вариантов и только неверные
@@ -1298,6 +1300,8 @@ def auto_expire_assignment_if_needed(assignment: Assignment):
 
     tasks = assignment.tasks.all()
     for t in tasks:
+        max_points_effective = max(int(t.exam_points or 0), int(getattr(getattr(t, "task_type", None), "max_points", 0) or 0))
+        is_extended = is_extended_answer_task(t)
         sub, created = Submission.objects.get_or_create(
             student=assignment.student,
             task=t,
@@ -1310,13 +1314,13 @@ def auto_expire_assignment_if_needed(assignment: Assignment):
             },
         )
         if not created:
-            if int(t.exam_points or 0) == 1:
-                sub.score = 1 if sub.is_correct else 0
-                sub.save(update_fields=['score'])
-            else:
+            if is_extended:
                 sub.primary_score = int(sub.primary_score or 0)
                 sub.score = int(sub.primary_score or 0)
                 sub.save(update_fields=['score', 'primary_score'])
+            else:
+                sub.score = int(max_points_effective) if sub.is_correct else 0
+                sub.save(update_fields=['score'])
 
         record_task_log(assignment.student, t, sub, assignment, 0)
 
@@ -1392,7 +1396,7 @@ def student_solve_assignment(request, assignment_id):
                 defaults={
                     'user_answer': user_answer,
                     'is_correct': is_correct,
-                    'score': task.exam_points if is_correct else 0
+                    'score': max_points_effective if is_correct else 0
                 }
             )
             
@@ -1400,7 +1404,7 @@ def student_solve_assignment(request, assignment_id):
                 # Если уже было, просто обновим (вдруг ученик поменял ответ при общем сабмите)
                 sub.user_answer = user_answer
                 sub.is_correct = is_correct
-                sub.score = task.exam_points if is_correct else 0
+                sub.score = max_points_effective if is_correct else 0
                 sub.save()
 
             subs_by_task_id[task.id] = sub
@@ -4180,19 +4184,33 @@ def admin_exam_structure(request):
 
     task_types = list(TaskType.objects.filter(exam_format=selected_exam_format).order_by("number")) if selected_exam_format else []
     if selected_exam_format:
-        subject_name = getattr(getattr(selected_exam_format, "subject", None), "name", "") or ""
-        fmt_name = getattr(selected_exam_format, "name", "") or ""
-        split_after = None
-        if "Матем" in subject_name and "ОГЭ" in fmt_name:
-            split_after = 19
-        elif "Матем" in subject_name and "ЕГЭ" in fmt_name:
-            split_after = 12
-        if split_after is not None:
+        # Основной способ: явный флаг на типе задания. Это корректно для ОГЭ/ЕГЭ,
+        # включая случаи, когда в тестовой части встречаются задания на 2 балла (ОГЭ физика).
+        any_marked = False
+        for tt in task_types:
+            if bool(getattr(tt, "is_extended_answer", False)):
+                any_marked = True
+                break
+        if any_marked:
             for tt in task_types:
-                if int(tt.number or 0) <= int(split_after):
-                    tt.part_label = "Тестовая часть"
-                else:
-                    tt.part_label = "Развёрнутая часть"
+                tt.part_label = "Развёрнутая часть" if bool(getattr(tt, "is_extended_answer", False)) else "Тестовая часть"
+        else:
+            # Fallback для старых форматов, где флаг ещё не проставлен.
+            subject_name = getattr(getattr(selected_exam_format, "subject", None), "name", "") or ""
+            fmt_name = getattr(selected_exam_format, "name", "") or ""
+            split_after = None
+            if "Матем" in subject_name and "ОГЭ" in fmt_name:
+                split_after = 19
+            elif "Матем" in subject_name and "ЕГЭ" in fmt_name:
+                split_after = 12
+            elif "Физ" in subject_name and "ОГЭ" in fmt_name:
+                split_after = 16
+            if split_after is not None:
+                for tt in task_types:
+                    if int(tt.number or 0) <= int(split_after):
+                        tt.part_label = "Тестовая часть"
+                    else:
+                        tt.part_label = "Развёрнутая часть"
     return render(request, "core/admin_exam_structure.html", {
         "exam_formats": exam_formats,
         "selected_exam_format": selected_exam_format,
