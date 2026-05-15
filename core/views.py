@@ -1523,6 +1523,7 @@ def student_solve_assignment(request, assignment_id):
     
     tasks_list = list(tasks)
     domain = request.build_absolute_uri('/')[:-1]
+    import json as pyjson
     
     for task in tasks_list:
         task.saved_submission = saved_submissions.get(task.id)
@@ -1535,6 +1536,16 @@ def student_solve_assignment(request, assignment_id):
                 task.saved_submission.ai_feedback_display_html = sanitize_ai_feedback_html(task.saved_submission.ai_feedback_display)
             except Exception:
                 task.saved_submission.ai_feedback_display_html = task.saved_submission.ai_feedback_display
+        if task.saved_submission:
+            # Структурные поля ИИ (могут быть null)
+            try:
+                task.saved_submission.ai_mistakes = pyjson.loads(task.saved_submission.ai_mistakes_json) if task.saved_submission.ai_mistakes_json else []
+            except Exception:
+                task.saved_submission.ai_mistakes = []
+            try:
+                task.saved_submission.ai_verdict = pyjson.loads(task.saved_submission.ai_verdict_json) if task.saved_submission.ai_verdict_json else []
+            except Exception:
+                task.saved_submission.ai_verdict = []
         if task.saved_submission and getattr(task.saved_submission, "ai_last_verify_at", None):
             try:
                 dt = task.saved_submission.ai_last_verify_at
@@ -4968,10 +4979,16 @@ def api_verify_with_ai(request, submission_id):
             "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
             "- primary_score: number\n"
             "- is_correct: boolean\n"
-            "- recognized_solution: string (как ты понял ход решения ученика; допускаются переносы строк)\n"
+            "- recognized_solution: string (что именно ты видишь на фото в решении ученика; допускаются переносы строк)\n"
             "- mistakes: array of strings (ошибки/замечания; каждый элемент — отдельный пункт)\n"
-            "- verdict: array of strings (итоговый вердикт и рекомендации; каждый элемент — отдельный абзац; обязательно укажи, за что сняты баллы)\n"
+            "- verdict: array of strings (итоговый вердикт и рекомендации; каждый элемент — отдельный абзац; обязательно укажи, за что сняты баллы; ОБЯЗАТЕЛЬНО добавь отдельным пунктом «Неуверенность распознавания: ...»)\n"
             "- feedback: string (опционально; если заполнишь — это краткий общий текст)\n"
+            "\n"
+            "ВАЖНО (распознавание):\n"
+            "- Описывай в recognized_solution ТОЛЬКО то, что реально видно на фото (формулы, преобразования, подстановки).\n"
+            "- Если часть не читается/не видна — явно помечай: [неразборчиво], [не видно], [сомнение].\n"
+            "- Не додумывай шаги решения. Если всё же вынужден предположить — явно пометь строку как «ПРЕДПОЛОЖЕНИЕ: ...».\n"
+            "- Если из-за качества фото нельзя надёжно оценить — укажи это в verdict и снизь балл (или поставь 0), но не делай уверенных утверждений.\n"
             "\n"
             "Формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
             "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши в LaTeX (используй двойной обратный слэш)."
@@ -5283,6 +5300,8 @@ def api_tutor_verify_with_ai(request, submission_id):
             "Если решение полностью верное — primary_score = максимум.\n"
             "Если решение частично верное — поставь частичный балл.\n"
             "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
+            "\n"
+            "ВАЖНО (распознавание): опирайся только на то, что реально видно на фото. Если часть решения не читается/не видна — явно напиши это и не делай уверенных утверждений.\n"
             "В feedback обязательно коротко объясни, за что сняты баллы, в формате:\n"
             "- Что верно:\n"
             "- Ошибки:\n"

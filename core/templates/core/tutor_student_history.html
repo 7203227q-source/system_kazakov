@@ -169,6 +169,29 @@
                                     </div>
                                     {% endif %}
 
+                                    <div class="not-prose mt-4 bg-white border border-gray-200 rounded-lg p-4">
+                                        {% with mp=sub.task.task_type.max_points|default:sub.task.exam_points|default:0 %}
+                                        <div class="flex items-center justify-between gap-4 flex-wrap">
+                                            <div class="text-sm font-bold text-gray-800">
+                                                Баллы:
+                                                {% if sub.tutor_primary_score != None %}
+                                                    {{ sub.tutor_primary_score }}/{{ mp }}
+                                                    <span class="text-gray-400 font-normal">(исправлено)</span>
+                                                {% else %}
+                                                    {{ sub.primary_score|default:0 }}/{{ mp }}
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-xs font-bold text-gray-600">Баллы репетитора</label>
+                                                <input id="tutor_score_{{ sub.id }}" type="number" min="0" max="{{ mp }}" value="{% if sub.tutor_primary_score != None %}{{ sub.tutor_primary_score }}{% else %}{{ sub.primary_score|default:0 }}{% endif %}" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm">
+                                                <button type="button" onclick="tutorOverrideScore({{ sub.id }}, {{ mp }})" class="bg-primary text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition">
+                                                    Сохранить
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {% endwith %}
+                                    </div>
+
                                     <div class="not-prose mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
                                         <div class="text-sm font-bold text-gray-800 mb-3">Вопросы по задаче</div>
                                         {% if sub.comments.count %}
@@ -291,6 +314,29 @@
                                         {% endif %}
                                     </div>
                                     {% endif %}
+
+                                    <div class="not-prose mt-4 bg-white border border-gray-200 rounded-lg p-4">
+                                        {% with mp=sub.task.task_type.max_points|default:sub.task.exam_points|default:0 %}
+                                        <div class="flex items-center justify-between gap-4 flex-wrap">
+                                            <div class="text-sm font-bold text-gray-800">
+                                                Баллы:
+                                                {% if sub.tutor_primary_score != None %}
+                                                    {{ sub.tutor_primary_score }}/{{ mp }}
+                                                    <span class="text-gray-400 font-normal">(исправлено)</span>
+                                                {% else %}
+                                                    {{ sub.primary_score|default:0 }}/{{ mp }}
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-xs font-bold text-gray-600">Баллы репетитора</label>
+                                                <input id="tutor_score_{{ sub.id }}" type="number" min="0" max="{{ mp }}" value="{% if sub.tutor_primary_score != None %}{{ sub.tutor_primary_score }}{% else %}{{ sub.primary_score|default:0 }}{% endif %}" class="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm">
+                                                <button type="button" onclick="tutorOverrideScore({{ sub.id }}, {{ mp }})" class="bg-primary text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition">
+                                                    Сохранить
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {% endwith %}
+                                    </div>
 
                                     <form method="POST" action="{% url 'tutor_student_srs_remove' student.id sub.task.id %}" class="not-prose mt-3" onsubmit="return confirm('Убрать задачу из повторения?');">
                                         {% csrf_token %}
@@ -442,6 +488,42 @@
         } catch (e) {
             console.error(e);
             alert('Ошибка соединения с сервером');
+        }
+    }
+
+    async function tutorOverrideScore(submissionId, maxPoints) {
+        const input = document.getElementById(`tutor_score_${submissionId}`);
+        const raw = (input?.value || "").trim();
+        if (raw === "" || isNaN(parseInt(raw, 10))) {
+            alert("Введите баллы");
+            return;
+        }
+        const val = parseInt(raw, 10);
+        const mp = parseInt(maxPoints || 0, 10);
+        if (val < 0 || (mp > 0 && val > mp)) {
+            alert(`Баллы должны быть от 0 до ${mp}`);
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("tutor_primary_score", String(val));
+        formData.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+
+        try {
+            const res = await fetch(`/api/tutor/submission/${submissionId}/override-score/`, {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin",
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                alert((data && data.error) ? data.error : "Не удалось сохранить балл");
+                return;
+            }
+            location.reload();
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка соединения с сервером");
         }
     }
 </script>
