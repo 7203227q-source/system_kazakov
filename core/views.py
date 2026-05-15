@@ -1625,6 +1625,8 @@ def student_practice_submit(request, task_id):
 @login_required
 def student_history(request):
     """История решений (Журнал) ученика"""
+    import json as pyjson
+
     submissions = (
         Submission.objects.filter(student=request.user)
         .select_related('task', 'assignment')
@@ -1639,7 +1641,29 @@ def student_history(request):
     ).count()
     total_xp = StudentSubjectProfile.objects.filter(student=request.user).aggregate(total=models.Sum('xp')).get('total') or 0
     total_level = (int(total_xp) // 100) + 1
-    return render(request, 'core/student_history.html', {'submissions': submissions, 'total_xp': total_xp, 'total_level': total_level, 'unread_tutor_replies_total': unread_tutor_replies_total})
+
+    # Подготавливаем поля для шаблона (JSON-массивы -> списки)
+    for sub in submissions:
+        try:
+            sub.ai_mistakes = pyjson.loads(sub.ai_mistakes_json) if sub.ai_mistakes_json else []
+        except Exception:
+            sub.ai_mistakes = []
+
+        try:
+            sub.ai_verdict = pyjson.loads(sub.ai_verdict_json) if sub.ai_verdict_json else []
+        except Exception:
+            sub.ai_verdict = []
+
+    return render(
+        request,
+        'core/student_history.html',
+        {
+            'submissions': submissions,
+            'total_xp': total_xp,
+            'total_level': total_level,
+            'unread_tutor_replies_total': unread_tutor_replies_total,
+        },
+    )
 
 @login_required
 def update_theme_view(request):

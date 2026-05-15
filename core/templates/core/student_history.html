@@ -130,6 +130,63 @@
                             </div>
                         </div>
                         {% endif %}
+                        
+                        {% if sub.image_url or sub.ai_recognized_solution or sub.ai_mistakes or sub.ai_verdict or sub.ai_feedback %}
+                        <div class="mt-4">
+                            <button type="button" onclick="toggleTaskDetail('sub_detail_{{ sub.id }}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
+                                Фото и вердикт ИИ
+                            </button>
+                        </div>
+
+                        <!-- Details (hidden by default) -->
+                        <div id="sub_detail_{{ sub.id }}" class="hidden mt-3 p-4 bg-white border border-gray-200 rounded-lg text-sm text-gray-800">
+                            {% if sub.image_url %}
+                                <div class="mb-4">
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Фото решения:</p>
+                                    <img
+                                        src="{{ sub.image_url.url }}"
+                                        class="rounded-lg max-w-[260px] border border-gray-200 shadow-sm cursor-pointer hover:opacity-95"
+                                        onclick="event.stopPropagation(); openImageModal(this.src)"
+                                        alt="Фото решения"
+                                    >
+                                </div>
+                            {% endif %}
+
+                            {% if sub.ai_recognized_solution %}
+                                <div class="mb-4">
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Решение (как распознано):</p>
+                                    <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ sub.ai_recognized_solution }}</div>
+                                </div>
+                            {% endif %}
+
+                            {% if sub.ai_mistakes %}
+                                <div class="mb-4">
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Ошибки и замечания:</p>
+                                    <ul class="list-disc pl-5 space-y-1">
+                                        {% for m in sub.ai_mistakes %}
+                                            <li>{{ m }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
+
+                            {% if sub.ai_verdict %}
+                                <div class="mb-2">
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Итоговый вердикт:</p>
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                                        {% for p in sub.ai_verdict %}
+                                            <p class="mt-2 first:mt-0">{{ p }}</p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% elif sub.ai_feedback %}
+                                <div class="mb-2">
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Вердикт ИИ:</p>
+                                    <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">{{ sub.ai_feedback }}</div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                     </div>
                     {% empty %}
                     <div class="p-12 text-center text-gray-500">
@@ -148,6 +205,13 @@
     function toggleComments(id) {
         const el = document.getElementById(`comments_${id}`);
         if (el) el.classList.toggle('hidden');
+    }
+
+    function toggleTaskDetail(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.toggle('hidden');
+        }
     }
 </script>
 
