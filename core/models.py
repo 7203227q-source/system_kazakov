@@ -163,6 +163,14 @@ class Task(models.Model):
     difficulty = models.IntegerField(default=50, verbose_name="Сложность (1-100)")
     exam_points = models.IntegerField(default=1, verbose_name="Балл на ЕГЭ")
 
+    # ИИ-разметка (не влияет на текущую логику XP/подбора задач)
+    ai_difficulty_raw = models.IntegerField(null=True, blank=True, verbose_name="ИИ: сложность (1-100)")
+    ai_difficulty_exam_percentile = models.IntegerField(null=True, blank=True, verbose_name="ИИ: сложность (процентиль по экзамену)")
+    ai_difficulty_type_percentile = models.IntegerField(null=True, blank=True, verbose_name="ИИ: сложность (процентиль по типу)")
+    ai_annotated_at = models.DateTimeField(null=True, blank=True, verbose_name="ИИ: размечено")
+    ai_annotation_version = models.CharField(max_length=50, null=True, blank=True, verbose_name="ИИ: версия разметки")
+    ai_tags = models.ManyToManyField("TaskTag", blank=True, related_name="tasks", verbose_name="ИИ: теги")
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def get_content_for_theme(self, theme='classic'):
@@ -224,6 +232,24 @@ class TaskVariant(models.Model):
 
     def __str__(self):
         return f"Variant '{self.get_theme_display()}' for Task {self.task.id}"
+
+
+class TaskTag(models.Model):
+    KIND_CHOICES = [
+        ("method", "Метод"),
+        ("property", "Свойство"),
+        ("topic", "Тема"),
+        ("other", "Другое"),
+    ]
+    name = models.CharField(max_length=200)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="other")
+
+    class Meta:
+        unique_together = ("kind", "name")
+        indexes = [models.Index(fields=["kind", "name"])]
+
+    def __str__(self):
+        return f"{self.kind}:{self.name}"
 
 
 class SpacedRepetition(models.Model):
