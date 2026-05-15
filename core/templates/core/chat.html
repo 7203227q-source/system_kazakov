@@ -60,7 +60,12 @@
                             <div class="flex justify-between items-baseline mb-1">
                                 <h3 class="text-sm font-bold text-gray-800 truncate">{{ d.user.get_full_name|default:d.user.username }}</h3>
                                 {% if d.last_message %}
-                                <span class="text-[10px] text-gray-400 whitespace-nowrap ml-2">{{ d.last_message.created_at|ui_datetime }}</span>
+                                <div class="flex items-baseline">
+                                    <span class="text-[10px] text-gray-400 whitespace-nowrap ml-2">{{ d.last_message.created_at|ui_datetime }}</span>
+                                    {% if user.role == 'tutor' and d.needs_reply %}
+                                    <span class="ml-2 bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">Ждёт ответа</span>
+                                    {% endif %}
+                                </div>
                                 {% endif %}
                             </div>
                             <p class="text-xs {% if d.unread_count > 0 %}text-gray-800 font-bold{% else %}text-gray-500{% endif %} truncate">

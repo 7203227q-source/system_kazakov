@@ -63,11 +63,16 @@ def get_user_dialogs(user):
         unread_count = Message.objects.filter(
             sender=other_user, receiver=user, is_read=False
         ).count()
+
+        needs_reply = False
+        if user.role == "tutor" and last_msg and last_msg.sender_id != user.id:
+            needs_reply = True
         
         enriched_dialogs.append({
             'user': other_user,
             'last_message': last_msg,
             'unread_count': unread_count,
+            'needs_reply': needs_reply,
             # django.utils.timezone не содержит `utc` в Django 6+, поэтому используем безопасный "минимум"
             # (важно, чтобы tz-aware, иначе сравнение дат в сортировке может падать).
             'sort_date': last_msg.created_at if last_msg else timezone.datetime(1970, 1, 1, tzinfo=timezone.get_current_timezone())
