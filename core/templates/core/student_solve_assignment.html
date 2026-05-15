@@ -112,6 +112,14 @@
                                         </button>
                                         <div id="upload2_status_{{ task.id }}" class="text-xs text-gray-500 mt-2 hidden"></div>
                                     </div>
+
+                                    <div class="mt-3">
+                                        <button type="button"
+                                                onclick="clearUploadedPhotos({{ task.saved_submission.id }})"
+                                                class="text-xs bg-red-50 text-red-700 hover:bg-red-100 px-4 py-2 rounded-lg transition font-bold">
+                                            <i class="fas fa-trash mr-2"></i> Удалить фото
+                                        </button>
+                                    </div>
                                     
                                     <div class="flex flex-col sm:flex-row gap-2 justify-center">
                                          <button type="button"
@@ -727,6 +735,22 @@
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-robot mr-2"></i> Проверить ещё раз через ИИ';
             }
+        }
+    }
+
+    async function clearUploadedPhotos(submissionId) {
+        if (!confirm('Удалить прикреплённые фото и сбросить проверку ИИ?')) return;
+        try {
+            const res = await fetch(`/api/submission/${submissionId}/clear-images/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                credentials: 'same-origin',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error((data && data.error) ? data.error : 'clear_failed');
+            location.reload();
+        } catch (e) {
+            alert('Не удалось удалить фото. Попробуйте ещё раз.');
         }
     }
 

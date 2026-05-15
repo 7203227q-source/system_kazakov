@@ -948,6 +948,18 @@ def student_dashboard(request):
         seen_by_student_at__isnull=True,
     ).count()
 
+    # Награды XP от репетитора (видно ученику)
+    try:
+        from core.models import TutorReward
+
+        recent_rewards = (
+            TutorReward.objects.filter(student=request.user)
+            .select_related("subject", "tutor")
+            .order_by("-created_at")[:10]
+        )
+    except Exception:
+        recent_rewards = []
+
     pending_assignment_ids = list(pending_assignments.values_list("id", flat=True))
     unread_by_assignment = {
         row["submission__assignment_id"]: row["c"]
@@ -980,6 +992,7 @@ def student_dashboard(request):
         'chart_data': chart_data,
         'due_srs_count': due_srs_count,
         'unread_tutor_replies_total': unread_tutor_replies_total,
+        'recent_rewards': recent_rewards,
         'exam_formats_for_subject': exam_formats_for_subject,
     })
 
@@ -4400,6 +4413,42 @@ def api_submission_reveal_solution(request, submission_id):
         solution_html = variant.solution
 
     return JsonResponse({'status': 'ok', 'solution_html': solution_html})
+
+
+@login_required
+@require_POST
+def api_submission_clear_images(request, submission_id):
+    submission = get_object_or_404(Submission, id=submission_id)
+    if submission.student_id != request.user.id:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    # Очистка изображений
+    submission.image_url = None
+    if hasattr(submission, "image_url_2"):
+        submission.image_url_2 = None
+
+    # Сброс ИИ-вердикта и оценки, чтобы не оставалось данных от "чужого" фото
+    submission.ai_feedback = None
+    submission.ai_recognized_solution = None
+    submission.ai_mistakes_json = None
+    submission.ai_verdict_json = None
+    submission.primary_score = 0
+    submission.is_correct = False
+
+    update_fields = [
+        "image_url",
+        "ai_feedback",
+        "ai_recognized_solution",
+        "ai_mistakes_json",
+        "ai_verdict_json",
+        "primary_score",
+        "is_correct",
+    ]
+    if hasattr(submission, "image_url_2"):
+        update_fields.append("image_url_2")
+
+    submission.save(update_fields=update_fields)
+    return JsonResponse({"status": "ok"})
 
 import re
 from django.conf import settings

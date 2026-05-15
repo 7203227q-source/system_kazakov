@@ -17,6 +17,7 @@ urlpatterns = [
     path('api/submission/<int:submission_id>/status/', views.api_submission_status, name='api_submission_status'),
     path('api/submission/<int:submission_id>/upload/', views.api_submission_upload, name='api_submission_upload'),
     path('api/submission/<int:submission_id>/reveal-solution/', views.api_submission_reveal_solution, name='api_submission_reveal_solution'),
+    path('api/submission/<int:submission_id>/clear-images/', views.api_submission_clear_images, name='api_submission_clear_images'),
     path('api/submission/<int:submission_id>/verify/', views.api_verify_with_ai, name='api_verify_with_ai'),
     path('api/tutor/submission/<int:submission_id>/override-score/', views.api_tutor_override_score, name='api_tutor_override_score'),
     path('api/tutor/submission/<int:submission_id>/verify-ai/', views.api_tutor_verify_with_ai, name='api_tutor_verify_with_ai'),
