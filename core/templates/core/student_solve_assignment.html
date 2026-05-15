@@ -902,6 +902,37 @@
             }
         }
     }
+
+    // Deep-link from dashboard comments: scroll to task + open Q&A block
+    document.addEventListener('DOMContentLoaded', () => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const taskId = params.get('task_id');
+            if (!taskId) return;
+
+            const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                card.classList.add('ring-2', 'ring-indigo-300', 'ring-offset-2');
+                setTimeout(() => card.classList.remove('ring-2', 'ring-indigo-300', 'ring-offset-2'), 2500);
+            }
+
+            const block = document.getElementById(`chat_block_${taskId}`);
+            const body = document.getElementById(`chat_body_${taskId}`);
+            const chev = document.getElementById(`chat_chev_${taskId}`);
+            if (block) block.classList.remove('hidden');
+            if (body) body.classList.remove('hidden');
+            if (chev) chev.classList.add('rotate-180');
+
+            if (body) {
+                setTimeout(() => {
+                    body.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    body.classList.add('ring-2', 'ring-yellow-300', 'ring-offset-2');
+                    setTimeout(() => body.classList.remove('ring-2', 'ring-yellow-300', 'ring-offset-2'), 2500);
+                }, 250);
+            }
+        } catch (e) {}
+    });
 </script>
 {% include "core/image_modal.html" %}
 <script>
