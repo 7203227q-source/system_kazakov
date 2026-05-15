@@ -1,4 +1,4 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 OGE_PHYSICS_2026_TASKTYPES = {
@@ -32,22 +32,29 @@ def forwards(apps, schema_editor):
     ExamFormat = apps.get_model("core", "ExamFormat")
     TaskType = apps.get_model("core", "TaskType")
 
-    # Backfill for already existing OGE math types (migration 0023 appends "развёрнутый ответ" in name)
-    TaskType.objects.filter(name__icontains="развёрнут").update(is_extended_answer=True)
-    TaskType.objects.filter(name__icontains="развернут").update(is_extended_answer=True)
-
     physics, _ = Subject.objects.get_or_create(name="Физика")
 
-    ef = (
-        ExamFormat.objects.filter(subject=physics, year=2026, name__icontains="ОГЭ").first()
-        or ExamFormat.objects.create(subject=physics, year=2026, name="ОГЭ", is_active=True)
+    # В проекте формат уже создаётся миграцией 0031, но на всякий случай делаем get_or_create.
+    ef, _ = ExamFormat.objects.get_or_create(
+        subject=physics,
+        name="ОГЭ физика",
+        year=2026,
+        defaults={"is_active": True},
     )
+    if not ef.is_active:
+        ef.is_active = True
+        ef.save(update_fields=["is_active"])
 
     for number, (name, max_points, is_extended) in OGE_PHYSICS_2026_TASKTYPES.items():
         tt, created = TaskType.objects.get_or_create(
             exam_format=ef,
             number=number,
-            defaults={"name": name, "max_points": max_points, "is_extended_answer": is_extended},
+            defaults={
+                "name": name,
+                "max_points": max_points,
+                "is_extended_answer": is_extended,
+                "is_geometry": False,
+            },
         )
         if not created:
             TaskType.objects.filter(id=tt.id).update(
@@ -59,15 +66,10 @@ def forwards(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0023_update_oge_math_tasktype_names"),
+        ("core", "0055_task_ai_annotated_at_task_ai_annotation_version_and_more"),
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="tasktype",
-            name="is_extended_answer",
-            field=models.BooleanField(default=False, verbose_name="Развёрнутый ответ (часть 2)"),
-        ),
         migrations.RunPython(forwards, migrations.RunPython.noop),
     ]
 
