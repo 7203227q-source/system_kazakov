@@ -1184,7 +1184,7 @@ def student_assignment_summary(request, assignment_id):
                 else:
                     points_earned = max_points_effective if bool(getattr(sub, "is_correct", False)) else 0
             else:
-                points_earned = int(sub.primary_score or 0)
+                points_earned = int(getattr(sub, "tutor_primary_score", None) if getattr(sub, "tutor_primary_score", None) is not None else (sub.primary_score or 0))
                 
         total_primary_earned += points_earned
         max_primary_possible += max_points_effective
@@ -1319,8 +1319,10 @@ def auto_expire_assignment_if_needed(assignment: Assignment):
         )
         if not created:
             if is_extended:
-                sub.primary_score = int(sub.primary_score or 0)
-                sub.score = int(sub.primary_score or 0)
+                eff = getattr(sub, "tutor_primary_score", None)
+                eff = int(eff) if eff is not None else int(sub.primary_score or 0)
+                sub.primary_score = eff
+                sub.score = eff
                 sub.save(update_fields=['score', 'primary_score'])
             else:
                 # Для тестовой части (в т.ч. ОГЭ физика) возможны частичные баллы за краткий ответ.
@@ -1460,7 +1462,8 @@ def student_solve_assignment(request, assignment_id):
                 if not is_extended:
                     student_primary += int(getattr(sub, "score", 0) or 0)
                 else:
-                    student_primary += int(sub.primary_score or 0)
+                    eff = getattr(sub, "tutor_primary_score", None)
+                    student_primary += int(eff if eff is not None else (sub.primary_score or 0))
 
         request.user.save()
         
@@ -2120,7 +2123,8 @@ def tutor_dashboard(request):
                 if not sub:
                     continue
                 if is_extended_answer_task(t):
-                    total_primary_earned += int(sub.primary_score or 0)
+                    eff = getattr(sub, "tutor_primary_score", None)
+                    total_primary_earned += int(eff if eff is not None else (sub.primary_score or 0))
                 else:
                     saved_score = getattr(sub, "score", None)
                     saved_score = int(saved_score or 0)
@@ -2480,7 +2484,7 @@ def tutor_assignment_summary(request, assignment_id):
             if max_points <= 1:
                 points_earned = 1 if sub.is_correct else 0
             else:
-                points_earned = int(sub.primary_score or 0)
+                points_earned = int(getattr(sub, "tutor_primary_score", None) if getattr(sub, "tutor_primary_score", None) is not None else (sub.primary_score or 0))
         if solved:
             solved_count += 1
         total_primary_earned += points_earned
@@ -5427,58 +5431,15 @@ def api_tutor_override_score(request, submission_id):
     from django.utils import timezone
     submission.tutor_primary_score = val
     submission.tutor_scored_at = timezone.now()
-    submission.save(update_fields=["tutor_primary_score", "tutor_scored_at"])
+    # Считаем, что итог репетитора является итоговой оценкой за развёрнутую часть:
+    # обновляем primary_score / score / is_correct, чтобы корректно пересчитывались результаты вариантов
+    # и чтобы ученик видел исправленный балл.
+    submission.primary_score = val
+    submission.score = val
+    submission.is_correct = (val == int(max_points or 0))
+    submission.save(update_fields=["tutor_primary_score", "tutor_scored_at", "primary_score", "score", "is_correct"])
 
     return JsonResponse({"status": "ok", "tutor_primary_score": submission.tutor_primary_score})
-            
-    points_earned = int(primary_score or 0) if int(max_points or 0) > 1 else (1 if is_correct else 0)
-    submission.primary_score = primary_score
-    submission.is_correct = is_correct
-    submission.score = points_earned
-    submission.ai_feedback = feedback
-    submission.save(update_fields=['primary_score', 'is_correct', 'score', 'ai_feedback'])
-    
-    # Award XP if correct
-    xp_gained = 0
-    if is_correct:
-        xp_gained = max(1, int(task.difficulty / 5))
-        profile, _ = StudentSubjectProfile.objects.get_or_create(
-            student=request.user,
-            subject=task.topic.subject,
-            defaults={
-                'target_score': 80,
-                'level': 1,
-                'xp': 0,
-                'exam_format': ExamFormat.objects.filter(subject=task.topic.subject, is_active=True).order_by("-year", "name").first(),
-            },
-        )
-        profile.xp += xp_gained
-        profile.level = (profile.xp // 100) + 1
-        profile.save()
-
-    # Автодобавление в интервальное повторение: только из вариантов и только при 0 баллов
-    if submission.assignment_id and points_earned == 0:
-        try:
-            process_task_submission(request.user, task, 1)
-        except Exception:
-            pass
-        
-    solution_html = ""
-    variant = task.variants.filter(theme='classic').first()
-    if variant and variant.solution:
-        solution_html = variant.solution
-
-    return JsonResponse({
-        'status': 'ok',
-        'primary_score': primary_score,
-        'feedback': feedback,
-        'feedback_html': sanitize_ai_feedback_html(feedback),
-        'is_correct': is_correct,
-        'xp_gained': xp_gained,
-        'solution_html': solution_html,
-        'model': model,
-        'cooldown_seconds': cooldown_seconds,
-    })
 
 from django.contrib.auth import logout
 def logout_view(request):
