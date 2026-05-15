@@ -558,6 +558,7 @@ from urllib.parse import urlparse
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from .models import TaskVariant, TaskType, Topic
+from .scoring import get_max_points_effective, score_short_answer
 
 def download_and_replace_images(html_content, task_fipi_id, theme):
     if not html_content:
@@ -670,20 +671,18 @@ def student_practice(request):
             messages.error(request, "Эта задача уже была проверена. Откройте следующую задачу.")
             return redirect("student_practice")
         
-        # Простейшая логика проверки (с учетом точек и запятых)
-        norm_user_answer = user_answer.lower().replace(',', '.')
-        norm_correct_answer = task.correct_answer.lower().replace(',', '.')
-        is_correct = (norm_user_answer == norm_correct_answer)
+        points_earned = score_short_answer(task, user_answer)
+        points_max = get_max_points_effective(task)
+        is_correct = (points_earned == int(points_max or 0))
         grade = 5 if is_correct else 1
         
         # Сохраняем попытку в TaskLog через аналитику (чтобы учелся EMA и статистика)
-        max_points_effective = max(int(task.exam_points or 0), int(getattr(getattr(task, "task_type", None), "max_points", 0) or 0))
         submission = Submission.objects.create(
             student=request.user,
             task=task,
             user_answer=user_answer,
             is_correct=is_correct,
-            score=max_points_effective if is_correct else 0
+            score=int(points_earned or 0),
         )
         
         # Время решения в тренажере не замеряем строго, ставим заглушку 60с для избежания аномалии
@@ -709,8 +708,7 @@ def student_practice(request):
             profile.level = (profile.xp // 100) + 1
             profile.save()
 
-        points_max = int(max_points_effective or 0)
-        points_earned = points_max if is_correct else 0
+        points_max = int(points_max or 0)
 
         # Store result so refresh/resubmit can't change it
         display_total_xp = total_xp + xp_gained
@@ -1071,11 +1069,9 @@ def student_check_assignment_task(request, assignment_id, task_id):
         
     user_answer = request.POST.get('answer', '').strip()
     
-    # Нормализация
-    norm_user_answer = user_answer.lower().replace(',', '.')
-    norm_correct_answer = task.correct_answer.lower().replace(',', '.')
-    is_correct = (norm_user_answer == norm_correct_answer)
-    max_points_effective = max(int(task.exam_points or 0), int(getattr(getattr(task, "task_type", None), "max_points", 0) or 0))
+    points_earned = score_short_answer(task, user_answer)
+    points_max = get_max_points_effective(task)
+    is_correct = (int(points_earned or 0) == int(points_max or 0))
     
     # Ищем старое решение или создаем новое
     submission, created = Submission.objects.get_or_create(
@@ -1085,7 +1081,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
         defaults={
             'user_answer': user_answer,
             'is_correct': is_correct,
-            'score': max_points_effective if is_correct else 0
+            'score': int(points_earned or 0),
         }
     )
     
@@ -1096,7 +1092,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
     elif not created:
         submission.user_answer = user_answer
         submission.is_correct = is_correct
-        submission.score = max_points_effective if is_correct else 0
+        submission.score = int(points_earned or 0)
         submission.save()
 
     # Автодобавление в интервальное повторение: только из вариантов и только неверные
@@ -1175,23 +1171,31 @@ def student_assignment_summary(request, assignment_id):
         sub = submissions.get(task.id)
         points_earned = 0
         if sub:
-            max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+            max_points_effective = int(get_max_points_effective(task) or 0)
             is_extended = is_extended_answer_task(task)
             if not is_extended:
-                points_earned = max_points_effective if sub.is_correct else 0
+                # В старых данных score мог не заполняться (хранился только is_correct).
+                saved_score = getattr(sub, "score", None)
+                if saved_score is None:
+                    saved_score = 0
+                saved_score = int(saved_score or 0)
+                if saved_score > 0:
+                    points_earned = saved_score
+                else:
+                    points_earned = max_points_effective if bool(getattr(sub, "is_correct", False)) else 0
             else:
                 points_earned = int(sub.primary_score or 0)
                 
         total_primary_earned += points_earned
-        max_primary_possible += max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+        max_primary_possible += max_points_effective
         if task.task_type and task.task_type.is_geometry:
             geometry_primary_earned += points_earned
-            geometry_primary_possible += int(task.exam_points or 0)
+            geometry_primary_possible += max_points_effective
         
         if points_earned > 0:
             correct_count += 1
-            total_score += task.exam_points
-        max_score += int(task.exam_points or 0)
+            total_score += max_points_effective
+        max_score += max_points_effective
         
         tasks_list.append({
             'task': task,
@@ -1319,7 +1323,9 @@ def auto_expire_assignment_if_needed(assignment: Assignment):
                 sub.score = int(sub.primary_score or 0)
                 sub.save(update_fields=['score', 'primary_score'])
             else:
-                sub.score = int(max_points_effective) if sub.is_correct else 0
+                # Для тестовой части (в т.ч. ОГЭ физика) возможны частичные баллы за краткий ответ.
+                # Пересчитываем по сохранённому user_answer.
+                sub.score = int(score_short_answer(t, getattr(sub, "user_answer", "") or "") or 0)
                 sub.save(update_fields=['score'])
 
         record_task_log(assignment.student, t, sub, assignment, 0)
@@ -1364,7 +1370,6 @@ def student_solve_assignment(request, assignment_id):
         correct_count = 0
         subs_by_task_id = {}
         for task in tasks:
-            max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
             is_extended = is_extended_answer_task(task)
             if is_extended:
                 sub, _created = Submission.objects.get_or_create(
@@ -1382,11 +1387,9 @@ def student_solve_assignment(request, assignment_id):
                 continue
 
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
-            
-            # Нормализация: заменяем запятые на точки для сравнения
-            norm_user_answer = user_answer.lower().replace(',', '.')
-            norm_correct_answer = task.correct_answer.lower().replace(',', '.')
-            is_correct = (norm_user_answer == norm_correct_answer)
+            points_earned = int(score_short_answer(task, user_answer) or 0)
+            max_points_effective = int(get_max_points_effective(task) or 0)
+            is_correct = (points_earned == max_points_effective)
             
             # Ищем старое решение или создаем новое (с привязкой к варианту)
             sub, created = Submission.objects.get_or_create(
@@ -1396,7 +1399,7 @@ def student_solve_assignment(request, assignment_id):
                 defaults={
                     'user_answer': user_answer,
                     'is_correct': is_correct,
-                    'score': max_points_effective if is_correct else 0
+                    'score': points_earned
                 }
             )
             
@@ -1404,7 +1407,7 @@ def student_solve_assignment(request, assignment_id):
                 # Если уже было, просто обновим (вдруг ученик поменял ответ при общем сабмите)
                 sub.user_answer = user_answer
                 sub.is_correct = is_correct
-                sub.score = max_points_effective if is_correct else 0
+                sub.score = points_earned
                 sub.save()
 
             subs_by_task_id[task.id] = sub
@@ -1455,7 +1458,7 @@ def student_solve_assignment(request, assignment_id):
             if sub:
                 is_extended = is_extended_answer_task(t)
                 if not is_extended:
-                    student_primary += max_points_effective if sub.is_correct else 0
+                    student_primary += int(getattr(sub, "score", 0) or 0)
                 else:
                     student_primary += int(sub.primary_score or 0)
 
