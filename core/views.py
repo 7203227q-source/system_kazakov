@@ -1675,8 +1675,27 @@ def student_history(request):
         Submission.objects.filter(student=request.user)
         .select_related('task', 'assignment')
         .prefetch_related('comments', 'comments__author')
-        .order_by('-created_at')
+        .order_by('-created_at', '-id')
     )
+
+    submission_id_raw = (request.GET.get("submission_id") or "").strip()
+    page_raw = (request.GET.get("page") or "").strip()
+
+    # Deep-link: если submission_id находится не на текущей странице пагинации, перенаправляем на нужную.
+    if submission_id_raw.isdigit():
+        target = Submission.objects.filter(
+            id=int(submission_id_raw),
+            student=request.user,
+        ).only("id", "created_at").first()
+        if target:
+            from django.db.models import Q
+            newer_count = submissions_qs.filter(
+                Q(created_at__gt=target.created_at) |
+                (Q(created_at=target.created_at) & Q(id__gt=target.id))
+            ).count()
+            target_page = (newer_count // 20) + 1
+            if (not page_raw) or (page_raw.isdigit() and int(page_raw) != target_page):
+                return redirect(f"{reverse('student_history')}?page={target_page}&submission_id={target.id}")
 
     per_page = 20
     page_number = (request.GET.get("page") or "1").strip()
@@ -1710,6 +1729,7 @@ def student_history(request):
         {
             'submissions': submissions,
             'page_obj': page_obj,
+            'submission_id': submission_id_raw,
             'total_xp': total_xp,
             'total_level': total_level,
             'unread_tutor_replies_total': unread_tutor_replies_total,

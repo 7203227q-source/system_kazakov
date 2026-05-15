@@ -260,6 +260,22 @@
         if (el) {
             el.classList.toggle('hidden');
         }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const params = new URLSearchParams(window.location.search);
+        const submissionId = params.get('submission_id');
+        if (!submissionId) return;
+
+        // раскрываем блок вопросов и ответов + скроллим к нему
+        toggleComments(`sub_${submissionId}`);
+        const el = document.getElementById(`comments_sub_${submissionId}`);
+        if (el) {
+            el.classList.remove('hidden');
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            el.classList.add('ring-2', 'ring-indigo-400', 'ring-offset-2');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-400', 'ring-offset-2'), 2500);
+        }
+    });
     }
 </script>
 
