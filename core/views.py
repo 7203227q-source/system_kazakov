@@ -4584,6 +4584,11 @@ def api_verify_with_ai(request, submission_id):
     if not api_key or not model:
         return JsonResponse({'error': 'ai_not_configured'}, status=400)
 
+    # Структурированный вердикт (по умолчанию пустой; заполняется если модель вернула поля)
+    recognized_solution = ""
+    mistakes = []
+    verdict = []
+
     try:
         from .http_headers import require_ascii
         require_ascii(api_key, "OPENROUTER_API_KEY")
@@ -4690,14 +4695,16 @@ def api_verify_with_ai(request, submission_id):
             "Если решение полностью верное — primary_score = максимум.\n"
             "Если решение частично верное — поставь частичный балл.\n"
             "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
-            "В feedback обязательно коротко объясни, за что сняты баллы, в формате:\n"
-            "- Что верно:\n"
-            "- Ошибки:\n"
-            "- За что сняты баллы:\n"
-            "- Что исправить:\n"
-            "В поле feedback используй Markdown. Все формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
-            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши LaTeX (используй двойной обратный слэш).\n"
-            "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
+            "\n"
+            "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
+            "- primary_score: number\n"
+            "- is_correct: boolean\n"
+            "- recognized_solution: string (как ты понял ход решения ученика; допускаются переносы строк)\n"
+            "- mistakes: array of strings (ошибки/замечания; каждый элемент — отдельный пункт)\n"
+            "- verdict: array of strings (итоговый вердикт и рекомендации; каждый элемент — отдельный абзац)\n"
+            "- feedback: string (опционально; если заполнишь — это краткий общий текст)\n"
+            "\n"
+            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши в LaTeX (используй двойной обратный слэш)."
         )
 
         if task_text:
@@ -4788,11 +4795,47 @@ def api_verify_with_ai(request, submission_id):
         is_correct = bool(ic_val)
         feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
 
+        # Структурные поля (могут отсутствовать, тогда оставляем дефолты)
+        recognized_solution = str(parsed.get("recognized_solution") or "").strip()
+
+        mistakes = parsed.get("mistakes") or []
+        if isinstance(mistakes, str):
+            mistakes = [mistakes]
+        mistakes = [str(x).strip() for x in mistakes if str(x).strip()]
+
+        verdict = parsed.get("verdict") or []
+        if isinstance(verdict, str):
+            verdict = [verdict]
+        verdict = [str(x).strip() for x in verdict if str(x).strip()]
+
+        # Если модель отдала структурные поля, но не заполнила feedback — собираем человекочитаемый fallback
+        if (recognized_solution or mistakes or verdict) and not feedback.strip():
+            parts = []
+            if recognized_solution:
+                parts.append("Решение (как распознано):\n" + recognized_solution)
+            if mistakes:
+                parts.append("Ошибки и замечания:\n" + "\n".join(f"- {m}" for m in mistakes))
+            if verdict:
+                parts.append("Итоговый вердикт:\n" + "\n\n".join(verdict))
+            feedback = "\n\n".join(parts).strip()
+
         # Обновляем submission (ИИ-оценка)
         submission.primary_score = primary_score
         submission.is_correct = is_correct
         submission.ai_feedback = feedback
-        submission.save(update_fields=["primary_score", "is_correct", "ai_feedback"])
+        submission.ai_recognized_solution = recognized_solution or None
+        submission.ai_mistakes_json = pyjson.dumps(mistakes, ensure_ascii=False) if mistakes else None
+        submission.ai_verdict_json = pyjson.dumps(verdict, ensure_ascii=False) if verdict else None
+        submission.save(
+            update_fields=[
+                "primary_score",
+                "is_correct",
+                "ai_feedback",
+                "ai_recognized_solution",
+                "ai_mistakes_json",
+                "ai_verdict_json",
+            ]
+        )
 
         # XP и аналитика ученика
         points_earned = primary_score
@@ -4836,6 +4879,9 @@ def api_verify_with_ai(request, submission_id):
             'primary_score': primary_score,
             'feedback': feedback,
             'feedback_html': sanitize_ai_feedback_html(feedback),
+            'recognized_solution': recognized_solution,
+            'mistakes': mistakes,
+            'verdict': verdict,
             'is_correct': is_correct,
             'xp_gained': xp_gained,
             'solution_html': solution_html,
