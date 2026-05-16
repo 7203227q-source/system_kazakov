@@ -1,61 +1,16 @@
 import os
 import time
 
-import requests
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
 from django.utils import timezone
 
 from core.http_headers import require_ascii, sanitize_header_value
-from core.models import ExamFormat, Task, TaskTag
+from core.models import ExamFormat, Task
 from core.services_task_ai_annotation import (
     ANNOTATION_VERSION,
-    build_task_annotation_prompt,
-    parse_task_annotation,
+    annotate_task_with_ai,
+    recompute_percentiles_for_exam_format,
 )
-
-
-def _percentiles(values):
-    """
-    values: list of tuples (id, raw_score)
-    returns dict id -> percentile int 0..100
-    """
-    n = len(values)
-    if n <= 0:
-        return {}
-    if n == 1:
-        return {values[0][0]: 50}
-    # stable order by (raw, id)
-    values = sorted(values, key=lambda x: (x[1], x[0]))
-    out = {}
-    for i, (tid, _raw) in enumerate(values):
-        out[tid] = int(round(100.0 * (i / (n - 1))))
-    return out
-
-
-def recompute_percentiles_for_exam_format(exam_format_id: int):
-    qs = Task.objects.filter(task_type__exam_format_id=exam_format_id, ai_difficulty_raw__isnull=False)
-    rows = list(qs.values_list("id", "ai_difficulty_raw"))
-    exam_pct = _percentiles(rows)
-    if exam_pct:
-        for tid, pct in exam_pct.items():
-            Task.objects.filter(id=tid).update(ai_difficulty_exam_percentile=pct)
-
-    # per task_type
-    type_ids = list(
-        Task.objects.filter(task_type__exam_format_id=exam_format_id)
-        .exclude(task_type_id__isnull=True)
-        .values_list("task_type_id", flat=True)
-        .distinct()
-    )
-    for tt_id in type_ids:
-        tqs = Task.objects.filter(task_type_id=tt_id, ai_difficulty_raw__isnull=False)
-        rows2 = list(tqs.values_list("id", "ai_difficulty_raw"))
-        tpct = _percentiles(rows2)
-        if not tpct:
-            continue
-        for tid, pct in tpct.items():
-            Task.objects.filter(id=tid).update(ai_difficulty_type_percentile=pct)
 
 
 class Command(BaseCommand):
@@ -129,71 +84,20 @@ class Command(BaseCommand):
             self.stdout.write(f"Batch {i//batch_size + 1}: {len(batch)} tasks")
 
             for task in batch:
-                tt = task.task_type
-                ef = tt.exam_format if tt else None
-                exam_label = f"{ef.subject.name} · {ef.name} {ef.year}" if ef else "—"
-                type_label = f"№{tt.number} {tt.name}" if tt else "—"
-                max_points = int(getattr(tt, "max_points", 0) or 0) if tt else 0
-
-                prompt = build_task_annotation_prompt(
-                    task=task,
-                    exam_format_label=exam_label,
-                    task_type_label=type_label,
-                    max_points=max_points,
-                )
-
                 if dry_run:
                     self.stdout.write(f"[dry-run] task_id={task.id}")
                     continue
 
-                res = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": referer,
-                        "X-Title": title,
-                    },
-                    json={
-                        "model": "google/gemini-2.0-flash",
-                        "messages": [
-                            {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
-                            {"role": "user", "content": prompt},
-                        ],
-                        "response_format": {"type": "json_object"},
-                    },
-                    timeout=60,
-                )
-                if res.status_code != 200:
-                    raise CommandError(f"OpenRouter error: {res.status_code} {res.text[:500]}")
-
-                data = res.json()
-                content = ""
                 try:
-                    content = data["choices"][0]["message"]["content"]
-                except Exception:
-                    content = ""
-
-                ann = parse_task_annotation(content)
-
-                with transaction.atomic():
-                    task.ai_difficulty_raw = ann.difficulty_raw
-                    task.ai_annotated_at = timezone.now()
-                    task.ai_annotation_version = annotation_version
-                    task.save(update_fields=["ai_difficulty_raw", "ai_annotated_at", "ai_annotation_version"])
-
-                    tag_ids = []
-                    for name in ann.methods:
-                        tag, _ = TaskTag.objects.get_or_create(kind="method", name=name)
-                        tag_ids.append(tag.id)
-                    for name in ann.properties:
-                        tag, _ = TaskTag.objects.get_or_create(kind="property", name=name)
-                        tag_ids.append(tag.id)
-                    for name in ann.topics:
-                        tag, _ = TaskTag.objects.get_or_create(kind="topic", name=name)
-                        tag_ids.append(tag.id)
-
-                    task.ai_tags.set(tag_ids)
+                    annotate_task_with_ai(
+                        task=task,
+                        api_key=api_key,
+                        referer=referer,
+                        title=title,
+                        annotation_version=annotation_version,
+                    )
+                except Exception as e:
+                    raise CommandError(str(e))
 
                 # простая пауза для снижения rate-limit (можно улучшить позже)
                 time.sleep(0.1)
@@ -209,4 +113,3 @@ class Command(BaseCommand):
             recompute_percentiles_for_exam_format(int(ef_id))
 
         self.stdout.write(self.style.SUCCESS("Done."))
-
