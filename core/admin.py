@@ -13,6 +13,7 @@ from .models import (
     Submission,
     SystemConfig,
     Task,
+    TaskVariant,
     TaskType,
     Topic,
     User,
@@ -37,6 +38,17 @@ class CustomUserAdmin(UserAdmin):
     list_display = ['username', 'email', 'first_name', 'last_name', 'role']
     list_filter = ['role', 'is_staff', 'is_active']
 
+
+class TaskVariantClassicInline(admin.StackedInline):
+    model = TaskVariant
+    extra = 1
+    max_num = 1
+    fields = ("theme", "content", "solution")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(theme="classic")
+
+
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
     list_display = (
@@ -53,6 +65,7 @@ class TaskAdmin(admin.ModelAdmin):
     list_filter = ('topic__subject', 'task_type__exam_format', 'task_type', 'difficulty', 'ai_annotation_version')
     search_fields = ('fipi_id', 'topic__name')
     actions = ["ai_annotate_difficulty_filtered_25", "ai_recompute_ai_percentiles_filtered"]
+    inlines = [TaskVariantClassicInline]
 
     @admin.action(description="ИИ: разметить сложность (по текущему фильтру, 25 шт.)")
     def ai_annotate_difficulty_filtered_25(self, request, queryset):
