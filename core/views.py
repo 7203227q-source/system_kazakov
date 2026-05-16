@@ -870,8 +870,24 @@ def student_dashboard(request):
     
     if active_subject_id:
         pending_assignments = pending_assignments.filter(tasks__topic__subject_id=active_subject_id).distinct()
-        
-    pending_assignments = pending_assignments.order_by('-created_at')
+
+    # Дедлайны: подсветка "срок скоро" (порог: 1 день) + сортировка по ближайшему due_date (null внизу).
+    import datetime as _dt
+    today = timezone.now().date()
+    soon = today + _dt.timedelta(days=1)
+
+    pending_assignments = pending_assignments.annotate(
+        due_overdue=models.Case(
+            models.When(due_date__isnull=False, due_date__lt=today, then=models.Value(True)),
+            default=models.Value(False),
+            output_field=models.BooleanField(),
+        ),
+        due_soon=models.Case(
+            models.When(due_date__isnull=False, due_date__gte=today, due_date__lte=soon, then=models.Value(True)),
+            default=models.Value(False),
+            output_field=models.BooleanField(),
+        ),
+    ).order_by(models.F("due_date").asc(nulls_last=True), "-created_at")
 
     # Gamification calculations (total across subjects)
     latest_snapshot = None
@@ -5626,7 +5642,22 @@ def api_student_pending_assignments(request):
     subject_id_raw = (request.GET.get("subject_id") or "").strip()
     if subject_id_raw.isdigit():
         qs = qs.filter(tasks__topic__subject_id=int(subject_id_raw)).distinct()
-    qs = qs.order_by("-created_at")[:50]
+    import datetime as _dt
+    today = timezone.now().date()
+    soon = today + _dt.timedelta(days=1)
+
+    qs = qs.annotate(
+        due_overdue=models.Case(
+            models.When(due_date__isnull=False, due_date__lt=today, then=models.Value(True)),
+            default=models.Value(False),
+            output_field=models.BooleanField(),
+        ),
+        due_soon=models.Case(
+            models.When(due_date__isnull=False, due_date__gte=today, due_date__lte=soon, then=models.Value(True)),
+            default=models.Value(False),
+            output_field=models.BooleanField(),
+        ),
+    ).order_by(models.F("due_date").asc(nulls_last=True), "-created_at")[:50]
 
     assignment_ids = list(qs.values_list("id", flat=True))
     unread_by_assignment = {
@@ -5642,10 +5673,16 @@ def api_student_pending_assignments(request):
     }
     items = []
     for a in qs:
+        due_status = "none"
+        if a.due_overdue:
+            due_status = "overdue"
+        elif a.due_soon:
+            due_status = "soon"
         items.append({
             "id": a.id,
             "title": a.title,
             "due_date": a.due_date.isoformat() if a.due_date else None,
+            "due_status": due_status,
             "is_verified": bool(getattr(a, "is_verified", False)),
             "tasks_count": a.tasks.count(),
             "unread_tutor_replies_count": int(unread_by_assignment.get(a.id, 0) or 0),

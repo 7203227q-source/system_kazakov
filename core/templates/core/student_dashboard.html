@@ -242,6 +242,15 @@
                                         Контрольная
                                     </span>
                                     {% endif %}
+                                    {% if assignment.due_overdue %}
+                                    <span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 uppercase tracking-wider">
+                                        Просрочено
+                                    </span>
+                                    {% elif assignment.due_soon %}
+                                    <span class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 uppercase tracking-wider">
+                                        Срок сегодня/завтра
+                                    </span>
+                                    {% endif %}
                                     {% if assignment.unread_tutor_replies_count %}
                                     <a href="{% url 'student_history' %}" class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">
                                         Ответы: {{ assignment.unread_tutor_replies_count }}
@@ -681,6 +690,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const isVerified = !!a.is_verified;
                 const due = fmtDate(a.due_date);
                 const replies = parseInt(a.unread_tutor_replies_count || 0, 10) || 0;
+                const dueStatus = String(a.due_status || '');
+                const dueBadge = (dueStatus === 'overdue')
+                    ? `<span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 uppercase tracking-wider">Просрочено</span>`
+                    : (dueStatus === 'soon')
+                        ? `<span class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 uppercase tracking-wider">Срок сегодня/завтра</span>`
+                        : '';
 
                 const row = document.createElement('div');
                 row.className = 'p-5 border-b border-gray-100 flex items-center hover:bg-gray-50 transition';
@@ -698,6 +713,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="flex items-center space-x-2">
                             <h4 class="font-bold text-gray-800">${a.title || ''}</h4>
                             ${isVerified ? `<span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-red-200">Контрольная</span>` : ''}
+                            ${dueBadge}
                             ${replies ? `<a href="/student/history/" class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">Ответы: ${replies}</a>` : ''}
                         </div>
                         <p class="text-sm text-gray-500">
