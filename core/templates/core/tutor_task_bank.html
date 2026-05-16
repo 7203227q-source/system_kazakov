@@ -589,9 +589,11 @@
         });
 
         let regenTaskId = null;
+        let regenPreviewLogId = null;
 
         function openRegenModal(taskId) {
             regenTaskId = taskId;
+            regenPreviewLogId = null;
             document.getElementById('regen-overlay').classList.remove('hidden');
             document.getElementById('regen-modal').classList.remove('hidden');
 
@@ -653,6 +655,7 @@
             }
 
             const p = data.preview || {};
+            regenPreviewLogId = data.preview_log_id || null;
             document.getElementById('regen-preview').innerHTML = p.content_html || '';
             document.getElementById('regen-preview-answer').textContent = p.correct_answer || '';
             if (p.solution_html) {
@@ -676,6 +679,7 @@
                 mode: document.getElementById('regen-mode').value,
                 model: document.getElementById('regen-model').value,
                 prompt_template: document.getElementById('regen-prompt').value,
+                preview_log_id: regenPreviewLogId,
             };
 
             const res = await fetch(url, {

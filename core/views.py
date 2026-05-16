@@ -3553,6 +3553,8 @@ def admin_task_regen_preview(request, task_id):
     prompt_template = payload.get('prompt_template')
 
     try:
+        import uuid
+
         if not model:
             from .models import SubjectAIConfig
             cfg = SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id).select_related('task_regen_text_model').first()
@@ -3562,17 +3564,27 @@ def admin_task_regen_preview(request, task_id):
         if not model:
             raise ValueError("Не выбрана модель OpenRouter для регенерации текста (настройки по предмету).")
 
+        nonce = uuid.uuid4().hex
+        regen_prompt_suffix = (
+            "\n\n"
+            "ВАЖНО: обязательно измени ВСЕ числовые значения по сравнению с ORIGINAL_CONTENT. "
+            "Не повторяй исходные числа.\n"
+            f"REGEN_NONCE={nonce}\n"
+        )
+        prompt_template_effective = (prompt_template or "").rstrip() + regen_prompt_suffix
+
         from .openrouter_client import generate_task_regeneration
-        result = generate_task_regeneration(task=task, mode=mode, model=model, prompt_template=prompt_template)
+        result = generate_task_regeneration(task=task, mode=mode, model=model, prompt_template=prompt_template_effective)
         from .answer_format import normalize_regen_correct_answer
         result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
-        TaskGenerationLog.objects.create(
+        preview_log = TaskGenerationLog.objects.create(
             task=task,
             user=request.user,
             provider='openrouter',
             model=model,
             mode=mode,
             prompt_template=prompt_template,
+            prompt_rendered=prompt_template_effective,
             response_raw=json.dumps(result, ensure_ascii=False),
             result_content_html=result.get('content_html'),
             result_solution_html=result.get('solution_html'),
@@ -3588,7 +3600,7 @@ def admin_task_regen_preview(request, task_id):
             'solution_html': result.get('solution_html') or '',
             'correct_answer': result.get('correct_answer') or '',
         }
-        return JsonResponse({'preview': preview})
+        return JsonResponse({'preview': preview, 'preview_log_id': preview_log.id})
     except Exception as e:
         TaskGenerationLog.objects.create(
             task=task,
@@ -3628,8 +3640,6 @@ def admin_task_regen_apply(request, task_id):
     except Exception:
         payload = {}
 
-    from .openrouter_client import generate_task_regeneration
-
     mode = payload.get('mode', 'full')
     model = (payload.get('model') or '').strip()
     if not model:
@@ -3642,12 +3652,49 @@ def admin_task_regen_apply(request, task_id):
         return JsonResponse({'error': 'Не выбрана модель OpenRouter для регенерации текста (настройки по предмету).'}, status=400)
 
     try:
-        result = generate_task_regeneration(
-            task=task,
-            mode=mode,
-            model=model,
-            prompt_template=payload.get('prompt_template'),
-        )
+        preview_log_id_raw = payload.get("preview_log_id")
+        if str(preview_log_id_raw or "").isdigit():
+            preview_log = (
+                TaskGenerationLog.objects
+                .filter(
+                    id=int(preview_log_id_raw),
+                    task=task,
+                    user=request.user,
+                    status="success",
+                )
+                .first()
+            )
+            if not preview_log:
+                raise ValueError("Неверный preview_log_id")
+            try:
+                result = json.loads(preview_log.response_raw or "{}")
+            except Exception:
+                raise ValueError("Невозможно прочитать результат предпросмотра")
+            if not isinstance(result, dict):
+                raise ValueError("Невалидный результат предпросмотра")
+            if preview_log.model:
+                model = preview_log.model
+            if preview_log.mode:
+                mode = preview_log.mode
+            prompt_template_effective = preview_log.prompt_rendered or payload.get("prompt_template")
+        else:
+            import uuid
+            from .openrouter_client import generate_task_regeneration
+
+            nonce = uuid.uuid4().hex
+            regen_prompt_suffix = (
+                "\n\n"
+                "ВАЖНО: обязательно измени ВСЕ числовые значения по сравнению с ORIGINAL_CONTENT. "
+                "Не повторяй исходные числа.\n"
+                f"REGEN_NONCE={nonce}\n"
+            )
+            prompt_template_effective = (payload.get("prompt_template") or "").rstrip() + regen_prompt_suffix
+            result = generate_task_regeneration(
+                task=task,
+                mode=mode,
+                model=model,
+                prompt_template=prompt_template_effective,
+            )
         from .answer_format import normalize_regen_correct_answer
         result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
     except Exception as e:
@@ -3681,6 +3728,7 @@ def admin_task_regen_apply(request, task_id):
         model=model,
         mode=mode,
         prompt_template=payload.get('prompt_template'),
+        prompt_rendered=locals().get("prompt_template_effective"),
         response_raw=json.dumps(result, ensure_ascii=False),
         result_content_html=result.get('content_html'),
         result_solution_html=result.get('solution_html'),

@@ -34,26 +34,38 @@ class AdminTaskRegenExactAnswerTests(TestCase):
         )
 
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["preview"]["correct_answer"], "0.175")
+        payload = res.json()
+        self.assertEqual(payload["preview"]["correct_answer"], "0.175")
+        self.assertTrue(bool(payload.get("preview_log_id")))
 
-    @patch("core.openrouter_client.generate_task_regeneration")
-    def test_apply_saves_normalized_correct_answer(self, gen):
-        gen.return_value = {
-            "content_html": "<p>x</p>",
-            "solution_html": "<p>y</p>",
-            "correct_answer": "0.2917",
-            "notes": "exact_fraction=7/40",
-        }
-
+    def test_apply_uses_preview_log_id_and_does_not_regenerate(self):
         self.client.force_login(self.admin)
-        url = reverse("admin_task_regen_apply", args=[self.task.id])
-        res = self.client.post(
-            url,
-            data=json.dumps({"mode": "full", "model": "m"}),
-            content_type="application/json",
-        )
+        preview_url = reverse("admin_task_regen_preview", args=[self.task.id])
+        with patch("core.openrouter_client.generate_task_regeneration") as gen_preview:
+            gen_preview.return_value = {
+                "content_html": "<p>x</p>",
+                "solution_html": "<p>y</p>",
+                "correct_answer": "0.2917",
+                "notes": "exact_fraction=7/40",
+            }
+            preview_res = self.client.post(
+                preview_url,
+                data=json.dumps({"mode": "full", "model": "m"}),
+                content_type="application/json",
+            )
+        self.assertEqual(preview_res.status_code, 200)
+        preview_log_id = preview_res.json().get("preview_log_id")
+        self.assertTrue(bool(preview_log_id))
+
+        apply_url = reverse("admin_task_regen_apply", args=[self.task.id])
+        with patch("core.openrouter_client.generate_task_regeneration") as gen_apply:
+            gen_apply.side_effect = AssertionError("generate_task_regeneration should not be called on apply")
+            res = self.client.post(
+                apply_url,
+                data=json.dumps({"mode": "full", "model": "m", "preview_log_id": preview_log_id}),
+                content_type="application/json",
+            )
 
         self.assertEqual(res.status_code, 200)
         self.task.refresh_from_db()
         self.assertEqual(self.task.correct_answer, "0.175")
-
