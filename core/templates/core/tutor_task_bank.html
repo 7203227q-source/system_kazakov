@@ -437,7 +437,7 @@
                 document.getElementById('regen-preview-solution-wrap').classList.add('hidden');
                 document.getElementById('regen-preview-solution').innerHTML = '';
             }
-            status.textContent = 'Готово';
+            status.textContent = p.error || 'Готово';
         }
 
         async function regenApply() {

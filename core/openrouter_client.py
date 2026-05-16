@@ -18,6 +18,16 @@ def generate_task_regeneration(*, task, mode, model, prompt_template=None):
     if not prompt:
         prompt = "Return JSON with keys: content_html, solution_html, correct_answer, notes."
 
+    technical_suffix = (
+        "\n\n"
+        "TECHNICAL REQUIREMENTS:\n"
+        "1) Return ONLY valid JSON. No markdown.\n"
+        "2) In notes, include: exact_fraction=a/b where a and b are integers, b>0.\n"
+        "3) correct_answer must be an integer or a terminating decimal WITHOUT rounding/approximation.\n"
+        "4) If the answer would be non-terminating (periodic) or irrational, change the numbers in the task.\n"
+    )
+    prompt = f"{prompt}{technical_suffix}"
+
     messages = [
         {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
         {"role": "user", "content": prompt},
