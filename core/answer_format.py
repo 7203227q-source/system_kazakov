@@ -60,6 +60,9 @@ def exact_fraction_to_decimal_str(frac: str) -> str:
         bb5 //= 5
         k5 += 1
 
+    if k2 > 0 and k2 == k5:
+        raise ValueError("Looks like rounding: denominator is 10^k")
+
     k = max(k2, k5)
     mul = (2 ** (k - k2)) * (5 ** (k - k5))
     num = a * mul
@@ -79,4 +82,3 @@ def exact_fraction_to_decimal_str(frac: str) -> str:
 def normalize_regen_correct_answer(*, notes: str) -> str:
     frac = extract_exact_fraction(notes)
     return exact_fraction_to_decimal_str(frac)
-
