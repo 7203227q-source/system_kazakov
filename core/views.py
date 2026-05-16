@@ -438,6 +438,22 @@ def student_assignment_summary(request, assignment_id):
                 points_earned = 1 if sub.is_correct else 0
             else:
                 points_earned = sub.primary_score or 0
+
+        status = "unattempted"
+        user_answer_display = "—"
+        if sub:
+            has_answer = bool((sub.user_answer or "").strip()) or bool(sub.image_url)
+            if sub.is_correct is True:
+                status = "correct"
+            elif sub.is_correct is False:
+                status = "incorrect"
+            elif has_answer:
+                status = "pending"
+
+            if (sub.user_answer or "").strip():
+                user_answer_display = (sub.user_answer or "").strip()
+            elif sub.image_url:
+                user_answer_display = "фото"
                 
         total_primary_earned += points_earned
         max_primary_possible += task.exam_points
@@ -450,7 +466,9 @@ def student_assignment_summary(request, assignment_id):
         tasks_list.append({
             'task': task,
             'submission': sub,
-            'points_earned': points_earned
+            'points_earned': points_earned,
+            'status': status,
+            'user_answer_display': user_answer_display,
         })
         
     # Перевод во вторичные (если максимальный балл <= 32, используем таблицу)
@@ -499,6 +517,12 @@ def student_solve_assignment(request, assignment_id):
         correct_count = 0
         for task in tasks:
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
+
+            sub = Submission.objects.filter(student=request.user, task=task, assignment=assignment).first()
+            if not user_answer:
+                if action == 'finish' and sub and (sub.user_answer or sub.image_url):
+                    record_task_log(request.user, task, sub, assignment, time_spent_per_task)
+                continue
             
             # Нормализация: заменяем запятые на точки для сравнения
             norm_user_answer = user_answer.lower().replace(',', '.')
@@ -506,23 +530,22 @@ def student_solve_assignment(request, assignment_id):
             is_correct = (norm_user_answer == norm_correct_answer)
             
             # Ищем старое решение или создаем новое (с привязкой к варианту)
-            sub, created = Submission.objects.get_or_create(
-                student=request.user,
-                task=task,
-                assignment=assignment,
-                defaults={
-                    'user_answer': user_answer,
-                    'is_correct': is_correct,
-                    'score': task.exam_points if is_correct else 0
-                }
-            )
-            
-            if not created:
-                # Если уже было, просто обновим (вдруг ученик поменял ответ при общем сабмите)
+            if sub:
+                created = False
                 sub.user_answer = user_answer
                 sub.is_correct = is_correct
                 sub.score = task.exam_points if is_correct else 0
                 sub.save()
+            else:
+                created = True
+                sub = Submission.objects.create(
+                    student=request.user,
+                    task=task,
+                    assignment=assignment,
+                    user_answer=user_answer,
+                    is_correct=is_correct,
+                    score=task.exam_points if is_correct else 0
+                )
             
             if is_correct:
                 correct_count += 1
@@ -549,7 +572,7 @@ def student_solve_assignment(request, assignment_id):
                 if t.exam_points == 1:
                     student_primary += 1 if sub.is_correct else 0
                 else:
-                    student_primary += sub.primary_score
+                    student_primary += sub.primary_score or 0
 
         request.user.save()
         

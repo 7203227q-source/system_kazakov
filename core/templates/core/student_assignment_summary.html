@@ -63,9 +63,12 @@
             </div>
             <div class="divide-y divide-gray-100">
                 {% for item in tasks_list %}
-                <div class="px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 {% if item.submission and item.submission.is_correct %}bg-green-50/40{% else %}bg-red-50/40{% endif %}">
+                <div class="px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 {% if item.status == 'correct' %}bg-green-50/40{% elif item.status == 'incorrect' %}bg-red-50/40{% elif item.status == 'pending' %}bg-yellow-50/40{% else %}bg-gray-50/40{% endif %}">
                     <div class="flex items-center gap-3 min-w-0">
-                        <span class="text-sm font-black {% if item.submission and item.submission.is_correct %}text-green-700{% else %}text-red-700{% endif %}">№{{ forloop.counter }}</span>
+                        <span class="text-sm font-black {% if item.status == 'correct' %}text-green-700{% elif item.status == 'incorrect' %}text-red-700{% elif item.status == 'pending' %}text-yellow-700{% else %}text-gray-600{% endif %}">№{{ forloop.counter }}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap {% if item.status == 'correct' %}bg-green-100 text-green-800{% elif item.status == 'incorrect' %}bg-red-100 text-red-800{% elif item.status == 'pending' %}bg-yellow-100 text-yellow-900{% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {% if item.status == 'correct' %}Верно{% elif item.status == 'incorrect' %}Ошибка{% elif item.status == 'pending' %}На проверке{% else %}Не решено{% endif %}
+                        </span>
                         <span class="text-sm text-gray-800 truncate">
                             {% if item.task.task_type %}
                                 Тип {{ item.task.task_type.number }} — {{ item.task.task_type.name }}
@@ -77,8 +80,8 @@
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                         <div class="text-gray-600">
                             <span class="text-xs text-gray-500 mr-1">Ответ:</span>
-                            <span class="font-mono font-bold {% if item.submission and item.submission.is_correct %}text-green-700{% else %}text-red-700{% endif %}">
-                                {% if item.submission and item.submission.user_answer %}{{ item.submission.user_answer }}{% else %}—{% endif %}
+                            <span class="font-mono font-bold {% if item.status == 'correct' %}text-green-700{% elif item.status == 'incorrect' %}text-red-700{% elif item.status == 'pending' %}text-yellow-800{% else %}text-gray-600{% endif %}">
+                                {{ item.user_answer_display }}
                             </span>
                         </div>
                         <div class="text-gray-600">
@@ -95,15 +98,21 @@
         <h3 class="text-lg font-bold text-gray-800 mb-4">Подробный разбор</h3>
         <div class="space-y-6">
             {% for item in tasks_list %}
-            <div class="bg-white rounded-xl shadow-sm border {% if item.submission and item.submission.is_correct %}border-green-200{% else %}border-red-200{% endif %} overflow-hidden task-card">
-                <div class="{% if item.submission and item.submission.is_correct %}bg-green-50{% else %}bg-red-50{% endif %} px-6 py-3 flex justify-between items-center border-b {% if item.submission and item.submission.is_correct %}border-green-100{% else %}border-red-100{% endif %}">
+            <div class="bg-white rounded-xl shadow-sm border {% if item.status == 'correct' %}border-green-200{% elif item.status == 'incorrect' %}border-red-200{% elif item.status == 'pending' %}border-yellow-200{% else %}border-gray-200{% endif %} overflow-hidden task-card">
+                <div class="{% if item.status == 'correct' %}bg-green-50{% elif item.status == 'incorrect' %}bg-red-50{% elif item.status == 'pending' %}bg-yellow-50{% else %}bg-gray-50{% endif %} px-6 py-3 flex justify-between items-center border-b {% if item.status == 'correct' %}border-green-100{% elif item.status == 'incorrect' %}border-red-100{% elif item.status == 'pending' %}border-yellow-100{% else %}border-gray-100{% endif %}">
                     <div class="flex items-center space-x-3">
-                        {% if item.submission and item.submission.is_correct %}
+                        {% if item.status == 'correct' %}
                             <i class="fas fa-check-circle text-green-600 text-lg"></i>
                             <span class="text-sm font-bold text-green-800">Задача №{{ forloop.counter }} (Верно)</span>
-                        {% else %}
+                        {% elif item.status == 'incorrect' %}
                             <i class="fas fa-times-circle text-red-500 text-lg"></i>
                             <span class="text-sm font-bold text-red-800">Задача №{{ forloop.counter }} (Ошибка)</span>
+                        {% elif item.status == 'pending' %}
+                            <i class="fas fa-clock text-yellow-600 text-lg"></i>
+                            <span class="text-sm font-bold text-yellow-900">Задача №{{ forloop.counter }} (На проверке)</span>
+                        {% else %}
+                            <i class="fas fa-minus-circle text-gray-500 text-lg"></i>
+                            <span class="text-sm font-bold text-gray-700">Задача №{{ forloop.counter }} (Не решено)</span>
                         {% endif %}
                     </div>
                     {% if item.task.task_type %}
@@ -121,11 +130,13 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div>
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Ваш ответ:</p>
-                            <div class="font-mono text-lg bg-white px-3 py-2 rounded-lg border border-gray-200 {% if not item.submission or not item.submission.user_answer %}text-gray-400 italic{% endif %}">
-                                {% if item.submission and item.submission.user_answer %}
-                                    {{ item.submission.user_answer }}
-                                {% else %}
+                            <div class="font-mono text-lg bg-white px-3 py-2 rounded-lg border border-gray-200 {% if item.status == 'unattempted' %}text-gray-400 italic{% endif %}">
+                                {% if item.status == 'unattempted' %}
                                     (нет ответа)
+                                {% elif item.user_answer_display == 'фото' %}
+                                    (фото загружено)
+                                {% else %}
+                                    {{ item.user_answer_display }}
                                 {% endif %}
                             </div>
                         </div>
