@@ -213,19 +213,45 @@ def update_student_analytics(student, subject):
     snapshot.predicted_exam_score = round(predicted_score, 2)
     
     # 4. Анализ разрыва (Gap Analysis)
-    solo_avg = TaskLog.objects.filter(student=student, is_verified=False).aggregate(Avg('score'))['score__avg'] or 0
-    verified_avg = TaskLog.objects.filter(student=student, is_verified=True).aggregate(Avg('score'))['score__avg'] or 0
-    
+    def _avg_score_pct(qs):
+        logs = list(qs.select_related("task").order_by("-created_at")[:100])
+        if not logs:
+            return 0.0
+        total = 0.0
+        n = 0
+        for log in logs:
+            max_points = float(getattr(log.task, "exam_points", 0) or 0.0)
+            if max_points <= 0:
+                continue
+            total += (float(log.score or 0.0) / max_points) * 100.0
+            n += 1
+        return (total / float(n)) if n > 0 else 0.0
+
+    solo_avg = _avg_score_pct(
+        TaskLog.objects.filter(
+            student=student,
+            task__topic__subject=subject,
+            is_verified=False,
+            is_anomaly=False,
+        )
+    )
+    verified_avg = _avg_score_pct(
+        TaskLog.objects.filter(
+            student=student,
+            task__topic__subject=subject,
+            is_verified=True,
+            is_anomaly=False,
+        )
+    )
+
     if verified_avg > 0 and solo_avg > 0:
-        # Если в соло он решает на 100%, а при репетиторе на 50%, разрыв огромный
-        gap = solo_avg - verified_avg
+        gap = float(solo_avg) - float(verified_avg)
         snapshot.gap_between_solo_and_verified = round(gap, 2)
-        
-        # Корректируем Trust Factor
-        if gap > (0.3 * task.exam_points): # Если разрыв больше 30%
-            profile.trust_factor = max(0.1, profile.trust_factor - 0.05)
-        elif gap < (0.1 * task.exam_points):
-            profile.trust_factor = min(1.0, profile.trust_factor + 0.05)
+
+        if gap > 30.0:
+            profile.trust_factor = max(0.1, float(profile.trust_factor) - 0.05)
+        elif gap < 10.0:
+            profile.trust_factor = min(1.0, float(profile.trust_factor) + 0.05)
             
     snapshot.save()
     profile.save(update_fields=['trust_factor'])
