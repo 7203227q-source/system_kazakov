@@ -52,7 +52,7 @@ class TaskAdmin(admin.ModelAdmin):
     )
     list_filter = ('topic__subject', 'task_type__exam_format', 'task_type', 'difficulty', 'ai_annotation_version')
     search_fields = ('fipi_id', 'topic__name')
-    actions = ["ai_annotate_difficulty_filtered_25"]
+    actions = ["ai_annotate_difficulty_filtered_25", "ai_recompute_ai_percentiles_filtered"]
 
     @admin.action(description="ИИ: разметить сложность (по текущему фильтру, 25 шт.)")
     def ai_annotate_difficulty_filtered_25(self, request, queryset):
@@ -117,6 +117,36 @@ class TaskAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"ИИ-разметка завершена: размечено {annotated} задач (порция 25, по текущему фильтру).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="ИИ: пересчитать процентили сложности (по текущему фильтру)")
+    def ai_recompute_ai_percentiles_filtered(self, request, queryset):
+        """
+        Пересчитывает ai_difficulty_exam_percentile / ai_difficulty_type_percentile для задач,
+        попадающих под текущий фильтр changelist.
+        """
+        try:
+            cl = self.get_changelist_instance(request)
+            filtered_qs = cl.get_queryset(request)
+        except Exception:
+            filtered_qs = queryset
+
+        ef_ids = set(
+            filtered_qs.exclude(task_type__exam_format_id__isnull=True)
+            .values_list("task_type__exam_format_id", flat=True)
+            .distinct()
+        )
+        if not ef_ids:
+            self.message_user(request, "Нет exam_format для пересчёта по текущему фильтру.", level=messages.INFO)
+            return
+
+        for ef_id in sorted(int(x) for x in ef_ids if x):
+            recompute_percentiles_for_exam_format(int(ef_id))
+
+        self.message_user(
+            request,
+            f"Процентили пересчитаны для exam_format: {len(ef_ids)}.",
             level=messages.SUCCESS,
         )
 
