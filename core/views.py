@@ -3146,6 +3146,22 @@ def tutor_create_assignment(request):
             if raw.isdigit():
                 requested_bundle_count = max(requested_bundle_count, int(raw))
 
+        valid_bundle_codes = list(
+            Task.objects.filter(
+                task_type__exam_format=exam_format,
+                task_type__number__in=[1, 2, 3, 4, 5],
+            )
+            .exclude(bundle_code__isnull=True)
+            .exclude(bundle_code__exact="")
+            .values("bundle_code")
+            .annotate(
+                total=models.Count("id"),
+                distinct_numbers=models.Count("task_type__number", distinct=True),
+            )
+            .filter(total=5, distinct_numbers=5)
+            .values_list("bundle_code", flat=True)
+        )
+
         if bundle_anchor and requested_bundle_count > 0:
             allowed_subtypes = allowed_subtypes_by_type.get(bundle_anchor.id, [])
             if allowed_subtypes:
@@ -3153,6 +3169,7 @@ def tutor_create_assignment(request):
                     Task.objects.filter(task_type=bundle_anchor, subtype_tag__in=allowed_subtypes)
                     .exclude(bundle_code__isnull=True)
                     .exclude(bundle_code__exact="")
+                    .filter(bundle_code__in=valid_bundle_codes)
                     .order_by("?")[: requested_bundle_count * 4]
                 )
                 bundle_codes: list[str] = []
@@ -3207,6 +3224,7 @@ def tutor_create_assignment(request):
                         Task.objects.filter(task_type=bundle_anchor, subtype_tag__in=allowed_subtypes)
                         .exclude(bundle_code__isnull=True)
                         .exclude(bundle_code__exact="")
+                        .filter(bundle_code__in=valid_bundle_codes)
                         .order_by("?")[: requested_bundle_count * 4]
                     )
                     bundle_codes: list[str] = []
