@@ -64,8 +64,41 @@
             </a>
         </div>
 
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+            <div class="p-4 rounded-lg text-sm font-medium
+                {% if message.tags == 'error' %}bg-red-100 text-red-700
+                {% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if needs_force_finish %}
+        <div class="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-xl p-4">
+            <div class="font-bold">Не все задания 2-й части сданы</div>
+            <div class="text-sm mt-1">
+                Нет фото решения по задачам:
+                {% if missing_part2_indexes %}
+                    {% for idx in missing_part2_indexes %}
+                        <span class="font-bold">№{{ idx }}</span>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <span class="font-bold">2-й части</span>
+                {% endif %}
+            </div>
+            <div class="text-sm mt-2">Вы можете завершить вариант всё равно (эти задания будут считаться нерешёнными).</div>
+        </div>
+        {% endif %}
+
         <form method="POST" action="{% url 'student_solve_assignment' assignment.id %}" id="assignment-form">
             {% csrf_token %}
+            {% if needs_force_finish %}
+            <input type="hidden" name="force_finish" value="1">
+            {% endif %}
             <div class="space-y-6">
                 {% for task in tasks %}
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden task-card" data-task-id="{{ task.id }}">
@@ -544,12 +577,11 @@
             </div>
 
             <div class="mt-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-                <input type="hidden" name="action" id="assignment_action" value="">
-                <button type="button" onclick="submitAssignmentAction('postpone')" class="text-gray-600 border border-gray-300 bg-white px-6 py-3 rounded-lg font-bold hover:bg-gray-50 transition w-full sm:w-auto">
+                <button type="submit" name="action" value="postpone" class="text-gray-600 border border-gray-300 bg-white px-6 py-3 rounded-lg font-bold hover:bg-gray-50 transition w-full sm:w-auto">
                     <i class="fas fa-pause mr-2"></i> Отложить решение
                 </button>
-                <button type="button" onclick="submitAssignmentAction('finish')" class="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md w-full sm:w-auto flex items-center justify-center">
-                    <i class="fas fa-flag-checkered mr-2"></i> Завершить вариант
+                <button type="submit" name="action" value="finish" class="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition shadow-md w-full sm:w-auto flex items-center justify-center">
+                    <i class="fas fa-flag-checkered mr-2"></i> {% if needs_force_finish %}Завершить всё равно{% else %}Завершить вариант{% endif %}
                 </button>
             </div>
         </form>
@@ -557,14 +589,6 @@
 </div>
 
 <script>
-    function submitAssignmentAction(action) {
-        const form = document.getElementById('assignment-form');
-        const input = document.getElementById('assignment_action');
-        if (!form || !input) return;
-        input.value = action;
-        form.submit();
-    }
-
     function toggleSolution(taskId) {
         const solDiv = document.getElementById(`solution_${taskId}`);
         solDiv.classList.toggle('hidden');

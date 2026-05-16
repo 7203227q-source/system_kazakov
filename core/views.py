@@ -1380,6 +1380,113 @@ def student_solve_assignment(request, assignment_id):
         return redirect('student_assignment_summary', assignment_id=assignment.id)
 
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+
+    def _render_student_solve_assignment(*, needs_force_finish: bool = False, missing_part2_tasks=None):
+        saved_submissions = {
+            sub.task_id: sub
+            for sub in Submission.objects.filter(assignment=assignment, student=request.user).prefetch_related(
+                "comments", "comments__author"
+            )
+        }
+
+        visible_submissions = [s for s in saved_submissions.values() if s.is_correct is not None]
+        if visible_submissions:
+            _mark_student_replies_seen(request.user, visible_submissions)
+
+        unread_tutor_replies_total = SubmissionComment.objects.filter(
+            submission__student=request.user,
+            author_role="tutor",
+            seen_by_student_at__isnull=True,
+        ).count()
+
+        tasks_list = list(tasks)
+        domain = request.build_absolute_uri('/')[:-1]
+        import json as pyjson
+
+        for task in tasks_list:
+            task.saved_submission = saved_submissions.get(task.id)
+            if task.saved_submission and getattr(task.saved_submission, "ai_feedback", None):
+                try:
+                    task.saved_submission.ai_feedback_display = normalize_tex_in_feedback(task.saved_submission.ai_feedback)
+                except Exception:
+                    task.saved_submission.ai_feedback_display = task.saved_submission.ai_feedback
+                try:
+                    task.saved_submission.ai_feedback_display_html = sanitize_ai_feedback_html(task.saved_submission.ai_feedback_display)
+                except Exception:
+                    task.saved_submission.ai_feedback_display_html = task.saved_submission.ai_feedback_display
+            if task.saved_submission:
+                # Структурные поля ИИ (могут быть null)
+                try:
+                    task.saved_submission.ai_mistakes = pyjson.loads(task.saved_submission.ai_mistakes_json) if task.saved_submission.ai_mistakes_json else []
+                except Exception:
+                    task.saved_submission.ai_mistakes = []
+                try:
+                    task.saved_submission.ai_verdict = pyjson.loads(task.saved_submission.ai_verdict_json) if task.saved_submission.ai_verdict_json else []
+                except Exception:
+                    task.saved_submission.ai_verdict = []
+            if task.saved_submission and getattr(task.saved_submission, "ai_last_verify_at", None):
+                try:
+                    dt = task.saved_submission.ai_last_verify_at
+                    if dt:
+                        from django.utils import timezone
+                        now = timezone.now()
+                        delta = (now - dt).total_seconds()
+                        remain = int(max(0, 120 - int(delta)))
+                        task.saved_submission.ai_retry_after_seconds = remain
+                except Exception:
+                    pass
+
+            # Определяем, нужен ли черновик / фото
+            # Важно: в ОГЭ встречаются задания с кратким ответом на 2 балла, поэтому
+            # "часть 2" определяем по признаку типа задания, а не по exam_points.
+            max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
+            task.exam_points_effective = max_points_effective
+            is_part2 = is_extended_answer_task(task)
+            requires_draft = False
+
+            if not is_part2 and request.user.draft_check_probability > 0:
+                # Если еще нет сохраненного флага requires_draft для этой задачи, сгенерируем
+                if task.saved_submission and task.saved_submission.requires_draft:
+                    requires_draft = True
+                elif not task.saved_submission:
+                    # Генерируем с вероятностью из профиля ученика
+                    if random.randint(1, 100) <= request.user.draft_check_probability:
+                        requires_draft = True
+
+            task.needs_photo = is_part2 or requires_draft
+
+            # Если нужно фото, убеждаемся, что есть Submission и у него есть upload_token
+            if task.needs_photo:
+                if not task.saved_submission:
+                    sub = Submission.objects.create(
+                        student=request.user,
+                        task=task,
+                        assignment=assignment,
+                        requires_draft=requires_draft
+                    )
+                    task.saved_submission = sub
+                elif not task.saved_submission.upload_token:
+                    task.saved_submission.upload_token = uuid.uuid4()
+                    task.saved_submission.requires_draft = requires_draft
+                    task.saved_submission.save()
+
+                upload_url = f"{domain}/upload/{task.saved_submission.upload_token}/"
+                task.qr_code_base64 = generate_qr_base64(upload_url)
+
+        missing_part2_indexes = []
+        if missing_part2_tasks:
+            missing_ids = {t.id for t in missing_part2_tasks}
+            for idx, t in enumerate(tasks_list, start=1):
+                if t.id in missing_ids:
+                    missing_part2_indexes.append(idx)
+
+        return render(request, 'core/student_solve_assignment.html', {
+            'assignment': assignment,
+            'tasks': tasks_list,
+            'unread_tutor_replies_total': unread_tutor_replies_total,
+            'needs_force_finish': bool(needs_force_finish),
+            'missing_part2_indexes': missing_part2_indexes,
+        })
     
     if request.method == 'POST':
         action = (request.POST.get('action') or '').strip()
@@ -1456,8 +1563,10 @@ def student_solve_assignment(request, assignment_id):
                     profile.level = (profile.xp // 100) + 1
                     profile.save()
             
-        # Если ученик пытается завершить вариант, но по заданиям 2-й части нет загруженного фото — блокируем завершение.
+        # Если ученик пытается завершить вариант, но по заданиям 2-й части нет загруженного фото —
+        # просим подтвердить завершение (force_finish=1).
         if action == 'finish':
+            force_finish = (request.POST.get("force_finish") == "1")
             missing_part2 = []
             for t in tasks:
                 is_extended = is_extended_answer_task(t)
@@ -1465,9 +1574,13 @@ def student_solve_assignment(request, assignment_id):
                     sub = subs_by_task_id.get(t.id)
                     if not sub or not sub.image_url:
                         missing_part2.append(t)
-            if missing_part2:
-                messages.warning(request, "Вы не решили задания 2-й части: загрузите фото решений по всем заданиям второй части, затем завершите вариант.")
-                return redirect('student_solve_assignment', assignment_id=assignment.id)
+            if missing_part2 and not force_finish:
+                messages.warning(
+                    request,
+                    "Не все задания 2-й части сданы: по некоторым задачам нет фото решения. "
+                    "Вы можете вернуться и загрузить фото, либо завершить вариант всё равно.",
+                )
+                return _render_student_solve_assignment(needs_force_finish=True, missing_part2_tasks=missing_part2)
 
             # Если завершаем, записываем лог в аналитику
             for t in tasks:
@@ -1510,102 +1623,8 @@ def student_solve_assignment(request, assignment_id):
     # GET: Устанавливаем время начала
     if f'assignment_{assignment.id}_start' not in request.session:
         request.session[f'assignment_{assignment.id}_start'] = time.time()
-    saved_submissions = {
-        sub.task_id: sub
-        for sub in Submission.objects.filter(assignment=assignment, student=request.user).prefetch_related(
-            "comments", "comments__author"
-        )
-    }
 
-    visible_submissions = [s for s in saved_submissions.values() if s.is_correct is not None]
-    if visible_submissions:
-        _mark_student_replies_seen(request.user, visible_submissions)
-
-    unread_tutor_replies_total = SubmissionComment.objects.filter(
-        submission__student=request.user,
-        author_role="tutor",
-        seen_by_student_at__isnull=True,
-    ).count()
-    
-    tasks_list = list(tasks)
-    domain = request.build_absolute_uri('/')[:-1]
-    import json as pyjson
-    
-    for task in tasks_list:
-        task.saved_submission = saved_submissions.get(task.id)
-        if task.saved_submission and getattr(task.saved_submission, "ai_feedback", None):
-            try:
-                task.saved_submission.ai_feedback_display = normalize_tex_in_feedback(task.saved_submission.ai_feedback)
-            except Exception:
-                task.saved_submission.ai_feedback_display = task.saved_submission.ai_feedback
-            try:
-                task.saved_submission.ai_feedback_display_html = sanitize_ai_feedback_html(task.saved_submission.ai_feedback_display)
-            except Exception:
-                task.saved_submission.ai_feedback_display_html = task.saved_submission.ai_feedback_display
-        if task.saved_submission:
-            # Структурные поля ИИ (могут быть null)
-            try:
-                task.saved_submission.ai_mistakes = pyjson.loads(task.saved_submission.ai_mistakes_json) if task.saved_submission.ai_mistakes_json else []
-            except Exception:
-                task.saved_submission.ai_mistakes = []
-            try:
-                task.saved_submission.ai_verdict = pyjson.loads(task.saved_submission.ai_verdict_json) if task.saved_submission.ai_verdict_json else []
-            except Exception:
-                task.saved_submission.ai_verdict = []
-        if task.saved_submission and getattr(task.saved_submission, "ai_last_verify_at", None):
-            try:
-                dt = task.saved_submission.ai_last_verify_at
-                if dt:
-                    from django.utils import timezone
-                    now = timezone.now()
-                    delta = (now - dt).total_seconds()
-                    remain = int(max(0, 120 - int(delta)))
-                    task.saved_submission.ai_retry_after_seconds = remain
-            except Exception:
-                pass
-        
-        # Определяем, нужен ли черновик / фото
-        # Важно: в ОГЭ встречаются задания с кратким ответом на 2 балла, поэтому
-        # "часть 2" определяем по признаку типа задания, а не по exam_points.
-        max_points_effective = max(int(task.exam_points or 0), int(getattr(task.task_type, "max_points", 0) or 0))
-        task.exam_points_effective = max_points_effective
-        is_part2 = is_extended_answer_task(task)
-        requires_draft = False
-        
-        if not is_part2 and request.user.draft_check_probability > 0:
-            # Если еще нет сохраненного флага requires_draft для этой задачи, сгенерируем
-            if task.saved_submission and task.saved_submission.requires_draft:
-                requires_draft = True
-            elif not task.saved_submission:
-                # Генерируем с вероятностью из профиля ученика
-                if random.randint(1, 100) <= request.user.draft_check_probability:
-                    requires_draft = True
-                    
-        task.needs_photo = is_part2 or requires_draft
-        
-        # Если нужно фото, убеждаемся, что есть Submission и у него есть upload_token
-        if task.needs_photo:
-            if not task.saved_submission:
-                sub = Submission.objects.create(
-                    student=request.user,
-                    task=task,
-                    assignment=assignment,
-                    requires_draft=requires_draft
-                )
-                task.saved_submission = sub
-            elif not task.saved_submission.upload_token:
-                task.saved_submission.upload_token = uuid.uuid4()
-                task.saved_submission.requires_draft = requires_draft
-                task.saved_submission.save()
-                
-            upload_url = f"{domain}/upload/{task.saved_submission.upload_token}/"
-            task.qr_code_base64 = generate_qr_base64(upload_url)
-            
-    return render(request, 'core/student_solve_assignment.html', {
-        'assignment': assignment, 
-        'tasks': tasks_list,
-        'unread_tutor_replies_total': unread_tutor_replies_total,
-    })
+    return _render_student_solve_assignment()
 
 
 @login_required
