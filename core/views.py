@@ -650,6 +650,9 @@ def student_practice(request):
 
         # Protect against re-submitting the same "checked" attempt (back button / refresh / multi-click)
         results = request.session.get("practice_results") or {}
+        if not isinstance(results, dict):
+            results = {}
+            request.session["practice_results"] = results
         if attempt_token and attempt_token in results:
             saved = results.get(attempt_token) or {}
             if int(saved.get("task_id") or 0) == int(task.id) and (saved.get("mode") or "") == mode:
@@ -667,6 +670,9 @@ def student_practice(request):
 
         # Validate that the posted attempt token matches the current shown task
         current = request.session.get("practice_current") or {}
+        if not isinstance(current, dict):
+            current = {}
+            request.session["practice_current"] = current
         if not attempt_token or current.get("token") != attempt_token or int(current.get("task_id") or 0) != int(task.id) or (current.get("mode") or "") != mode:
             messages.error(request, "Эта задача уже была проверена. Откройте следующую задачу.")
             return redirect("student_practice")
@@ -1662,20 +1668,41 @@ def student_add_submission_comment(request, assignment_id, task_id):
     return JsonResponse({"ok": True, "comments_count": submission.comments.count(), "submission_id": submission.id})
 
 @login_required
+@require_POST
 def student_practice_submit(request, task_id):
     """Обработка ответа ученика"""
-    if request.user.role != 'student' or request.method != 'POST':
+    if request.user.role != 'student':
         return redirect('student_dashboard')
         
     task = get_object_or_404(Task, id=task_id)
-    user_answer = request.POST.get('answer', '')
-    
-    submission = process_task_submission(request.user, task, user_answer)
-    
-    # Store result in session for display
+    mode = (request.POST.get('mode') or request.GET.get('mode') or '').strip()
+    user_answer = (request.POST.get('answer') or '').strip()
+
+    points_earned = score_short_answer(task, user_answer)
+    points_max = get_max_points_effective(task)
+    is_correct = (points_earned == int(points_max or 0))
+    grade = 5 if is_correct else 1
+
+    submission = Submission.objects.create(
+        student=request.user,
+        task=task,
+        user_answer=user_answer,
+        is_correct=is_correct,
+        score=int(points_earned or 0),
+    )
+    record_task_log(request.user, task, submission, None, 60)
+
+    if mode == 'srs':
+        try:
+            process_task_submission(request.user, task, grade)
+        except Exception:
+            pass
+
     request.session['last_submission_id'] = submission.id
-    
-    return redirect('student_practice')
+    url = reverse('student_practice')
+    if mode:
+        url = f"{url}?mode={mode}"
+    return redirect(url)
 
 @login_required
 def student_history(request):
