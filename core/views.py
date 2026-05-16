@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 from datetime import timedelta, date
 import uuid
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, TaskLog
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
@@ -642,6 +642,24 @@ def student_practice(request):
         active_subject_id = int(profiles.first().subject_id) if profiles.exists() else None
     active_profile = next((p for p in profiles if int(p.subject_id) == int(active_subject_id or 0)), None) if active_subject_id else None
 
+    def _eta_minutes_for_srs(user, due_count: int) -> int:
+        import math
+        if due_count <= 0:
+            return 0
+        avg = (
+            TaskLog.objects.filter(student=user, is_anomaly=False, time_spent__gt=0)
+            .aggregate(a=models.Avg("time_spent"))
+            .get("a")
+        )
+        if not avg:
+            avg = (
+                TaskLog.objects.filter(is_anomaly=False, time_spent__gt=0)
+                .aggregate(a=models.Avg("time_spent"))
+                .get("a")
+            )
+        avg_seconds = float(avg) if avg else 60.0
+        return int(math.ceil((float(due_count) * avg_seconds) / 60.0))
+
     if request.method == 'POST':
         task_id = request.POST.get('task_id')
         user_answer = request.POST.get('answer', '').strip()
@@ -666,6 +684,11 @@ def student_practice(request):
                     'points_earned': int(saved.get("points_earned") or 0),
                     'points_max': int(saved.get("points_max") or 0),
                     'mode': mode,
+                    'srs_due_remaining': get_due_tasks_for_student(request.user).count() if mode == "srs" else None,
+                    'srs_eta_minutes': _eta_minutes_for_srs(
+                        request.user,
+                        int(get_due_tasks_for_student(request.user).count()),
+                    ) if mode == "srs" else None,
                 })
 
         # Validate that the posted attempt token matches the current shown task
@@ -737,6 +760,12 @@ def student_practice(request):
         request.session["practice_results"] = results
         request.session.modified = True
 
+        srs_due_remaining = None
+        srs_eta_minutes = None
+        if mode == "srs":
+            srs_due_remaining = get_due_tasks_for_student(request.user).count()
+            srs_eta_minutes = _eta_minutes_for_srs(request.user, int(srs_due_remaining))
+
         return render(request, 'core/student_practice_result.html', {
             'task': task,
             'user_answer': user_answer,
@@ -747,15 +776,24 @@ def student_practice(request):
             'points_earned': points_earned,
             'points_max': points_max,
             'mode': mode,
+            'srs_due_remaining': srs_due_remaining,
+            'srs_eta_minutes': srs_eta_minutes,
         })
-    
+
     # GET запрос
     if mode == 'srs':
-        due = get_due_tasks_for_student(request.user).select_related('task').first()
+        due_qs = get_due_tasks_for_student(request.user).select_related('task')
+        srs_due_total = due_qs.count()
+        due = due_qs.first()
         task = due.task if due else None
+        srs_due_left_after_current = max(0, int(srs_due_total) - (1 if task else 0))
+        srs_eta_minutes = _eta_minutes_for_srs(request.user, int(srs_due_total))
     else:
         # Обычный тренажёр (адаптивный)
         task = get_adaptive_task_for_student(request.user, subject_id=active_subject_id, exam_format_id=getattr(active_profile, "exam_format_id", None))
+        srs_due_total = None
+        srs_due_left_after_current = None
+        srs_eta_minutes = None
 
     attempt_token = None
     if task is not None:
@@ -793,6 +831,9 @@ def student_practice(request):
         'practice_submission': practice_submission,
         'profiles': profiles,
         'active_subject_id': active_subject_id,
+        'srs_due_total': srs_due_total,
+        'srs_due_left_after_current': srs_due_left_after_current,
+        'srs_eta_minutes': srs_eta_minutes,
     })
 
 
