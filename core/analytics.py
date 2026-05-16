@@ -258,6 +258,137 @@ def update_student_analytics(student, subject):
     
     return snapshot
 
+
+def calibrate_learning_velocity_for_assignment(assignment: Assignment) -> bool:
+    """
+    Калибрует StudentSubjectProfile.learning_velocity по завершённому варианту.
+
+    Возвращает True, если калибровка была применена, иначе False.
+    """
+    if not assignment or not getattr(assignment, "is_completed", False):
+        return False
+
+    # Не калибруем дважды по одному варианту.
+    if getattr(assignment, "learning_velocity_calibrated_at", None):
+        return False
+
+    student = assignment.student
+    subject = None
+    if getattr(assignment, "exam_format_id", None):
+        subject = getattr(assignment.exam_format, "subject", None)
+    if subject is None:
+        # fallback: берём предмет первой задачи
+        first_task = assignment.tasks.select_related("topic__subject").first()
+        subject = getattr(getattr(first_task, "topic", None), "subject", None)
+    if subject is None:
+        return False
+
+    profile = StudentSubjectProfile.objects.filter(student=student, subject=subject).first()
+    if profile is None:
+        return False
+
+    today = timezone.now().date()
+    # Берём "прогноз до выполнения работы", чтобы избежать нулевой ошибки (волатильности):
+    # если мы возьмём snapshot "сегодня", он уже может включать результаты текущего варианта.
+    snapshot = (
+        DailySnapshot.objects.filter(student=student, subject=subject, date__lt=today)
+        .order_by("-date")
+        .first()
+        or DailySnapshot.objects.filter(student=student, subject=subject, date__lte=today).order_by("-date").first()
+    )
+    if snapshot is None:
+        return False
+
+    predicted = float(getattr(snapshot, "predicted_exam_score", 0.0) or 0.0)
+
+    # Фактический результат варианта: сумма первичных баллов / max_primary_score.
+    subs = Submission.objects.filter(assignment=assignment, student=student)
+    earned = 0.0
+    for sub in subs:
+        if sub.tutor_primary_score is not None:
+            earned += float(sub.tutor_primary_score or 0.0)
+        elif sub.primary_score is not None:
+            earned += float(sub.primary_score or 0.0)
+        elif sub.score is not None:
+            earned += float(sub.score or 0.0)
+
+    max_primary = None
+    try:
+        if assignment.exam_format_id and getattr(assignment.exam_format, "score_scale", None):
+            max_primary = float(getattr(assignment.exam_format.score_scale, "max_primary_score", None) or 0.0) or None
+    except Exception:
+        max_primary = None
+
+    if not max_primary:
+        # fallback: сумма max_points по типам (или exam_points)
+        max_primary = 0.0
+        for t in assignment.tasks.select_related("task_type").all():
+            pts = getattr(getattr(t, "task_type", None), "max_points", None)
+            if pts is None:
+                pts = getattr(t, "exam_points", 0) or 0
+            max_primary += float(pts or 0.0)
+
+    if not max_primary or max_primary <= 0:
+        return False
+
+    fact = max(0.0, min(100.0, 100.0 * float(earned) / float(max_primary)))
+    err = float(fact) - float(predicted)
+
+    # Смешанная стратегия:
+    # - в начале (нет 3 контрольных калибровок) пропускаем неконтрольные варианты
+    # - позже учитываем неконтрольные с меньшим весом и с учётом trust_factor
+    verified_calibrations = Assignment.objects.filter(
+        student=student,
+        exam_format__subject=subject,
+        is_verified=True,
+        learning_velocity_calibrated_at__isnull=False,
+    ).count()
+    if not assignment.is_verified and verified_calibrations < 3:
+        return False
+
+    base_weight = 1.0 if assignment.is_verified else (0.5 * float(getattr(profile, "trust_factor", 0.6) or 0.6))
+
+    # Базовый коэффициент (насколько быстро адаптируемся к err).
+    k = 0.25
+    delta = (k * err) / 100.0
+
+    # Ограничение шага за один пересчёт.
+    delta = max(-0.10, min(0.10, float(delta)))
+
+    # Прогрев (warm-up): первые калибровки — заметно мягче.
+    n = Assignment.objects.filter(
+        student=student,
+        exam_format__subject=subject,
+        learning_velocity_calibrated_at__isnull=False,
+    ).count()
+    warmup = 1.0
+    if n < 5:
+        warmup = 0.3
+    elif n < 10:
+        warmup = 0.6
+
+    # Дедлайны: сильный штраф (снижаем влияние результата).
+    deadline_weight = 1.0
+    if getattr(assignment, "is_expired", False):
+        deadline_weight = 0.2
+    else:
+        due = getattr(assignment, "due_date", None)
+        if due and today > due:
+            deadline_weight = 0.2
+
+    delta *= float(base_weight) * float(warmup) * float(deadline_weight)
+
+    old_lv = float(getattr(profile, "learning_velocity", 1.0) or 1.0)
+    new_lv = old_lv + float(delta)
+    new_lv = max(0.5, min(1.5, float(new_lv)))
+
+    profile.learning_velocity = float(new_lv)
+    profile.save(update_fields=["learning_velocity"])
+
+    assignment.learning_velocity_calibrated_at = timezone.now()
+    assignment.save(update_fields=["learning_velocity_calibrated_at"])
+    return True
+
 def get_adaptive_task_for_student(student, subject_id: int | None = None, exam_format_id: int | None = None):
     """
     Алгоритм интервального повторения (Адаптивный Тренажер).

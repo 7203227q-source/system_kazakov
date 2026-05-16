@@ -1421,6 +1421,14 @@ def auto_expire_assignment_if_needed(assignment: Assignment):
             except Exception:
                 pass
 
+    # Калибровка темпа по просроченному варианту (с сильным штрафом внутри калибровки).
+    try:
+        from core.analytics import calibrate_learning_velocity_for_assignment
+
+        calibrate_learning_velocity_for_assignment(assignment)
+    except Exception:
+        pass
+
     return True
 
 
@@ -1669,6 +1677,14 @@ def student_solve_assignment(request, assignment_id):
         # Иначе - Завершаем
         assignment.is_completed = True
         assignment.save()
+
+        # Калибровка learning_velocity по результатам варианта (плавно, с учётом дедлайнов).
+        try:
+            from core.analytics import calibrate_learning_velocity_for_assignment
+
+            calibrate_learning_velocity_for_assignment(assignment)
+        except Exception:
+            pass
         
         # Clear session start time
         if f'assignment_{assignment.id}_start' in request.session:

@@ -286,6 +286,11 @@ class Assignment(models.Model):
     due_date = models.DateField(null=True, blank=True, verbose_name="Срок (до конца дня)")
     is_expired = models.BooleanField(default=False, verbose_name="Просрочено (автозакрыто)")
     expired_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда просрочено")
+    learning_velocity_calibrated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Когда калибровали learning_velocity по этому варианту",
+    )
     exam_format = models.ForeignKey(ExamFormat, on_delete=models.SET_NULL, null=True, blank=True, related_name="assignments")
     is_deleted = models.BooleanField(default=False, verbose_name="Удалено (скрыто у ученика)")
     deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда удалено")
