@@ -3564,6 +3564,8 @@ def admin_task_regen_preview(request, task_id):
 
         from .openrouter_client import generate_task_regeneration
         result = generate_task_regeneration(task=task, mode=mode, model=model, prompt_template=prompt_template)
+        from .answer_format import normalize_regen_correct_answer
+        result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
         TaskGenerationLog.objects.create(
             task=task,
             user=request.user,
@@ -3639,12 +3641,27 @@ def admin_task_regen_apply(request, task_id):
     if not model:
         return JsonResponse({'error': 'Не выбрана модель OpenRouter для регенерации текста (настройки по предмету).'}, status=400)
 
-    result = generate_task_regeneration(
-        task=task,
-        mode=mode,
-        model=model,
-        prompt_template=payload.get('prompt_template'),
-    )
+    try:
+        result = generate_task_regeneration(
+            task=task,
+            mode=mode,
+            model=model,
+            prompt_template=payload.get('prompt_template'),
+        )
+        from .answer_format import normalize_regen_correct_answer
+        result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
+    except Exception as e:
+        TaskGenerationLog.objects.create(
+            task=task,
+            user=request.user,
+            provider='openrouter',
+            model=model,
+            mode=mode,
+            prompt_template=payload.get('prompt_template'),
+            status='error',
+            error_message=str(e),
+        )
+        return JsonResponse({'error': str(e)}, status=400)
 
     variant, _ = TaskVariant.objects.get_or_create(task=task, theme='classic', defaults={'content': '', 'solution': ''})
     if result.get('content_html') is not None:
