@@ -110,7 +110,7 @@
     let tool = 'pen';
     let color = '#111827';
     let width = 4;
-    let lastEventId = 0;
+    let lastServerId = 0;
     let dirty = false;
     let pending = [];
     let state = { version: 1, objects: [] };
@@ -118,6 +118,65 @@
     let previewId = null;
     let erasing = false;
     let lastEraseAt = 0;
+    let ws = null;
+    let wsOpen = false;
+
+    function wsUrl() {
+        const proto = (window.location.protocol === 'https:') ? 'wss' : 'ws';
+        return `${proto}://${window.location.host}/ws/board/${sessionId}/`;
+    }
+
+    function connectWs() {
+        try {
+            ws = new WebSocket(wsUrl());
+        } catch (e) {
+            wsOpen = false;
+            setTimeout(connectWs, 500);
+            return;
+        }
+
+        ws.addEventListener('open', () => {
+            wsOpen = true;
+            try {
+                ws.send(JSON.stringify({ type: 'sync', after_server_id: lastServerId }));
+            } catch (e) {}
+        });
+
+        ws.addEventListener('close', () => {
+            wsOpen = false;
+            setTimeout(connectWs, 500);
+        });
+
+        ws.addEventListener('message', (evt) => {
+            let msg = null;
+            try { msg = JSON.parse(evt.data); } catch (e) { return; }
+            if (!msg || !msg.type) return;
+
+            if (msg.type === 'events') {
+                for (const e of (msg.events || [])) {
+                    lastServerId = Math.max(lastServerId, e.server_id || 0);
+                    try { applyEvent(e.kind, e.payload || {}); } catch (err) {}
+                }
+                return;
+            }
+
+            if (msg.type === 'sync_result') {
+                if (msg.need_snapshot) {
+                    if (initialSnapshot) {
+                        try { state = JSON.parse(initialSnapshot); } catch (e) {}
+                        ensureTaskCard();
+                        render();
+                        clearDirty();
+                    }
+                }
+                for (const e of (msg.events || [])) {
+                    lastServerId = Math.max(lastServerId, e.server_id || 0);
+                    try { applyEvent(e.kind, e.payload || {}); } catch (err) {}
+                }
+                return;
+            }
+        });
+    }
 
     function uid(prefix) {
         return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
@@ -239,31 +298,11 @@
         render();
     }
 
-    async function pullLoop() {
-        try {
-            const res = await fetch(`/board/${sessionId}/events/pull/?after=${lastEventId}`, { credentials: 'same-origin' });
-            if (res.ok) {
-                const data = await res.json();
-                for (const e of (data.events || [])) {
-                    lastEventId = Math.max(lastEventId, e.id);
-                    try {
-                        applyEvent(e.kind, JSON.parse(e.payload || '{}'));
-                    } catch (err) {}
-                }
-            }
-        } catch (e) {}
-    }
-
     async function flushLoop() {
-        if (!pending.length) return;
+        if (!wsOpen || !pending.length) return;
         const batch = pending.splice(0, 100);
         try {
-            await fetch(`/board/${sessionId}/events/append/`, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ events: batch }),
-            });
+            ws.send(JSON.stringify({ type: 'event_batch', events: batch }));
         } catch (e) {
             pending.unshift(...batch);
         }
@@ -573,8 +612,8 @@
     setTool('pen');
     setWidth(4);
 
-    setInterval(pullLoop, 500);
-    setInterval(flushLoop, 250);
+    connectWs();
+    setInterval(flushLoop, 50);
     setInterval(() => { if (dirty) saveSnapshot(); }, 60000);
 
     window.addEventListener('beforeunload', (e) => {
