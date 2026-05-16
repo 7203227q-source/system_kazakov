@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <h1>{{ title }}</h1>
+
+  <p>
+    <a href="{{ change_url }}">&larr; Назад к задаче</a>
+  </p>
+
+  {% if not report.found %}
+    <div class="messagelist">
+      <ul>
+        <li class="error">Вариант задачи (theme={{ report.theme }}) не найден.</li>
+      </ul>
+    </div>
+  {% else %}
+    <div class="module">
+      <h2>Статистика</h2>
+      <div style="padding: 10px 0;">
+        engine={{ report.engine }},
+        replaced={{ report.replaced }},
+        changed={{ report.changed }},
+        fixed_tokens={{ report.fixed_tokens }},
+        fixed_words={{ report.fixed_words }}
+      </div>
+    </div>
+
+    <div class="module">
+      <h2>Предпросмотр (dry-run): Условие</h2>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div>
+          <div><strong>До</strong></div>
+          <textarea style="width:100%; min-height:220px;" readonly>{{ report.old_content }}</textarea>
+        </div>
+        <div>
+          <div><strong>После</strong></div>
+          <textarea style="width:100%; min-height:220px;" readonly>{{ report.new_content }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="module">
+      <h2>Предпросмотр (dry-run): Решение</h2>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div>
+          <div><strong>До</strong></div>
+          <textarea style="width:100%; min-height:220px;" readonly>{{ report.old_solution }}</textarea>
+        </div>
+        <div>
+          <div><strong>После</strong></div>
+          <textarea style="width:100%; min-height:220px;" readonly>{{ report.new_solution }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <form method="post" action="{{ apply_url }}" style="margin-top: 16px;">
+      {% csrf_token %}
+      <input type="submit" class="default" value="Применить SVG→LaTeX (classic)">
+      <a class="button cancel-link" href="{{ change_url }}">Отмена</a>
+    </form>
+  {% endif %}
+{% endblock %}
+

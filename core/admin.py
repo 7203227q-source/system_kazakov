@@ -3,6 +3,9 @@ import os
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.db import models
+from django.shortcuts import get_object_or_404, redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 
 from .models import (
     ExamFormat,
@@ -18,8 +21,6 @@ from .models import (
     Topic,
     User,
 )
-from django.shortcuts import redirect
-from django.urls import reverse
 
 from core.http_headers import require_ascii, sanitize_header_value
 from core.services_task_ai_annotation import (
@@ -27,6 +28,7 @@ from core.services_task_ai_annotation import (
     annotate_task_with_ai,
     recompute_percentiles_for_exam_format,
 )
+from core.services_svg_to_latex import convert_svg_to_latex_for_task
 
 class CustomUserAdmin(UserAdmin):
     model = User
@@ -66,6 +68,54 @@ class TaskAdmin(admin.ModelAdmin):
     search_fields = ('fipi_id', 'topic__name')
     actions = ["ai_annotate_difficulty_filtered_25", "ai_recompute_ai_percentiles_filtered"]
     inlines = [TaskVariantClassicInline]
+    change_form_template = "admin/core/task/change_form.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<path:object_id>/svg-to-latex-preview/",
+                self.admin_site.admin_view(self.svg_to_latex_preview_view),
+                name="core_task_svg_to_latex_preview",
+            ),
+            path(
+                "<path:object_id>/svg-to-latex-apply/",
+                self.admin_site.admin_view(self.svg_to_latex_apply_view),
+                name="core_task_svg_to_latex_apply",
+            ),
+        ]
+        return custom + urls
+
+    def svg_to_latex_preview_view(self, request, object_id: str):
+        task = get_object_or_404(Task, pk=object_id)
+        if not self.has_change_permission(request, obj=task):
+            return redirect("admin:core_task_changelist")
+
+        report = convert_svg_to_latex_for_task(task_id=task.id, theme="classic", dry_run=True)
+        ctx = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "original": task,
+            "title": f"SVG→LaTeX (preview): Task {task.id}",
+            "report": report,
+            "apply_url": reverse("admin:core_task_svg_to_latex_apply", args=[task.id]),
+            "change_url": reverse("admin:core_task_change", args=[task.id]),
+        }
+        return TemplateResponse(request, "admin/core/task/svg_to_latex_preview.html", ctx)
+
+    def svg_to_latex_apply_view(self, request, object_id: str):
+        task = get_object_or_404(Task, pk=object_id)
+        if not self.has_change_permission(request, obj=task):
+            return redirect("admin:core_task_changelist")
+        if request.method != "POST":
+            return redirect(reverse("admin:core_task_svg_to_latex_preview", args=[task.id]))
+
+        report = convert_svg_to_latex_for_task(task_id=task.id, theme="classic", dry_run=False)
+        messages.success(
+            request,
+            f"SVG→LaTeX применено: changed={report.get('changed')}, replaced={report.get('replaced')}.",
+        )
+        return redirect(reverse("admin:core_task_change", args=[task.id]))
 
     @admin.action(description="ИИ: разметить сложность (по текущему фильтру, 25 шт.)")
     def ai_annotate_difficulty_filtered_25(self, request, queryset):
