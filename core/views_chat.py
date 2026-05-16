@@ -1,6 +1,7 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Max, Count, Subquery, OuterRef
@@ -86,14 +87,16 @@ def get_user_dialogs(user):
 def chat_index(request):
     """Главная страница чата (без выбранного диалога)"""
     dialogs = get_user_dialogs(request.user)
-    
-    # Если есть диалоги, редиректим на первый
-    if dialogs:
-        return redirect('chat_dialog', user_id=dialogs[0]['user'].id)
-        
+
+    # Если диалоги есть — показываем первый диалог сразу (без редиректа),
+    # чтобы поле ввода не "пропадало" и страница была стабильной.
+    active_dialog = dialogs[0]["user"] if dialogs else None
+    if active_dialog:
+        Message.objects.filter(sender=active_dialog, receiver=request.user, is_read=False).update(is_read=True)
+
     return render(request, 'core/chat.html', {
         'dialogs': dialogs,
-        'active_dialog': None
+        'active_dialog': active_dialog,
     })
 
 @login_required
@@ -110,6 +113,7 @@ def chat_dialog(request, user_id):
             break
             
     if not can_chat and request.user.role != 'admin':
+        messages.warning(request, "Диалог недоступен: контакт не найден или связь была удалена.")
         return redirect('chat_index')
 
     if dialogs:

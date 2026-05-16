@@ -32,6 +32,21 @@
         </div>
     </header>
 
+    {% if messages %}
+    <div class="bg-gray-50 px-4 md:px-6 pt-4">
+        <div class="max-w-5xl mx-auto space-y-2">
+            {% for message in messages %}
+            <div class="p-3 rounded-lg text-sm font-medium
+                {% if message.tags == 'error' %}bg-red-100 text-red-700
+                {% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
 <div class="flex-1 flex bg-gray-50 transition-all duration-300 overflow-hidden">
     <div class="flex flex-1 overflow-hidden">
         
