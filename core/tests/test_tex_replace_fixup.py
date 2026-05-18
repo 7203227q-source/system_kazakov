@@ -27,3 +27,12 @@ class TexReplaceFixupTests(SimpleTestCase):
         out, fixed = fix_latex_tokens_in_html(html)
         self.assertGreaterEqual(fixed, 1)
         self.assertIn(r"\\(\\sqrt{\\frac{36a^{21}}{a^{15}}}\\)", out.replace(" ", ""))
+
+    def test_converts_russian_trig_and_greek_words_inside_math(self):
+        html = "<p>$S=\\frac{d_1 d_2 синус альфа}{2}$</p>"
+        out, fixed = fix_latex_tokens_in_html(html)
+        self.assertGreaterEqual(fixed, 1)
+        self.assertIn(r"\sin", out)
+        self.assertIn(r"\alpha", out)
+        self.assertNotIn("синус", out.lower())
+        self.assertNotIn("альфа", out.lower())

@@ -67,6 +67,50 @@ _INFINITY_WORD_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_GREEK_RU_REPLACEMENTS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"(?<!\\)\bальфа\b", flags=re.IGNORECASE), r"\alpha"),
+    (re.compile(r"(?<!\\)\bбета\b", flags=re.IGNORECASE), r"\beta"),
+    (re.compile(r"(?<!\\)\bгамма\b", flags=re.IGNORECASE), r"\gamma"),
+    (re.compile(r"(?<!\\)\bдельта\b", flags=re.IGNORECASE), r"\delta"),
+    (re.compile(r"(?<!\\)\bэпсилон\b", flags=re.IGNORECASE), r"\epsilon"),
+    (re.compile(r"(?<!\\)\bзета\b", flags=re.IGNORECASE), r"\zeta"),
+    (re.compile(r"(?<!\\)\bэта\b", flags=re.IGNORECASE), r"\eta"),
+    (re.compile(r"(?<!\\)\bтета\b", flags=re.IGNORECASE), r"\theta"),
+    (re.compile(r"(?<!\\)\bйота\b", flags=re.IGNORECASE), r"\iota"),
+    (re.compile(r"(?<!\\)\bкаппа\b", flags=re.IGNORECASE), r"\kappa"),
+    (re.compile(r"(?<!\\)\bлямбда\b", flags=re.IGNORECASE), r"\lambda"),
+    (re.compile(r"(?<!\\)\bламбда\b", flags=re.IGNORECASE), r"\lambda"),
+    (re.compile(r"(?<!\\)\bмю\b", flags=re.IGNORECASE), r"\mu"),
+    (re.compile(r"(?<!\\)\bню\b", flags=re.IGNORECASE), r"\nu"),
+    (re.compile(r"(?<!\\)\bкси\b", flags=re.IGNORECASE), r"\xi"),
+    (re.compile(r"(?<!\\)\bомикрон\b", flags=re.IGNORECASE), r"o"),
+    (re.compile(r"(?<!\\)\bпи\b", flags=re.IGNORECASE), r"\pi"),
+    (re.compile(r"(?<!\\)\bро\b", flags=re.IGNORECASE), r"\rho"),
+    (re.compile(r"(?<!\\)\bсигма\b", flags=re.IGNORECASE), r"\sigma"),
+    (re.compile(r"(?<!\\)\bтау\b", flags=re.IGNORECASE), r"\tau"),
+    (re.compile(r"(?<!\\)\bипсилон\b", flags=re.IGNORECASE), r"\upsilon"),
+    (re.compile(r"(?<!\\)\bфи\b", flags=re.IGNORECASE), r"\varphi"),
+    (re.compile(r"(?<!\\)\bпси\b", flags=re.IGNORECASE), r"\psi"),
+    (re.compile(r"(?<!\\)\bхи\b", flags=re.IGNORECASE), r"\chi"),
+    (re.compile(r"(?<!\\)\bомега\b", flags=re.IGNORECASE), r"\omega"),
+]
+
+_TRIG_RU_TOKEN_REPLACEMENTS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"(?<![A-Za-zА-Яа-я\\])синус(?:а)?\b", flags=re.IGNORECASE), r"\sin"),
+    (re.compile(r"(?<![A-Za-zА-Яа-я\\])косинус(?:а)?\b", flags=re.IGNORECASE), r"\cos"),
+    (re.compile(r"(?<![A-Za-zА-Яа-я\\])тангенс(?:а)?\b", flags=re.IGNORECASE), r"\tan"),
+    (re.compile(r"(?<![A-Za-zА-Яа-я\\])котангенс(?:а)?\b", flags=re.IGNORECASE), r"\cot"),
+]
+
+_TRIG_LAT_TOKEN_REPLACEMENTS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"(?<![A-Za-z\\])sin\b", flags=re.IGNORECASE), r"\sin"),
+    (re.compile(r"(?<![A-Za-z\\])cos\b", flags=re.IGNORECASE), r"\cos"),
+    (re.compile(r"(?<![A-Za-z\\])tan\b", flags=re.IGNORECASE), r"\tan"),
+    (re.compile(r"(?<![A-Za-z\\])tg\b", flags=re.IGNORECASE), r"\tan"),
+    (re.compile(r"(?<![A-Za-z\\])ctg\b", flags=re.IGNORECASE), r"\cot"),
+    (re.compile(r"(?<![A-Za-z\\])cot\b", flags=re.IGNORECASE), r"\cot"),
+]
+
 _COMPACT_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]{2,})")
 _SPACED_TFRAC_RE = re.compile(r"\\tfrac\s*([0-9]+)\s+([0-9]+)")
 _POWER_PAREN_RE = re.compile(
@@ -102,6 +146,13 @@ def sanitize_math_latex(value: str) -> str:
     s = re.sub(r"\bвстепени\b", "степени", s, flags=re.IGNORECASE)
     s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])\s*в\s*(?=\^)", "", s, flags=re.IGNORECASE)
     s = re.sub(r"(?<=[0-9a-zA-Zа-яА-Я\)\]\}])в(?=\^)", "", s, flags=re.IGNORECASE)
+
+    for pattern, repl in _GREEK_RU_REPLACEMENTS:
+        s = pattern.sub(lambda _m, r=repl: r, s)
+    for pattern, repl in _TRIG_RU_TOKEN_REPLACEMENTS:
+        s = pattern.sub(lambda _m, r=repl: r, s)
+    for pattern, repl in _TRIG_LAT_TOKEN_REPLACEMENTS:
+        s = pattern.sub(lambda _m, r=repl: r, s)
 
     s = _DEGREE_WORD_RE.sub(lambda m: rf"{m.group('num')}^{{\circ}}", s)
 
