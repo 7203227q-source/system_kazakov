@@ -24,7 +24,7 @@
     <div class="max-w-5xl mx-auto p-6">
         <div class="flex items-center justify-between mb-6">
             <div class="font-bold text-xl">Редактирование задачи #{{ task.id }}</div>
-            <a class="text-indigo-700 font-bold" href="{% url 'tutor_task_bank' %}">← Назад</a>
+            <a class="text-indigo-700 font-bold" href="{{ return_to }}">← Назад</a>
         </div>
 
         {% if messages %}
@@ -38,9 +38,10 @@
         {% endif %}
 
         <div class="flex flex-wrap items-center gap-3 mb-6">
-            <a href="{% url 'task_bank_task_svg_to_latex_preview' task.id %}" class="px-4 py-2 rounded-lg bg-gray-900 text-white font-bold hover:bg-black transition">SVG→LaTeX: предпросмотр</a>
+            <a href="{% url 'task_bank_task_svg_to_latex_preview' task.id %}{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}" class="px-4 py-2 rounded-lg bg-gray-900 text-white font-bold hover:bg-black transition">SVG→LaTeX: предпросмотр</a>
             <form method="post" action="{% url 'task_bank_task_svg_to_latex_apply' task.id %}">
                 {% csrf_token %}
+                {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
                 <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-bold hover:bg-indigo-800 transition">SVG→LaTeX: применить</button>
             </form>
             <div id="live-preview-status" class="text-sm text-gray-500 ml-auto"></div>
@@ -67,6 +68,7 @@
             <div>
                 <form id="task-edit-form" method="post" class="space-y-4">
                     {% csrf_token %}
+                    {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
                     <div>
                         <div class="font-bold mb-2">Условие (classic)</div>
                         <textarea name="content" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.content }}</textarea>

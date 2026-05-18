@@ -8,6 +8,7 @@ from django.db import models, IntegrityError
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import timedelta, date
 import uuid
 from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, TaskLog
@@ -20,7 +21,7 @@ import os
 
 from django.core.management import call_command
 from django.http import HttpResponse
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 def run_migrations(request):
     try:
@@ -4139,6 +4140,14 @@ def task_bank_task_edit(request, task_id: int):
     if request.user.role != "admin":
         return redirect("tutor_task_bank")
 
+    return_to = (request.GET.get("return_to") or request.POST.get("return_to") or "").strip()
+    if not return_to or not url_has_allowed_host_and_scheme(
+        url=return_to,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return_to = reverse("tutor_task_bank")
+
     task = get_object_or_404(Task.objects.select_related("topic", "task_type"), id=task_id)
     variant = task.variants.filter(theme="classic").first()
     if not variant:
@@ -4151,15 +4160,24 @@ def task_bank_task_edit(request, task_id: int):
         variant.save(update_fields=["content", "solution"])
         task.save(update_fields=["correct_answer"])
         messages.success(request, "Сохранено.")
-        return redirect("task_bank_task_edit", task_id=task.id)
+        url = reverse("task_bank_task_edit", args=[task.id])
+        return redirect(f"{url}?return_to={quote(return_to, safe='/')}")
 
-    return render(request, "core/task_edit.html", {"task": task, "variant": variant})
+    return render(request, "core/task_edit.html", {"task": task, "variant": variant, "return_to": return_to})
 
 
 @login_required
 def task_bank_task_svg_to_latex_preview(request, task_id: int):
     if request.user.role != "admin":
         return redirect("tutor_task_bank")
+
+    return_to = (request.GET.get("return_to") or "").strip()
+    if not return_to or not url_has_allowed_host_and_scheme(
+        url=return_to,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return_to = reverse("tutor_task_bank")
 
     from .services_svg_to_latex import convert_svg_to_latex_for_task
 
@@ -4168,7 +4186,11 @@ def task_bank_task_svg_to_latex_preview(request, task_id: int):
     variant = task.variants.filter(theme="classic").first()
     if not variant:
         variant = TaskVariant.objects.create(task=task, theme="classic", content="", solution="")
-    return render(request, "core/task_edit.html", {"task": task, "variant": variant, "svg_report": report})
+    return render(
+        request,
+        "core/task_edit.html",
+        {"task": task, "variant": variant, "svg_report": report, "return_to": return_to},
+    )
 
 
 @login_required
@@ -4177,6 +4199,14 @@ def task_bank_task_svg_to_latex_apply(request, task_id: int):
     if request.user.role != "admin":
         return redirect("tutor_task_bank")
 
+    return_to = (request.POST.get("return_to") or "").strip()
+    if not return_to or not url_has_allowed_host_and_scheme(
+        url=return_to,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return_to = reverse("tutor_task_bank")
+
     from .services_svg_to_latex import convert_svg_to_latex_for_task
 
     report = convert_svg_to_latex_for_task(task_id=task_id, theme="classic", dry_run=False)
@@ -4184,7 +4214,8 @@ def task_bank_task_svg_to_latex_apply(request, task_id: int):
         messages.success(request, "SVG→LaTeX применено.")
     else:
         messages.info(request, "Изменений не найдено.")
-    return redirect("task_bank_task_edit", task_id=task_id)
+    url = reverse("task_bank_task_edit", args=[task_id])
+    return redirect(f"{url}?return_to={quote(return_to, safe='/')}")
 
 
 @login_required

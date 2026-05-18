@@ -364,7 +364,7 @@
                             </div>
                             {% if user.role == 'admin' %}
                             <div class="flex items-center gap-4">
-                                <a href="/tutor/tasks/{{ task.id }}/edit/" class="text-gray-700 hover:text-gray-900 text-sm font-bold flex items-center transition">
+                                <a href="{% url 'task_bank_task_edit' task.id %}?return_to={{ request.get_full_path|urlencode }}" class="text-gray-700 hover:text-gray-900 text-sm font-bold flex items-center transition">
                                     <i class="fas fa-pen-to-square mr-2"></i> Редактировать
                                 </a>
                                 <button type="button" onclick="openRegenModal({{ task.id }})" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold flex items-center transition">
