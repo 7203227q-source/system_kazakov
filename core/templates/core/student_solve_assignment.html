@@ -82,9 +82,9 @@
             <div class="font-bold">Не все задания 2-й части сданы</div>
             <div class="text-sm mt-1">
                 Нет фото решения по задачам:
-                {% if missing_part2_indexes %}
-                    {% for idx in missing_part2_indexes %}
-                        <span class="font-bold">№{{ idx }}</span>{% if not forloop.last %}, {% endif %}
+                {% if missing_part2_labels %}
+                    {% for label in missing_part2_labels %}
+                        <span class="font-bold">{{ label }}</span>{% if not forloop.last %}, {% endif %}
                     {% endfor %}
                 {% else %}
                     <span class="font-bold">2-й части</span>
@@ -104,16 +104,13 @@
                 {% for task in tasks %}
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden task-card" data-task-id="{{ task.id }}">
                     <div class="bg-gray-50 px-6 py-3 border-b border-gray-100 flex justify-between items-center gap-3">
-                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Задача №{{ forloop.counter }}</span>
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            {% if task.task_type %}{{ task.task_type.label }}{% else %}Задача №{{ forloop.counter }}{% endif %}
+                        </span>
                         <div class="flex items-center gap-2">
                             <button type="button" onclick="openBoard({{ assignment.id }}, {{ task.id }})" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-1 rounded-lg text-xs font-bold transition">
                                 Доска
                             </button>
-                            {% if task.task_type %}
-                            <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-full">
-                                {{ task.task_type.name }}
-                            </span>
-                            {% endif %}
                         </div>
                     </div>
                     <div class="p-6 prose max-w-none text-gray-800 task-content">

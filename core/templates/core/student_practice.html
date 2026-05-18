@@ -100,7 +100,7 @@
                             ID: {{ task.fipi_id|default:task.id }}
                         </span>
                         {% if task.task_type %}
-                        <h3 class="font-medium text-indigo-900 text-sm md:text-base">{{ task.task_type.name }}</h3>
+                        <h3 class="font-medium text-indigo-900 text-sm md:text-base">{{ task.task_type.label }}</h3>
                         <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{{ task.task_type.exam_format.name }}</span>
                         {% else %}
                         <h3 class="font-medium text-indigo-900 text-sm md:text-base">{{ task.topic.name }}</h3>

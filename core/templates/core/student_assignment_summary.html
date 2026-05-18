@@ -105,13 +105,8 @@
                 {% for item in tasks_list %}
                 <div class="px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 {% if item.submission and item.submission.is_correct %}bg-green-50/40{% else %}bg-red-50/40{% endif %}">
                     <div class="flex items-center gap-3 min-w-0">
-                        <span class="text-sm font-black {% if item.submission and item.submission.is_correct %}text-green-700{% else %}text-red-700{% endif %}">№{{ forloop.counter }}</span>
-                        <span class="text-sm text-gray-800 truncate">
-                            {% if item.task.task_type %}
-                                Тип {{ item.task.task_type.number }} — {{ item.task.task_type.name }}
-                            {% else %}
-                                Без типа
-                            {% endif %}
+                        <span class="text-sm font-black {% if item.submission and item.submission.is_correct %}text-green-700{% else %}text-red-700{% endif %}">
+                            {% if item.task.task_type %}{{ item.task.task_type.label }}{% else %}№{{ forloop.counter }}{% endif %}
                         </span>
                     </div>
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -140,15 +135,19 @@
                     <div class="flex items-center space-x-3">
                         {% if item.submission and item.submission.is_correct %}
                             <i class="fas fa-check-circle text-green-600 text-lg"></i>
-                            <span class="text-sm font-bold text-green-800">Задача №{{ forloop.counter }} (Верно)</span>
+                            <span class="text-sm font-bold text-green-800">
+                                Задача {% if item.task.task_type %}{{ item.task.task_type.label }}{% else %}№{{ forloop.counter }}{% endif %} (Верно)
+                            </span>
                         {% else %}
                             <i class="fas fa-times-circle text-red-500 text-lg"></i>
-                            <span class="text-sm font-bold text-red-800">Задача №{{ forloop.counter }} (Ошибка)</span>
+                            <span class="text-sm font-bold text-red-800">
+                                Задача {% if item.task.task_type %}{{ item.task.task_type.label }}{% else %}№{{ forloop.counter }}{% endif %} (Ошибка)
+                            </span>
                         {% endif %}
                     </div>
                     {% if item.task.task_type %}
                     <span class="bg-white/60 text-gray-800 text-xs font-bold px-2 py-1 rounded-md shadow-sm">
-                        {{ item.task.task_type.name }}
+                        {{ item.task.task_type.normalized_name }}
                     </span>
                     {% endif %}
                 </div>
