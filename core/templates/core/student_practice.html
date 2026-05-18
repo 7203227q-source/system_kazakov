@@ -179,6 +179,10 @@
                                 <div id="srs_ai_score" class="text-xs font-bold text-gray-700"></div>
                             </div>
                             <div id="srs_ai_verdict_body" class="mt-3 text-sm text-gray-700 bg-white p-3 rounded border border-gray-200 whitespace-pre-line"></div>
+                            <div id="srs_solution_block" class="hidden mt-4">
+                                <div class="text-sm font-bold text-gray-800 mb-2">Решение из базы</div>
+                                <div id="srs_solution_html" class="prose max-w-none text-sm"></div>
+                            </div>
                             <div class="mt-4 flex justify-end">
                                 <button type="button"
                                         id="btn_srs_next"
@@ -241,6 +245,8 @@
                                 const verdict = document.getElementById('srs_ai_verdict');
                                 const body = document.getElementById('srs_ai_verdict_body');
                                 const score = document.getElementById('srs_ai_score');
+                                const solBlock = document.getElementById('srs_solution_block');
+                                const solHtml = document.getElementById('srs_solution_html');
                                 if (!submissionId) return;
                                 if (btn) {
                                     btn.disabled = true;
@@ -268,6 +274,15 @@
                                     if (body) {
                                         body.innerHTML = (data && data.feedback_html) ? data.feedback_html : escapeHtml(data && data.feedback ? data.feedback : '');
                                     }
+                                    if (solHtml) {
+                                        solHtml.innerHTML = (data && data.solution_html)
+                                            ? data.solution_html
+                                            : '<p class="text-gray-500 italic">Решение для этой задачи пока не добавлено в базу.</p>';
+                                        if (window.MathJax) {
+                                            MathJax.typesetPromise([solHtml]);
+                                        }
+                                    }
+                                    if (solBlock) solBlock.classList.remove('hidden');
                                     if (verdict) verdict.classList.remove('hidden');
                                     // Скроем блок загрузки, чтобы не было двойного UI
                                     const up = document.getElementById('srs_upload_block');

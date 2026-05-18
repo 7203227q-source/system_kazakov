@@ -215,6 +215,17 @@ class Task(models.Model):
             fixed, _ = fix_latex_tokens_in_html(classic.solution)
             fixed2, _ = fix_math_words_in_html(fixed)
             return fixed2
+        any_variant = (
+            self.variants.exclude(solution__isnull=True)
+            .exclude(solution__exact="")
+            .first()
+        )
+        if any_variant and any_variant.solution:
+            from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
+
+            fixed, _ = fix_latex_tokens_in_html(any_variant.solution)
+            fixed2, _ = fix_math_words_in_html(fixed)
+            return fixed2
         return ""
 
     def __str__(self):

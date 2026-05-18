@@ -1206,11 +1206,11 @@ def student_check_assignment_task(request, assignment_id, task_id):
         profile.level = new_level
         profile.save()
         
-    # Формируем HTML решения
-    solution_html = ""
-    variant = task.variants.filter(theme='classic').first()
-    if variant and variant.solution:
-        solution_html = variant.solution
+    theme = getattr(request.user, "preferred_theme", None) or "classic"
+    try:
+        solution_html = task.get_solution_for_theme(theme) or ""
+    except Exception:
+        solution_html = ""
 
     unlocked = request.session.get('whiteboard_unlocked', {}) or {}
     unlocked[f"{int(assignment.id)}:{int(task.id)}"] = True
@@ -4909,10 +4909,11 @@ def api_submission_reveal_solution(request, submission_id):
     submission.show_solution_allowed = True
     submission.save(update_fields=['show_solution_allowed'])
 
-    solution_html = ""
-    variant = task.variants.filter(theme='classic').first()
-    if variant and variant.solution:
-        solution_html = variant.solution
+    theme = getattr(request.user, "preferred_theme", None) or "classic"
+    try:
+        solution_html = task.get_solution_for_theme(theme) or ""
+    except Exception:
+        solution_html = ""
 
     return JsonResponse({'status': 'ok', 'solution_html': solution_html})
 
@@ -5184,9 +5185,10 @@ def api_verify_with_ai(request, submission_id):
         import mimetypes
         import json as pyjson
 
+        theme = getattr(request.user, "preferred_theme", None) or "classic"
         task_html = ""
         try:
-            task_html = task.get_content_for_theme() or ""
+            task_html = task.get_content_for_theme(theme) or ""
         except Exception:
             task_html = ""
 
@@ -5471,9 +5473,10 @@ def api_verify_with_ai(request, submission_id):
             pass
 
         solution_html = ""
-        variant = task.variants.filter(theme='classic').first()
-        if variant and variant.solution:
-            solution_html = variant.solution
+        try:
+            solution_html = task.get_solution_for_theme(theme) or ""
+        except Exception:
+            solution_html = ""
 
         return JsonResponse({
             'status': 'ok',
@@ -5774,10 +5777,12 @@ def api_tutor_verify_with_ai(request, submission_id):
         except Exception:
             pass
 
+        theme = getattr(student, "preferred_theme", None) or "classic"
         solution_html = ""
-        variant = task.variants.filter(theme='classic').first()
-        if variant and variant.solution:
-            solution_html = variant.solution
+        try:
+            solution_html = task.get_solution_for_theme(theme) or ""
+        except Exception:
+            solution_html = ""
 
         return JsonResponse({
             'status': 'ok',
