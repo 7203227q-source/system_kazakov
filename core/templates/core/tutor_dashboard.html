@@ -182,9 +182,6 @@
                         <span class="hidden md:inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-2 rounded-lg text-sm font-bold">
                             Повторил: {{ selected_student.srs_reviewed_today|default:0 }}
                         </span>
-                        <button class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm flex items-center">
-                            <i class="fas fa-chart-line mr-2 text-primary"></i> Полная статистика
-                        </button>
                         <a href="{% url 'tutor_student_history' selected_student.id %}" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm flex items-center">
                             <i class="fas fa-history mr-2 text-indigo-500"></i> Журнал решений
                         </a>
