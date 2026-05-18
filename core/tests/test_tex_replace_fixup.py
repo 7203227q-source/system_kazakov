@@ -36,3 +36,10 @@ class TexReplaceFixupTests(SimpleTestCase):
         self.assertIn(r"\alpha", out)
         self.assertNotIn("синус", out.lower())
         self.assertNotIn("альфа", out.lower())
+
+    def test_converts_infinity_word_inside_math(self):
+        html = "<p>$(-3; +бесконечность)$</p><p>$(-бесконечность; -3)$</p>"
+        out, fixed = fix_latex_tokens_in_html(html)
+        self.assertGreaterEqual(fixed, 1)
+        self.assertIn(r"\infty", out)
+        self.assertNotIn("бесконечност", out.lower())
