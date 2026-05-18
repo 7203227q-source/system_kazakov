@@ -1,4 +1,4 @@
-{% load ui_datetime %}
+{% load ui_datetime json_extras %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -247,6 +247,44 @@
                                                     {% endfor %}
                                                 </ul>
                                             </div>
+                                        {% endif %}
+
+                                        {% if task.saved_submission.ai_score_breakdown.0 %}
+                                            <div class="mb-4">
+                                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Снятие баллов:</p>
+                                                <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                                                    <ul class="space-y-2">
+                                                        {% for b in task.saved_submission.ai_score_breakdown %}
+                                                            <li>
+                                                                <div class="font-semibold text-gray-800">{{ b.label|default:"Критерий" }}: {{ b.awarded|default:0 }}/{{ b.max|default:0 }}</div>
+                                                                {% if b.reason %}
+                                                                    <div class="text-gray-700 whitespace-pre-wrap">{{ b.reason }}</div>
+                                                                {% endif %}
+                                                            </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        {% elif task.saved_submission.ai_score_breakdown_json %}
+                                            {% with task.saved_submission.ai_score_breakdown_json|json_load as ai_score_breakdown %}
+                                                {% if ai_score_breakdown %}
+                                                    <div class="mb-4">
+                                                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Снятие баллов:</p>
+                                                        <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                                                            <ul class="space-y-2">
+                                                                {% for b in ai_score_breakdown %}
+                                                                    <li>
+                                                                        <div class="font-semibold text-gray-800">{{ b.label|default:"Критерий" }}: {{ b.awarded|default:0 }}/{{ b.max|default:0 }}</div>
+                                                                        {% if b.reason %}
+                                                                            <div class="text-gray-700 whitespace-pre-wrap">{{ b.reason }}</div>
+                                                                        {% endif %}
+                                                                    </li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                            {% endwith %}
                                         {% endif %}
 
                                         {% if task.saved_submission.ai_verdict %}
@@ -832,7 +870,8 @@
             const hasStructured =
                 (typeof data.recognized_solution === 'string' && data.recognized_solution.trim().length > 0) ||
                 (Array.isArray(data.mistakes) && data.mistakes.length > 0) ||
-                (Array.isArray(data.verdict) && data.verdict.length > 0);
+                (Array.isArray(data.verdict) && data.verdict.length > 0) ||
+                (Array.isArray(data.score_breakdown) && data.score_breakdown.length > 0);
 
             if (hasStructured) {
                 const wrap = document.createElement('div');
@@ -864,6 +903,39 @@
                     ms.forEach(m => {
                         const li = document.createElement('li');
                         li.textContent = m;
+                        ul.appendChild(li);
+                    });
+                    body.appendChild(ul);
+                });
+
+                renderSection(wrap, 'Снятие баллов:', (body) => {
+                    const items = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
+                    if (!items.length) {
+                        const p = document.createElement('p');
+                        p.className = 'text-gray-500 italic';
+                        p.textContent = 'Разбивка баллов не получена.';
+                        body.appendChild(p);
+                        return;
+                    }
+                    const ul = document.createElement('ul');
+                    ul.className = 'space-y-2';
+                    items.forEach(it => {
+                        const li = document.createElement('li');
+                        const head = document.createElement('div');
+                        head.className = 'font-semibold text-gray-800';
+                        const label = (it && it.label) ? String(it.label) : 'Критерий';
+                        const awarded = (it && it.awarded != null) ? String(it.awarded) : '0';
+                        const max = (it && it.max != null) ? String(it.max) : '0';
+                        head.textContent = `${label}: ${awarded}/${max}`;
+                        li.appendChild(head);
+
+                        const reason = (it && it.reason) ? String(it.reason) : '';
+                        if (reason.trim()) {
+                            const r = document.createElement('div');
+                            r.className = 'text-gray-700 whitespace-pre-wrap';
+                            r.textContent = reason;
+                            li.appendChild(r);
+                        }
                         ul.appendChild(li);
                     });
                     body.appendChild(ul);
@@ -942,6 +1014,39 @@
                             ms.forEach(m => {
                                 const li = document.createElement('li');
                                 li.textContent = m;
+                                ul.appendChild(li);
+                            });
+                            body.appendChild(ul);
+                        });
+
+                        renderSection(wrap2, 'Снятие баллов:', (body) => {
+                            const items = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
+                            if (!items.length) {
+                                const p = document.createElement('p');
+                                p.className = 'text-gray-500 italic';
+                                p.textContent = 'Разбивка баллов не получена.';
+                                body.appendChild(p);
+                                return;
+                            }
+                            const ul = document.createElement('ul');
+                            ul.className = 'space-y-2';
+                            items.forEach(it => {
+                                const li = document.createElement('li');
+                                const head = document.createElement('div');
+                                head.className = 'font-semibold text-gray-800';
+                                const label = (it && it.label) ? String(it.label) : 'Критерий';
+                                const awarded = (it && it.awarded != null) ? String(it.awarded) : '0';
+                                const max = (it && it.max != null) ? String(it.max) : '0';
+                                head.textContent = `${label}: ${awarded}/${max}`;
+                                li.appendChild(head);
+
+                                const reason = (it && it.reason) ? String(it.reason) : '';
+                                if (reason.trim()) {
+                                    const r = document.createElement('div');
+                                    r.className = 'text-gray-700 whitespace-pre-wrap';
+                                    r.textContent = reason;
+                                    li.appendChild(r);
+                                }
                                 ul.appendChild(li);
                             });
                             body.appendChild(ul);
