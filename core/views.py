@@ -4115,7 +4115,9 @@ def task_bank_task_edit(request, task_id: int):
     if request.method == "POST":
         variant.content = request.POST.get("content", "") or ""
         variant.solution = request.POST.get("solution", "") or ""
+        task.correct_answer = request.POST.get("correct_answer", "") or ""
         variant.save(update_fields=["content", "solution"])
+        task.save(update_fields=["correct_answer"])
         messages.success(request, "Сохранено.")
         return redirect("task_bank_task_edit", task_id=task.id)
 
@@ -4166,6 +4168,7 @@ def task_bank_task_render_preview(request, task_id: int):
 
     content = payload.get("content") or ""
     solution = payload.get("solution") or ""
+    correct_answer = payload.get("correct_answer") or ""
 
     from core.task_html import normalize_task_html
     from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
@@ -4178,7 +4181,7 @@ def task_bank_task_render_preview(request, task_id: int):
     solution3 = normalize_task_html(solution2) if solution2 else solution2
     solution4, _ = fix_math_words_in_html(solution3) if solution3 else (solution3, 0)
 
-    return JsonResponse({"content_html": content4, "solution_html": solution4 or ""})
+    return JsonResponse({"content_html": content4, "solution_html": solution4 or "", "correct_answer": correct_answer})
 
 @login_required
 def import_tasks_view(request):

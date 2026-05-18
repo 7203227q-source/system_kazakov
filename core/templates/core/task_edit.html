@@ -75,6 +75,10 @@
                         <div class="font-bold mb-2">Решение (classic)</div>
                         <textarea name="solution" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.solution }}</textarea>
                     </div>
+                    <div>
+                        <div class="font-bold mb-2">Ответ (поле)</div>
+                        <input name="correct_answer" class="w-full border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white" value="{{ task.correct_answer }}">
+                    </div>
                     <div class="flex items-center gap-3">
                         <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-bold hover:bg-indigo-800 transition">Сохранить</button>
                     </div>
@@ -125,9 +129,10 @@
         async function renderPreview() {
             const contentEl = document.querySelector('textarea[name="content"]');
             const solutionEl = document.querySelector('textarea[name="solution"]');
+            const answerEl = document.querySelector('input[name="correct_answer"]');
             const csrf = document.querySelector('#task-edit-form [name=csrfmiddlewaretoken]')?.value;
             const status = document.getElementById('live-preview-status');
-            if (!contentEl || !solutionEl || !csrf) return;
+            if (!contentEl || !solutionEl || !answerEl || !csrf) return;
 
             if (status) status.textContent = "Обновление…";
 
@@ -137,7 +142,7 @@
                 res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-                    body: JSON.stringify({ content: contentEl.value || "", solution: solutionEl.value || "" }),
+                    body: JSON.stringify({ content: contentEl.value || "", solution: solutionEl.value || "", correct_answer: answerEl.value || "" }),
                 });
             } catch (e) {
                 if (status) status.textContent = "";
@@ -153,6 +158,8 @@
             const outSolution = document.getElementById('live-preview-solution');
             if (outContent) outContent.innerHTML = data.content_html || '';
             if (outSolution) outSolution.innerHTML = data.solution_html || '';
+            const outAnswer = document.getElementById('live-preview-answer');
+            if (outAnswer) outAnswer.textContent = (data.correct_answer ?? '') || '';
 
             if (window.MathJax && window.MathJax.typesetPromise) {
                 try {
@@ -168,9 +175,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             const contentEl = document.querySelector('textarea[name="content"]');
             const solutionEl = document.querySelector('textarea[name="solution"]');
+            const answerEl = document.querySelector('input[name="correct_answer"]');
             const debounced = debounce(renderPreview, 700);
             if (contentEl) contentEl.addEventListener('input', debounced);
             if (solutionEl) solutionEl.addEventListener('input', debounced);
+            if (answerEl) answerEl.addEventListener('input', debounced);
             renderPreview();
         });
     </script>
