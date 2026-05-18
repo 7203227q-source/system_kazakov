@@ -1168,14 +1168,17 @@ def student_check_assignment_task(request, assignment_id, task_id):
     )
     
     locked = False
-    if not created and submission.is_correct is not None:
-        locked = True
-        is_correct = bool(submission.is_correct)
-    elif not created:
-        submission.user_answer = user_answer
-        submission.is_correct = is_correct
-        submission.score = int(points_earned or 0)
-        submission.save()
+    prev_correct = False
+    if not created:
+        prev_correct = bool(submission.is_correct)
+        if prev_correct:
+            locked = True
+            is_correct = True
+        else:
+            submission.user_answer = user_answer
+            submission.is_correct = is_correct
+            submission.score = int(points_earned or 0)
+            submission.save(update_fields=["user_answer", "is_correct", "score"])
 
     # Автодобавление в интервальное повторение: только из вариантов и только неверные
     if not is_correct and not locked:
@@ -1186,7 +1189,7 @@ def student_check_assignment_task(request, assignment_id, task_id):
         
     # Если решили правильно, даем XP (только если еще не давали)
     xp_gained = max(1, int(task.difficulty / 5))
-    if is_correct and created:
+    if is_correct and (created or (not prev_correct and not locked)):
         profile, _ = StudentSubjectProfile.objects.get_or_create(
             student=request.user,
             subject=task.topic.subject,
@@ -5084,6 +5087,39 @@ def api_verify_with_ai(request, submission_id):
         except Exception:
             task_html = ""
 
+        def _filefield_to_data_url(ff) -> str:
+            file_path_local = ff.path
+            mime_local = ""
+            try:
+                mime_local = (getattr(getattr(ff, "file", None), "content_type", "") or "").split(";", 1)[0].strip().lower()
+            except Exception:
+                mime_local = ""
+            if not mime_local:
+                mime_local = (mimetypes.guess_type(file_path_local)[0] or "").split(";", 1)[0].strip().lower()
+            allowed_local = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+            with open(file_path_local, "rb") as f:
+                raw_local = f.read()
+            if mime_local in allowed_local:
+                return f"data:{mime_local};base64,{base64.b64encode(raw_local).decode('utf-8')}"
+            try:
+                from io import BytesIO
+                from PIL import Image, ImageOps
+
+                img = Image.open(BytesIO(raw_local))
+                img = ImageOps.exif_transpose(img)
+                if img.mode in {"RGBA", "LA"}:
+                    bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+                    bg.alpha_composite(img.convert("RGBA"))
+                    img = bg.convert("RGB")
+                else:
+                    img = img.convert("RGB")
+                out = BytesIO()
+                img.save(out, format="JPEG", quality=90, optimize=True)
+                raw_jpg = out.getvalue()
+                return f"data:image/jpeg;base64,{base64.b64encode(raw_jpg).decode('utf-8')}"
+            except Exception:
+                raise ValueError(mime_local or "unknown")
+
         soup = BeautifulSoup(task_html, "html.parser") if task_html else None
         task_text = ""
         task_image_data_urls = []
@@ -5127,42 +5163,15 @@ def api_verify_with_ai(request, submission_id):
                     b64 = base64.b64encode(f.read()).decode("utf-8")
                 task_image_data_urls.append(f"data:{mime_img};base64,{b64}")
 
-        file_path = submission.image_url.path
-        mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
-        with open(file_path, "rb") as f:
-            img_b64 = base64.b64encode(f.read()).decode("utf-8")
-        data_url = f"data:{mime};base64,{img_b64}"
+        try:
+            data_url = _filefield_to_data_url(submission.image_url)
+        except ValueError as e:
+            return JsonResponse({'error': 'unsupported_image_format', 'mime': str(e)}, status=400)
 
         data_url_2 = None
         if getattr(submission, "image_url_2", None):
             try:
-                file_path2 = submission.image_url_2.path
-                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
-                with open(file_path2, "rb") as f:
-                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
-                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
-            except Exception:
-                data_url_2 = None
-
-        data_url_2 = None
-        if getattr(submission, "image_url_2", None):
-            try:
-                file_path2 = submission.image_url_2.path
-                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
-                with open(file_path2, "rb") as f:
-                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
-                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
-            except Exception:
-                data_url_2 = None
-
-        data_url_2 = None
-        if getattr(submission, "image_url_2", None):
-            try:
-                file_path2 = submission.image_url_2.path
-                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
-                with open(file_path2, "rb") as f:
-                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
-                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
+                data_url_2 = _filefield_to_data_url(submission.image_url_2)
             except Exception:
                 data_url_2 = None
 
@@ -5465,6 +5474,39 @@ def api_tutor_verify_with_ai(request, submission_id):
         except Exception:
             task_html = ""
 
+        def _filefield_to_data_url(ff) -> str:
+            file_path_local = ff.path
+            mime_local = ""
+            try:
+                mime_local = (getattr(getattr(ff, "file", None), "content_type", "") or "").split(";", 1)[0].strip().lower()
+            except Exception:
+                mime_local = ""
+            if not mime_local:
+                mime_local = (mimetypes.guess_type(file_path_local)[0] or "").split(";", 1)[0].strip().lower()
+            allowed_local = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+            with open(file_path_local, "rb") as f:
+                raw_local = f.read()
+            if mime_local in allowed_local:
+                return f"data:{mime_local};base64,{base64.b64encode(raw_local).decode('utf-8')}"
+            try:
+                from io import BytesIO
+                from PIL import Image, ImageOps
+
+                img = Image.open(BytesIO(raw_local))
+                img = ImageOps.exif_transpose(img)
+                if img.mode in {"RGBA", "LA"}:
+                    bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+                    bg.alpha_composite(img.convert("RGBA"))
+                    img = bg.convert("RGB")
+                else:
+                    img = img.convert("RGB")
+                out = BytesIO()
+                img.save(out, format="JPEG", quality=90, optimize=True)
+                raw_jpg = out.getvalue()
+                return f"data:image/jpeg;base64,{base64.b64encode(raw_jpg).decode('utf-8')}"
+            except Exception:
+                raise ValueError(mime_local or "unknown")
+
         soup = BeautifulSoup(task_html, "html.parser") if task_html else None
         task_text = ""
         task_image_data_urls = []
@@ -5474,20 +5516,15 @@ def api_tutor_verify_with_ai(request, submission_id):
             task_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True) or "").strip()
             task_text = task_text.replace("\\", "\\\\")
 
-        file_path = submission.image_url.path
-        mime = mimetypes.guess_type(file_path)[0] or "image/jpeg"
-        with open(file_path, "rb") as f:
-            img_b64 = base64.b64encode(f.read()).decode("utf-8")
-        data_url = f"data:{mime};base64,{img_b64}"
+        try:
+            data_url = _filefield_to_data_url(submission.image_url)
+        except ValueError as e:
+            return JsonResponse({'error': 'unsupported_image_format', 'mime': str(e)}, status=400)
 
         data_url_2 = None
         if getattr(submission, "image_url_2", None):
             try:
-                file_path2 = submission.image_url_2.path
-                mime2 = mimetypes.guess_type(file_path2)[0] or "image/jpeg"
-                with open(file_path2, "rb") as f:
-                    img_b64_2 = base64.b64encode(f.read()).decode("utf-8")
-                data_url_2 = f"data:{mime2};base64,{img_b64_2}"
+                data_url_2 = _filefield_to_data_url(submission.image_url_2)
             except Exception:
                 data_url_2 = None
 
