@@ -50,6 +50,7 @@ urlpatterns = [
     path('tutor/tasks/', views.tutor_task_bank, name='tutor_task_bank'),
     path('tutor/tasks/uniqualize/', views.tutor_bulk_uniqualize, name='tutor_bulk_uniqualize'),
     path('tutor/tasks/purge/', views.tutor_task_purge, name='tutor_task_purge'),
+    path("tutor/tasks/<int:task_id>/edit/", views.task_bank_task_edit, name="task_bank_task_edit"),
     path('tutor/tasks/<int:task_id>/regen/preview/', views.admin_task_regen_preview, name='admin_task_regen_preview'),
     path('tutor/tasks/<int:task_id>/regen/apply/', views.admin_task_regen_apply, name='admin_task_regen_apply'),
     path('tutor/create-assignment/', views.tutor_create_assignment, name='tutor_create_assignment'),

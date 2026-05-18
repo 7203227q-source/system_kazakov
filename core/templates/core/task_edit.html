@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование задачи</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-5xl mx-auto p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div class="font-bold text-xl">Редактирование задачи #{{ task.id }}</div>
+            <a class="text-indigo-700 font-bold" href="{% url 'tutor_task_bank' %}">← Назад</a>
+        </div>
+
+        {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+            <div class="rounded-lg border px-4 py-3 text-sm {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800{% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800{% else %}bg-gray-50 border-gray-200 text-gray-800{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <div class="font-bold mb-2">Условие (classic)</div>
+                <textarea name="content" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.content }}</textarea>
+            </div>
+            <div>
+                <div class="font-bold mb-2">Решение (classic)</div>
+                <textarea name="solution" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.solution }}</textarea>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-bold hover:bg-indigo-800 transition">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
+

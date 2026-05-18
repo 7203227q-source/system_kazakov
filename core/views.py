@@ -4077,6 +4077,26 @@ def tutor_task_bank(request):
         'subtype_filter': subtype_filter,
     })
 
+
+@login_required
+def task_bank_task_edit(request, task_id: int):
+    if request.user.role != "admin":
+        return redirect("tutor_task_bank")
+
+    task = get_object_or_404(Task.objects.select_related("topic", "task_type"), id=task_id)
+    variant = task.variants.filter(theme="classic").first()
+    if not variant:
+        variant = TaskVariant.objects.create(task=task, theme="classic", content="", solution="")
+
+    if request.method == "POST":
+        variant.content = request.POST.get("content", "") or ""
+        variant.solution = request.POST.get("solution", "") or ""
+        variant.save(update_fields=["content", "solution"])
+        messages.success(request, "Сохранено.")
+        return redirect("task_bank_task_edit", task_id=task.id)
+
+    return render(request, "core/task_edit.html", {"task": task, "variant": variant})
+
 @login_required
 def import_tasks_view(request):
     if request.user.role != 'admin':
