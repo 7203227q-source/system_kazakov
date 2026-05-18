@@ -363,9 +363,14 @@
                                 {% endif %}
                             </div>
                             {% if user.role == 'admin' %}
-                            <button type="button" onclick="openRegenModal({{ task.id }})" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold flex items-center transition">
-                                <i class="fas fa-wand-magic-sparkles mr-2"></i> ИИ: Регенерировать
-                            </button>
+                            <div class="flex items-center gap-4">
+                                <a href="/tutor/tasks/{{ task.id }}/edit/" class="text-gray-700 hover:text-gray-900 text-sm font-bold flex items-center transition">
+                                    <i class="fas fa-pen-to-square mr-2"></i> Редактировать
+                                </a>
+                                <button type="button" onclick="openRegenModal({{ task.id }})" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold flex items-center transition">
+                                    <i class="fas fa-wand-magic-sparkles mr-2"></i> ИИ: Регенерировать
+                                </button>
+                            </div>
                             {% else %}
                             <button type="button" class="text-primary hover:text-indigo-700 text-sm font-medium flex items-center transition">
                                 <i class="fas fa-plus mr-1"></i> Добавить в ДЗ
