@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Редактирование задачи</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [["$", "$"], ["\\(", "\\)"]],
+                displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+                processEscapes: true,
+                packages: { "[+]": ["ams"] }
+            },
+            chtml: {
+                scale: 1.0
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body class="bg-gray-50">
     <div class="max-w-5xl mx-auto p-6">
@@ -23,12 +37,13 @@
         </div>
         {% endif %}
 
-        <div class="flex items-center gap-3 mb-6">
+        <div class="flex flex-wrap items-center gap-3 mb-6">
             <a href="{% url 'task_bank_task_svg_to_latex_preview' task.id %}" class="px-4 py-2 rounded-lg bg-gray-900 text-white font-bold hover:bg-black transition">SVG→LaTeX: предпросмотр</a>
             <form method="post" action="{% url 'task_bank_task_svg_to_latex_apply' task.id %}">
                 {% csrf_token %}
                 <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-bold hover:bg-indigo-800 transition">SVG→LaTeX: применить</button>
             </form>
+            <div id="live-preview-status" class="text-sm text-gray-500 ml-auto"></div>
         </div>
 
         {% if svg_report %}
@@ -48,20 +63,116 @@
         </div>
         {% endif %}
 
-        <form method="post" class="space-y-4">
-            {% csrf_token %}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-                <div class="font-bold mb-2">Условие (classic)</div>
-                <textarea name="content" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.content }}</textarea>
+                <form id="task-edit-form" method="post" class="space-y-4">
+                    {% csrf_token %}
+                    <div>
+                        <div class="font-bold mb-2">Условие (classic)</div>
+                        <textarea name="content" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.content }}</textarea>
+                    </div>
+                    <div>
+                        <div class="font-bold mb-2">Решение (classic)</div>
+                        <textarea name="solution" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.solution }}</textarea>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-bold hover:bg-indigo-800 transition">Сохранить</button>
+                    </div>
+                </form>
             </div>
             <div>
-                <div class="font-bold mb-2">Решение (classic)</div>
-                <textarea name="solution" class="w-full h-64 border border-gray-300 rounded-lg p-3 font-mono text-sm bg-white">{{ variant.solution }}</textarea>
+                <div class="bg-white border border-gray-200 rounded-xl p-4">
+                    <div class="font-bold text-gray-800 mb-3">Предпросмотр</div>
+                    <div class="text-sm mb-4">
+                        <span class="text-gray-500 mr-2">Ответ:</span>
+                        <span id="live-preview-answer" class="font-bold text-green-700">{{ task.correct_answer }}</span>
+                    </div>
+                    <div class="font-bold mb-2">Условие</div>
+                    <div id="live-preview-content" class="prose max-w-none text-sm"></div>
+                    <div class="font-bold mt-4 mb-2">Решение</div>
+                    <div id="live-preview-solution" class="prose max-w-none text-sm"></div>
+                </div>
             </div>
-            <div class="flex items-center gap-3">
-                <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-bold hover:bg-indigo-800 transition">Сохранить</button>
-            </div>
-        </form>
+        </div>
     </div>
+
+    {% include "core/image_modal.html" %}
+
+    <script>
+        function debounce(fn, ms) {
+            let t = null;
+            return function (...args) {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(this, args), ms);
+            };
+        }
+
+        function bindPreviewImages() {
+            const images = document.querySelectorAll('#live-preview-content img, #live-preview-solution img');
+            images.forEach(img => {
+                if (img.classList.contains('tex')) return;
+                img.classList.add('cursor-zoom-in', 'hover:opacity-80', 'transition-opacity', 'rounded');
+                img.title = "Нажмите для увеличения";
+                if (img.dataset.previewBound === "1") return;
+                img.dataset.previewBound = "1";
+                img.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openImageModal(img.src);
+                });
+            });
+        }
+
+        async function renderPreview() {
+            const contentEl = document.querySelector('textarea[name="content"]');
+            const solutionEl = document.querySelector('textarea[name="solution"]');
+            const csrf = document.querySelector('#task-edit-form [name=csrfmiddlewaretoken]')?.value;
+            const status = document.getElementById('live-preview-status');
+            if (!contentEl || !solutionEl || !csrf) return;
+
+            if (status) status.textContent = "Обновление…";
+
+            const url = "{% url 'task_bank_task_render_preview' task.id %}";
+            let res = null;
+            try {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                    body: JSON.stringify({ content: contentEl.value || "", solution: solutionEl.value || "" }),
+                });
+            } catch (e) {
+                if (status) status.textContent = "";
+                return;
+            }
+            if (!res.ok) {
+                if (status) status.textContent = "";
+                return;
+            }
+            const data = await res.json();
+
+            const outContent = document.getElementById('live-preview-content');
+            const outSolution = document.getElementById('live-preview-solution');
+            if (outContent) outContent.innerHTML = data.content_html || '';
+            if (outSolution) outSolution.innerHTML = data.solution_html || '';
+
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                try {
+                    await window.MathJax.typesetPromise();
+                } catch (e) {
+                }
+            }
+            bindPreviewImages();
+
+            if (status) status.textContent = "";
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const contentEl = document.querySelector('textarea[name="content"]');
+            const solutionEl = document.querySelector('textarea[name="solution"]');
+            const debounced = debounce(renderPreview, 700);
+            if (contentEl) contentEl.addEventListener('input', debounced);
+            if (solutionEl) solutionEl.addEventListener('input', debounced);
+            renderPreview();
+        });
+    </script>
 </body>
 </html>
