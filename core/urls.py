@@ -61,6 +61,11 @@ urlpatterns = [
         views.task_bank_task_svg_to_latex_apply,
         name="task_bank_task_svg_to_latex_apply",
     ),
+    path(
+        "tutor/tasks/<int:task_id>/render-preview/",
+        views.task_bank_task_render_preview,
+        name="task_bank_task_render_preview",
+    ),
     path('tutor/tasks/<int:task_id>/regen/preview/', views.admin_task_regen_preview, name='admin_task_regen_preview'),
     path('tutor/tasks/<int:task_id>/regen/apply/', views.admin_task_regen_apply, name='admin_task_regen_apply'),
     path('tutor/create-assignment/', views.tutor_create_assignment, name='tutor_create_assignment'),

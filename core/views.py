@@ -4128,6 +4128,34 @@ def task_bank_task_svg_to_latex_apply(request, task_id: int):
         messages.info(request, "Изменений не найдено.")
     return redirect("task_bank_task_edit", task_id=task_id)
 
+
+@login_required
+@require_POST
+def task_bank_task_render_preview(request, task_id: int):
+    if request.user.role != "admin":
+        return redirect("tutor_task_bank")
+
+    try:
+        payload = json.loads((request.body or b"{}").decode("utf-8"))
+    except Exception:
+        payload = {}
+
+    content = payload.get("content") or ""
+    solution = payload.get("solution") or ""
+
+    from core.task_html import normalize_task_html
+    from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
+
+    content2, _ = fix_latex_tokens_in_html(content)
+    content3 = normalize_task_html(content2)
+    content4, _ = fix_math_words_in_html(content3)
+
+    solution2, _ = fix_latex_tokens_in_html(solution)
+    solution3 = normalize_task_html(solution2) if solution2 else solution2
+    solution4, _ = fix_math_words_in_html(solution3) if solution3 else (solution3, 0)
+
+    return JsonResponse({"content_html": content4, "solution_html": solution4 or ""})
+
 @login_required
 def import_tasks_view(request):
     if request.user.role != 'admin':
