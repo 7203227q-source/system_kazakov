@@ -1534,6 +1534,39 @@ def student_solve_assignment(request, assignment_id):
                     task.saved_submission.ai_verdict = pyjson.loads(task.saved_submission.ai_verdict_json) if task.saved_submission.ai_verdict_json else []
                 except Exception:
                     task.saved_submission.ai_verdict = []
+                try:
+                    task.saved_submission.ai_score_breakdown = (
+                        pyjson.loads(task.saved_submission.ai_score_breakdown_json)
+                        if task.saved_submission.ai_score_breakdown_json
+                        else []
+                    )
+                except Exception:
+                    task.saved_submission.ai_score_breakdown = []
+
+                # Если breakdown есть, но отдельная секция по какой-то причине не отрендерится,
+                # добавляем краткую разбивку в начало ai_verdict (чтобы пользователь всё равно увидел, за что сняты баллы).
+                try:
+                    if task.saved_submission.ai_score_breakdown:
+                        breakdown_lines = []
+                        for b in task.saved_submission.ai_score_breakdown:
+                            if not isinstance(b, dict):
+                                continue
+                            label = str(b.get("label") or "Критерий")
+                            awarded = int(b.get("awarded") or 0)
+                            mx = int(b.get("max") or 0)
+                            reason = str(b.get("reason") or "").strip()
+                            line = f"{label}: {awarded}/{mx}"
+                            if reason:
+                                line += f". {reason}"
+                            breakdown_lines.append(f"- {line}")
+                        if breakdown_lines:
+                            breakdown_paragraph = "Снятие баллов:\n" + "\n".join(breakdown_lines)
+                            if not getattr(task.saved_submission, "ai_verdict", None):
+                                task.saved_submission.ai_verdict = [breakdown_paragraph]
+                            elif breakdown_paragraph not in task.saved_submission.ai_verdict:
+                                task.saved_submission.ai_verdict = [breakdown_paragraph] + list(task.saved_submission.ai_verdict)
+                except Exception:
+                    pass
             if task.saved_submission and getattr(task.saved_submission, "ai_last_verify_at", None):
                 try:
                     dt = task.saved_submission.ai_last_verify_at
@@ -5042,6 +5075,10 @@ def api_submission_clear_images(request, submission_id):
     submission.ai_recognized_solution = None
     submission.ai_mistakes_json = None
     submission.ai_verdict_json = None
+    submission.ai_photo_valid = None
+    submission.ai_photo_valid_reason = None
+    submission.ai_recognition_confidence = None
+    submission.ai_score_breakdown_json = None
     submission.primary_score = 0
     submission.is_correct = False
 
@@ -5051,6 +5088,10 @@ def api_submission_clear_images(request, submission_id):
         "ai_recognized_solution",
         "ai_mistakes_json",
         "ai_verdict_json",
+        "ai_photo_valid",
+        "ai_photo_valid_reason",
+        "ai_recognition_confidence",
+        "ai_score_breakdown_json",
         "primary_score",
         "is_correct",
     ]
@@ -5184,6 +5225,187 @@ def sanitize_ai_feedback_html(text: str) -> str:
             continue
         tag.attrs = {}
     return str(soup)
+
+
+def parse_ai_photo_verdict(parsed: dict, max_points: int, *, confidence_threshold: float = 0.35) -> dict:
+    """
+    Нормализует/валидирует структурированный ответ ИИ по фото и применяет антифрод-гейт.
+
+    Возвращает dict:
+      - primary_score: int
+      - is_correct: bool
+      - feedback: str (человекочитаемый отчёт; fallback собирается автоматически)
+      - recognized_solution: str
+      - mistakes: list[str]
+      - verdict: list[str]
+      - photo_valid: bool
+      - photo_valid_reason: str
+      - recognition_confidence: float|None
+      - score_breakdown: list[dict]
+    """
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    def _to_bool(v, default=None):
+        if v is None:
+            return default
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return bool(v)
+        if isinstance(v, str):
+            return v.strip().lower() in {"true", "1", "yes", "y"}
+        return default
+
+    def _to_int(v, default=0):
+        try:
+            return int(v)
+        except Exception:
+            return default
+
+    def _to_float(v):
+        try:
+            return float(v)
+        except Exception:
+            return None
+
+    primary_score = _to_int(parsed.get("primary_score"), 0)
+    is_correct = _to_bool(parsed.get("is_correct"), False) or False
+    feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or "").strip())
+
+    # Распознавание/структура
+    recognized_solution = normalize_tex_in_feedback(str(parsed.get("recognized_solution") or "").strip())
+
+    mistakes = parsed.get("mistakes") or []
+    if isinstance(mistakes, str):
+        mistakes = [mistakes]
+    if not isinstance(mistakes, list):
+        mistakes = []
+    mistakes = [normalize_tex_in_feedback(str(x).strip()) for x in mistakes if str(x).strip()]
+
+    verdict = parsed.get("verdict") or []
+    if isinstance(verdict, str):
+        verdict = [verdict]
+    if not isinstance(verdict, list):
+        verdict = []
+    verdict = [normalize_tex_in_feedback(str(x).strip()) for x in verdict if str(x).strip()]
+
+    # Антифрод/валидность фото
+    photo_valid = _to_bool(parsed.get("photo_valid"), None)
+    if photo_valid is None:
+        photo_valid = True
+    photo_valid_reason = str(parsed.get("photo_valid_reason") or "").strip()
+    recognition_confidence = _to_float(parsed.get("recognition_confidence"))
+
+    # Breakdown баллов
+    raw_breakdown = parsed.get("score_breakdown") or []
+    if isinstance(raw_breakdown, dict):
+        raw_breakdown = [raw_breakdown]
+    if not isinstance(raw_breakdown, list):
+        raw_breakdown = []
+
+    score_breakdown = []
+    for item in raw_breakdown:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        awarded = _to_int(item.get("awarded"), 0)
+        mx = _to_int(item.get("max"), 0)
+        reason = normalize_tex_in_feedback(str(item.get("reason") or "").strip())
+
+        if not label and not reason:
+            continue
+        if mx < 0:
+            mx = 0
+        if awarded < 0:
+            awarded = 0
+        if awarded > mx:
+            awarded = mx
+
+        score_breakdown.append(
+            {"label": label or "Критерий", "awarded": awarded, "max": mx, "reason": reason}
+        )
+
+    # Если breakdown есть — считаем балл по нему, чтобы сумма "сходилась"
+    if score_breakdown:
+        primary_score = sum(int(x.get("awarded") or 0) for x in score_breakdown)
+
+    # Ограничиваем диапазон
+    try:
+        max_points_int = int(max_points or 0)
+    except Exception:
+        max_points_int = 0
+    if primary_score < 0:
+        primary_score = 0
+    if max_points_int >= 0 and primary_score > max_points_int:
+        primary_score = max_points_int
+    is_correct = bool(max_points_int and primary_score == max_points_int)
+
+    # Антифрод-гейт: невалидное фото или низкая уверенность => 0
+    force_zero = (photo_valid is False) or (
+        recognition_confidence is not None and recognition_confidence < float(confidence_threshold)
+    )
+    if force_zero:
+        primary_score = 0
+        is_correct = False
+        score_breakdown = []
+
+        if photo_valid is False and photo_valid_reason:
+            verdict = [photo_valid_reason] + (verdict or [])
+        if not any(("перефото" in v.lower()) or ("загруз" in v.lower()) for v in (verdict or []) if isinstance(v, str)):
+            verdict = (verdict or []) + [
+                "Загрузите корректное и читаемое фото решения этой задачи (без бликов, крупно, весь ход решения)."
+            ]
+
+    # Гарантируем наличие строки про неуверенность — только если вообще есть verdict.
+    # (Не добавляем "неуверенность" в сценарии, когда модель вернула только feedback.)
+    if verdict and not any(
+        "неуверенность распознавания" in (v.lower()) for v in (verdict or []) if isinstance(v, str)
+    ):
+        if recognition_confidence is None:
+            verdict = (verdict or []) + ["Неуверенность распознавания: неизвестна."]
+        elif recognition_confidence >= 0.8:
+            verdict = (verdict or []) + ["Неуверенность распознавания: низкая."]
+        elif recognition_confidence >= 0.5:
+            verdict = (verdict or []) + ["Неуверенность распознавания: средняя."]
+        else:
+            verdict = (verdict or []) + ["Неуверенность распознавания: высокая."]
+
+    # Сборка fallback-отчёта, если feedback пустой, но есть структура
+    if (recognized_solution or mistakes or verdict or score_breakdown) and not (feedback or "").strip():
+        parts = []
+        if recognized_solution:
+            parts.append("Решение (как распознано):\n" + recognized_solution)
+        if mistakes:
+            parts.append("Ошибки и замечания:\n" + "\n".join(f"- {m}" for m in mistakes))
+        if score_breakdown:
+            lines = []
+            for b in score_breakdown:
+                label = str(b.get("label") or "Критерий")
+                awarded = _to_int(b.get("awarded"), 0)
+                mx = _to_int(b.get("max"), 0)
+                reason = str(b.get("reason") or "").strip()
+                if reason:
+                    lines.append(f"- {label}: {awarded}/{mx}. {reason}")
+                else:
+                    lines.append(f"- {label}: {awarded}/{mx}.")
+            parts.append("Снятие баллов:\n" + "\n".join(lines))
+        if verdict:
+            parts.append("Итоговый вердикт:\n" + "\n\n".join(verdict))
+        feedback = "\n\n".join(parts).strip()
+
+    return {
+        "primary_score": primary_score,
+        "is_correct": is_correct,
+        "feedback": feedback or "",
+        "recognized_solution": recognized_solution,
+        "mistakes": mistakes,
+        "verdict": verdict,
+        "photo_valid": bool(photo_valid),
+        "photo_valid_reason": photo_valid_reason,
+        "recognition_confidence": recognition_confidence,
+        "score_breakdown": score_breakdown,
+    }
 
 def is_extended_answer_task(task) -> bool:
     """
@@ -5402,8 +5624,16 @@ def api_verify_with_ai(request, submission_id):
             "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
             "- primary_score: number\n"
             "- is_correct: boolean\n"
+            "- photo_valid: boolean (валидно ли фото для проверки именно этой задачи; false если это не решение/другая задача/нечитабельно)\n"
+            "- photo_valid_reason: string (почему photo_valid=false; если true — можно пустую строку)\n"
+            "- recognition_confidence: number (0..1; насколько уверенно распознано решение)\n"
             "- recognized_solution: string (что именно ты видишь на фото в решении ученика; допускаются переносы строк)\n"
             "- mistakes: array of strings (ошибки/замечания; каждый элемент — отдельный пункт)\n"
+            "- score_breakdown: array of objects (разбивка снятия баллов; сумма awarded должна равняться primary_score)\n"
+            "  - label: string (например К1/К2 или Ошибка 1)\n"
+            "  - awarded: number (целое)\n"
+            "  - max: number (целое)\n"
+            "  - reason: string (за что снято/почему не максимум)\n"
             "- verdict: array of strings (итоговый вердикт и рекомендации; каждый элемент — отдельный абзац; обязательно укажи, за что сняты баллы; ОБЯЗАТЕЛЬНО добавь отдельным пунктом «Неуверенность распознавания: ...»)\n"
             "- feedback: string (опционально; если заполнишь — это краткий общий текст)\n"
             "\n"
@@ -5411,7 +5641,7 @@ def api_verify_with_ai(request, submission_id):
             "- Описывай в recognized_solution ТОЛЬКО то, что реально видно на фото (формулы, преобразования, подстановки).\n"
             "- Если часть не читается/не видна — явно помечай: [неразборчиво], [не видно], [сомнение].\n"
             "- Не додумывай шаги решения. Если всё же вынужден предположить — явно пометь строку как «ПРЕДПОЛОЖЕНИЕ: ...».\n"
-            "- Если из-за качества фото нельзя надёжно оценить — укажи это в verdict и снизь балл (или поставь 0), но не делай уверенных утверждений.\n"
+            "- Если фото нерелевантно задаче или из-за качества нельзя надёжно оценить — поставь photo_valid=false, primary_score=0 и объясни причину.\n"
             "\n"
             "Формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
             "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши в LaTeX (используй двойной обратный слэш)."
@@ -5498,36 +5728,17 @@ def api_verify_with_ai(request, submission_id):
             else:
                 return JsonResponse({'error': 'ai_failed'}, status=400)
 
-        primary_score = int(parsed.get("primary_score") or 0)
-        ic_val = parsed.get("is_correct")
-        if isinstance(ic_val, str):
-            ic_val = ic_val.strip().lower() in {"true", "1", "yes"}
-        is_correct = bool(ic_val)
-        feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
-
-        # Структурные поля (могут отсутствовать, тогда оставляем дефолты)
-        recognized_solution = str(parsed.get("recognized_solution") or "").strip()
-
-        mistakes = parsed.get("mistakes") or []
-        if isinstance(mistakes, str):
-            mistakes = [mistakes]
-        mistakes = [str(x).strip() for x in mistakes if str(x).strip()]
-
-        verdict = parsed.get("verdict") or []
-        if isinstance(verdict, str):
-            verdict = [verdict]
-        verdict = [str(x).strip() for x in verdict if str(x).strip()]
-
-        # Если модель отдала структурные поля, но не заполнила feedback — собираем человекочитаемый fallback
-        if (recognized_solution or mistakes or verdict) and not feedback.strip():
-            parts = []
-            if recognized_solution:
-                parts.append("Решение (как распознано):\n" + recognized_solution)
-            if mistakes:
-                parts.append("Ошибки и замечания:\n" + "\n".join(f"- {m}" for m in mistakes))
-            if verdict:
-                parts.append("Итоговый вердикт:\n" + "\n\n".join(verdict))
-            feedback = "\n\n".join(parts).strip()
+        ai = parse_ai_photo_verdict(parsed, max_points, confidence_threshold=0.35)
+        primary_score = int(ai.get("primary_score") or 0)
+        is_correct = bool(ai.get("is_correct"))
+        feedback = str(ai.get("feedback") or "")
+        recognized_solution = str(ai.get("recognized_solution") or "")
+        mistakes = ai.get("mistakes") or []
+        verdict = ai.get("verdict") or []
+        photo_valid = bool(ai.get("photo_valid"))
+        photo_valid_reason = str(ai.get("photo_valid_reason") or "").strip()
+        recognition_confidence = ai.get("recognition_confidence")
+        score_breakdown = ai.get("score_breakdown") or []
 
         # Обновляем submission (ИИ-оценка)
         submission.primary_score = primary_score
@@ -5536,6 +5747,12 @@ def api_verify_with_ai(request, submission_id):
         submission.ai_recognized_solution = recognized_solution or None
         submission.ai_mistakes_json = pyjson.dumps(mistakes, ensure_ascii=False) if mistakes else None
         submission.ai_verdict_json = pyjson.dumps(verdict, ensure_ascii=False) if verdict else None
+        submission.ai_photo_valid = photo_valid
+        submission.ai_photo_valid_reason = photo_valid_reason or None
+        submission.ai_recognition_confidence = float(recognition_confidence) if recognition_confidence is not None else None
+        submission.ai_score_breakdown_json = (
+            pyjson.dumps(score_breakdown, ensure_ascii=False) if score_breakdown else None
+        )
         submission.save(
             update_fields=[
                 "primary_score",
@@ -5544,6 +5761,10 @@ def api_verify_with_ai(request, submission_id):
                 "ai_recognized_solution",
                 "ai_mistakes_json",
                 "ai_verdict_json",
+                "ai_photo_valid",
+                "ai_photo_valid_reason",
+                "ai_recognition_confidence",
+                "ai_score_breakdown_json",
             ]
         )
 
@@ -5593,6 +5814,10 @@ def api_verify_with_ai(request, submission_id):
             'recognized_solution': recognized_solution,
             'mistakes': mistakes,
             'verdict': verdict,
+            'photo_valid': photo_valid,
+            'photo_valid_reason': photo_valid_reason,
+            'recognition_confidence': recognition_confidence,
+            'score_breakdown': score_breakdown,
             'is_correct': is_correct,
             'xp_gained': xp_gained,
             'solution_html': solution_html,
@@ -5753,15 +5978,30 @@ def api_tutor_verify_with_ai(request, submission_id):
             "Если решение частично верное — поставь частичный балл.\n"
             "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
             "\n"
-            "ВАЖНО (распознавание): опирайся только на то, что реально видно на фото. Если часть решения не читается/не видна — явно напиши это и не делай уверенных утверждений.\n"
-            "В feedback обязательно коротко объясни, за что сняты баллы, в формате:\n"
-            "- Что верно:\n"
-            "- Ошибки:\n"
-            "- За что сняты баллы:\n"
-            "- Что исправить:\n"
-            "В поле feedback используй Markdown. Все формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
-            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши LaTeX (используй двойной обратный слэш).\n"
-            "Верни ТОЛЬКО JSON с полями: primary_score (число), is_correct (true/false), feedback (строка)."
+            "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
+            "- primary_score: number\n"
+            "- is_correct: boolean\n"
+            "- photo_valid: boolean (валидно ли фото для проверки именно этой задачи; false если это не решение/другая задача/нечитабельно)\n"
+            "- photo_valid_reason: string (почему photo_valid=false; если true — можно пустую строку)\n"
+            "- recognition_confidence: number (0..1; насколько уверенно распознано решение)\n"
+            "- recognized_solution: string (что именно ты видишь на фото в решении ученика; допускаются переносы строк)\n"
+            "- mistakes: array of strings (ошибки/замечания; каждый элемент — отдельный пункт)\n"
+            "- score_breakdown: array of objects (разбивка снятия баллов; сумма awarded должна равняться primary_score)\n"
+            "  - label: string (например К1/К2 или Ошибка 1)\n"
+            "  - awarded: number (целое)\n"
+            "  - max: number (целое)\n"
+            "  - reason: string (за что снято/почему не максимум)\n"
+            "- verdict: array of strings (итоговый вердикт и рекомендации; каждый элемент — отдельный абзац; обязательно укажи, за что сняты баллы; ОБЯЗАТЕЛЬНО добавь отдельным пунктом «Неуверенность распознавания: ...»)\n"
+            "- feedback: string (опционально; если заполнишь — это краткий общий текст)\n"
+            "\n"
+            "ВАЖНО (распознавание):\n"
+            "- Описывай в recognized_solution ТОЛЬКО то, что реально видно на фото (формулы, преобразования, подстановки).\n"
+            "- Если часть не читается/не видна — явно помечай: [неразборчиво], [не видно], [сомнение].\n"
+            "- Не додумывай шаги решения. Если всё же вынужден предположить — явно пометь строку как «ПРЕДПОЛОЖЕНИЕ: ...».\n"
+            "- Если фото нерелевантно задаче или из-за качества нельзя надёжно оценить — поставь photo_valid=false, primary_score=0 и объясни причину.\n"
+            "\n"
+            "Формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
+            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши в LaTeX (используй двойной обратный слэш)."
         )
 
         if task_text:
@@ -5840,18 +6080,45 @@ def api_tutor_verify_with_ai(request, submission_id):
             else:
                 return JsonResponse({'error': 'ai_failed'}, status=400)
 
-        primary_score = int(parsed.get("primary_score") or 0)
-        ic_val = parsed.get("is_correct")
-        if isinstance(ic_val, str):
-            ic_val = ic_val.strip().lower() in {"true", "1", "yes"}
-        is_correct = bool(ic_val)
-        feedback = normalize_tex_in_feedback(str(parsed.get("feedback") or ""))
+        ai = parse_ai_photo_verdict(parsed, max_points, confidence_threshold=0.35)
+        primary_score = int(ai.get("primary_score") or 0)
+        is_correct = bool(ai.get("is_correct"))
+        feedback = str(ai.get("feedback") or "")
+        recognized_solution = str(ai.get("recognized_solution") or "")
+        mistakes = ai.get("mistakes") or []
+        verdict = ai.get("verdict") or []
+        photo_valid = bool(ai.get("photo_valid"))
+        photo_valid_reason = str(ai.get("photo_valid_reason") or "").strip()
+        recognition_confidence = ai.get("recognition_confidence")
+        score_breakdown = ai.get("score_breakdown") or []
 
         # Обновляем submission (ИИ-оценка)
         submission.primary_score = primary_score
         submission.is_correct = is_correct
         submission.ai_feedback = feedback
-        submission.save(update_fields=["primary_score", "is_correct", "ai_feedback"])
+        submission.ai_recognized_solution = recognized_solution or None
+        submission.ai_mistakes_json = pyjson.dumps(mistakes, ensure_ascii=False) if mistakes else None
+        submission.ai_verdict_json = pyjson.dumps(verdict, ensure_ascii=False) if verdict else None
+        submission.ai_photo_valid = photo_valid
+        submission.ai_photo_valid_reason = photo_valid_reason or None
+        submission.ai_recognition_confidence = float(recognition_confidence) if recognition_confidence is not None else None
+        submission.ai_score_breakdown_json = (
+            pyjson.dumps(score_breakdown, ensure_ascii=False) if score_breakdown else None
+        )
+        submission.save(
+            update_fields=[
+                "primary_score",
+                "is_correct",
+                "ai_feedback",
+                "ai_recognized_solution",
+                "ai_mistakes_json",
+                "ai_verdict_json",
+                "ai_photo_valid",
+                "ai_photo_valid_reason",
+                "ai_recognition_confidence",
+                "ai_score_breakdown_json",
+            ]
+        )
 
         # XP и аналитика — только ученику
         points_earned = primary_score
@@ -5896,6 +6163,13 @@ def api_tutor_verify_with_ai(request, submission_id):
             'primary_score': primary_score,
             'feedback': feedback,
             'feedback_html': sanitize_ai_feedback_html(feedback),
+            'recognized_solution': recognized_solution,
+            'mistakes': mistakes,
+            'verdict': verdict,
+            'photo_valid': photo_valid,
+            'photo_valid_reason': photo_valid_reason,
+            'recognition_confidence': recognition_confidence,
+            'score_breakdown': score_breakdown,
             'is_correct': is_correct,
             'xp_gained': xp_gained,
             'solution_html': solution_html,

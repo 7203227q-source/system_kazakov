@@ -410,6 +410,12 @@ class Submission(models.Model):
     ai_recognized_solution = models.TextField(blank=True, null=True, verbose_name="ИИ: распознанное решение (текст)")
     ai_mistakes_json = models.TextField(blank=True, null=True, verbose_name="ИИ: ошибки (JSON-массив строк)")
     ai_verdict_json = models.TextField(blank=True, null=True, verbose_name="ИИ: вердикт (JSON-массив абзацев)")
+
+    # Доп. поля для прозрачности и антифрода (ИИ)
+    ai_photo_valid = models.BooleanField(null=True, blank=True, verbose_name="ИИ: фото валидно ли для этой задачи")
+    ai_photo_valid_reason = models.TextField(blank=True, null=True, verbose_name="ИИ: причина невалидного фото")
+    ai_recognition_confidence = models.FloatField(null=True, blank=True, verbose_name="ИИ: уверенность распознавания (0..1)")
+    ai_score_breakdown_json = models.TextField(blank=True, null=True, verbose_name="ИИ: снятие баллов (JSON-массив объектов)")
     
     tutor_comment = models.TextField(blank=True, null=True, verbose_name="Комментарий репетитора")
 

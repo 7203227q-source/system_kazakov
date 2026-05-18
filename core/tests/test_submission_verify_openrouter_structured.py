@@ -81,7 +81,11 @@ class SubmissionVerifyOpenRouterStructuredTests(TestCase):
         self.assertFalse(data["is_correct"])
         self.assertEqual(data["recognized_solution"], structured["recognized_solution"])
         self.assertEqual(data["mistakes"], structured["mistakes"])
-        self.assertEqual(data["verdict"], structured["verdict"])
+        self.assertEqual(data["verdict"][: len(structured["verdict"])], structured["verdict"])
+        self.assertTrue(
+            any("Неуверенность распознавания" in (v or "") for v in (data.get("verdict") or [])),
+            msg="Ожидали строку про неуверенность распознавания в verdict",
+        )
 
         self.submission.refresh_from_db()
         self.assertTrue(self.submission.ai_recognized_solution)
