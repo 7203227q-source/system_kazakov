@@ -1586,34 +1586,55 @@ def student_solve_assignment(request, assignment_id):
                 continue
 
             user_answer = request.POST.get(f'answer_{task.id}', '').strip()
+            if action == 'postpone':
+                sub, created = Submission.objects.get_or_create(
+                    student=request.user,
+                    task=task,
+                    assignment=assignment,
+                    defaults={
+                        'user_answer': user_answer,
+                        'is_correct': None,
+                        'score': 0,
+                    },
+                )
+                if not created and sub.is_correct is None:
+                    sub.user_answer = user_answer
+                    sub.score = 0
+                    sub.save(update_fields=['user_answer', 'score'])
+
+                subs_by_task_id[task.id] = sub
+                continue
+
             points_earned = int(score_short_answer(task, user_answer) or 0)
             max_points_effective = int(get_max_points_effective(task) or 0)
-            is_correct = (points_earned == max_points_effective)
-            
-            # Ищем старое решение или создаем новое (с привязкой к варианту)
+            computed_is_correct = (points_earned == max_points_effective)
+
             sub, created = Submission.objects.get_or_create(
                 student=request.user,
                 task=task,
                 assignment=assignment,
                 defaults={
                     'user_answer': user_answer,
-                    'is_correct': is_correct,
-                    'score': points_earned
-                }
+                    'is_correct': computed_is_correct,
+                    'score': points_earned,
+                },
             )
-            
+
+            is_correct = computed_is_correct
             if not created:
-                # Если уже было, просто обновим (вдруг ученик поменял ответ при общем сабмите)
-                sub.user_answer = user_answer
-                sub.is_correct = is_correct
-                sub.score = points_earned
-                sub.save()
+                if sub.is_correct is None:
+                    sub.user_answer = user_answer
+                    sub.is_correct = computed_is_correct
+                    sub.score = points_earned
+                    sub.save(update_fields=['user_answer', 'is_correct', 'score'])
+                else:
+                    is_correct = bool(sub.is_correct)
 
             subs_by_task_id[task.id] = sub
-            
+
             if is_correct:
                 correct_count += 1
-                if created: # Даем XP только за первое правильное решение
+                if created:
                     profile, _ = StudentSubjectProfile.objects.get_or_create(
                         student=request.user,
                         subject=task.topic.subject,
