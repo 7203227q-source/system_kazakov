@@ -1583,19 +1583,22 @@ def student_solve_assignment(request, assignment_id):
                 upload_url = f"{domain}/upload/{task.saved_submission.upload_token}/"
                 task.qr_code_base64 = generate_qr_base64(upload_url)
 
-        missing_part2_indexes = []
+        missing_part2_labels = []
         if missing_part2_tasks:
             missing_ids = {t.id for t in missing_part2_tasks}
             for idx, t in enumerate(tasks_list, start=1):
                 if t.id in missing_ids:
-                    missing_part2_indexes.append(idx)
+                    if t.task_type:
+                        missing_part2_labels.append(t.task_type.label)
+                    else:
+                        missing_part2_labels.append(f"№{idx}")
 
         return render(request, 'core/student_solve_assignment.html', {
             'assignment': assignment,
             'tasks': tasks_list,
             'unread_tutor_replies_total': unread_tutor_replies_total,
             'needs_force_finish': bool(needs_force_finish),
-            'missing_part2_indexes': missing_part2_indexes,
+            'missing_part2_labels': missing_part2_labels,
         })
     
     if request.method == 'POST':

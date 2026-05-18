@@ -1,4 +1,5 @@
 import uuid
+import re
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
@@ -127,6 +128,32 @@ class TaskType(models.Model):
         
     def __str__(self):
         return f"№{self.number} - {self.name} ({self.exam_format})"
+
+    @property
+    def normalized_name(self):
+        name = (self.name or "").strip()
+        if not name:
+            return ""
+        m = re.match(r"^Тип\s*\d+\s*\((.+)\)\s*$", name, flags=re.IGNORECASE)
+        if m:
+            return (m.group(1) or "").strip()
+        name2 = re.sub(
+            r"^(Тип|Задание)\s*(№\s*)?\d+\s*([.:—–-]\s*)?",
+            "",
+            name,
+            flags=re.IGNORECASE,
+        ).strip()
+        return name2 or name
+
+    @property
+    def label(self):
+        n = int(self.number) if self.number is not None else None
+        if n is None:
+            return self.normalized_name or ""
+        t = self.normalized_name
+        if t:
+            return f"№{n} — {t}"
+        return f"№{n}"
 
 
 class ExamScoreScale(models.Model):

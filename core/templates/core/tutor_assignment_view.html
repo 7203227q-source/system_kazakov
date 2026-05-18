@@ -89,8 +89,9 @@
                 <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 min-w-0">
-                            <span class="text-sm font-black text-gray-800">№{{ item.task.task_type.number|default:"—" }}</span>
-                            <span class="text-sm font-bold text-gray-800 truncate">{{ item.task.task_type.name|default:"Без типа" }}</span>
+                            <span class="text-sm font-black text-gray-800">
+                                {% if item.task.task_type %}{{ item.task.task_type.label }}{% else %}Без типа{% endif %}
+                            </span>
                             <span class="text-xs text-gray-500">ID: {{ item.task.fipi_id|default:item.task.id }}</span>
                         </div>
                     </div>

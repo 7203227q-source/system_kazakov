@@ -101,7 +101,9 @@
                                     </div>
                                     <div class="flex-1">
                                         <div class="flex justify-between">
-                                            <p class="text-sm font-bold text-gray-700">Задача №{{ forloop.counter }} <span class="text-xs font-normal text-gray-500">({{ sub.task.task_type.name|default:"Без типа" }})</span></p>
+                                            <p class="text-sm font-bold text-gray-700">
+                                                {% if sub.task.task_type %}{{ sub.task.task_type.label }}{% else %}Задача №{{ forloop.counter }}{% endif %}
+                                            </p>
                                             <span class="text-xs text-gray-400">{{ sub.created_at|date:"H:i" }}</span>
                                         </div>
                                         <div class="flex items-center text-sm mt-1">
@@ -247,7 +249,9 @@
                                     </div>
                                     <div class="flex-1">
                                         <div class="flex justify-between">
-                                            <p class="text-sm font-bold text-gray-700">Задача <span class="text-xs font-normal text-gray-500">({{ sub.task.task_type.name|default:"Без типа" }})</span></p>
+                                            <p class="text-sm font-bold text-gray-700">
+                                                {% if sub.task.task_type %}{{ sub.task.task_type.label }}{% else %}Задача{% endif %}
+                                            </p>
                                             <span class="text-xs text-gray-400">{{ sub.created_at|date:"H:i" }}</span>
                                         </div>
                                         <div class="flex items-center text-sm mt-1">
