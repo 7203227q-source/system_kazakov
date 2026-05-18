@@ -663,6 +663,7 @@ def student_practice(request):
     if request.method == 'POST':
         task_id = request.POST.get('task_id')
         user_answer = request.POST.get('answer', '').strip()
+        give_up = (request.POST.get("give_up") or "").strip()
         attempt_token = (request.POST.get("attempt_token") or "").strip()
         task = get_object_or_404(Task, id=task_id)
 
@@ -699,45 +700,85 @@ def student_practice(request):
         if not attempt_token or current.get("token") != attempt_token or int(current.get("task_id") or 0) != int(task.id) or (current.get("mode") or "") != mode:
             messages.error(request, "Эта задача уже была проверена. Откройте следующую задачу.")
             return redirect("student_practice")
-        
-        points_earned = score_short_answer(task, user_answer)
-        points_max = get_max_points_effective(task)
-        is_correct = (points_earned == int(points_max or 0))
-        grade = 5 if is_correct else 1
-        
-        # Сохраняем попытку в TaskLog через аналитику (чтобы учелся EMA и статистика)
-        submission = Submission.objects.create(
-            student=request.user,
-            task=task,
-            user_answer=user_answer,
-            is_correct=is_correct,
-            score=int(points_earned or 0),
-        )
-        
-        # Время решения в тренажере не замеряем строго, ставим заглушку 60с для избежания аномалии
-        record_task_log(request.user, task, submission, None, 60)
 
-        # Если это SRS-режим, обновляем интервалы (SM-2)
-        if mode == 'srs':
-            try:
-                process_task_submission(request.user, task, grade)
-            except Exception:
-                pass
-        
-        # Даем XP за правильный ответ
-        xp_gained = 0
-        if is_correct:
-            xp_gained = max(1, int(task.difficulty / 5))
-            # Обновляем XP в профиле предмета
-            profile, _ = StudentSubjectProfile.objects.get_or_create(
+        if give_up:
+            points_max = int(get_max_points_effective(task) or 0)
+            points_earned = 0
+            is_correct = False
+            grade = 1
+            user_answer = "Не могу решить"
+
+            submission = None
+            if is_extended_answer_task(task):
+                submission = (
+                    Submission.objects.filter(student=request.user, task=task, assignment__isnull=True)
+                    .order_by("-created_at")
+                    .first()
+                )
+            if submission is None:
+                submission = Submission.objects.create(
+                    student=request.user,
+                    task=task,
+                    user_answer="",
+                    is_correct=False,
+                    score=0,
+                    primary_score=0,
+                )
+            else:
+                submission.user_answer = ""
+                submission.is_correct = False
+                submission.score = 0
+                submission.primary_score = 0
+                submission.save(update_fields=["user_answer", "is_correct", "score", "primary_score"])
+
+            record_task_log(request.user, task, submission, None, 60)
+
+            if mode == 'srs':
+                try:
+                    process_task_submission(request.user, task, grade)
+                except Exception:
+                    pass
+
+            xp_gained = 0
+        else:
+            points_earned = score_short_answer(task, user_answer)
+            points_max = get_max_points_effective(task)
+            is_correct = (points_earned == int(points_max or 0))
+            grade = 5 if is_correct else 1
+
+            # Сохраняем попытку в TaskLog через аналитику (чтобы учелся EMA и статистика)
+            submission = Submission.objects.create(
                 student=request.user,
-                subject=task.topic.subject
+                task=task,
+                user_answer=user_answer,
+                is_correct=is_correct,
+                score=int(points_earned or 0),
             )
-            profile.xp += xp_gained
-            profile.level = (profile.xp // 100) + 1
-            profile.save()
 
-        points_max = int(points_max or 0)
+            # Время решения в тренажере не замеряем строго, ставим заглушку 60с для избежания аномалии
+            record_task_log(request.user, task, submission, None, 60)
+
+            # Если это SRS-режим, обновляем интервалы (SM-2)
+            if mode == 'srs':
+                try:
+                    process_task_submission(request.user, task, grade)
+                except Exception:
+                    pass
+
+            # Даем XP за правильный ответ
+            xp_gained = 0
+            if is_correct:
+                xp_gained = max(1, int(task.difficulty / 5))
+                # Обновляем XP в профиле предмета
+                profile, _ = StudentSubjectProfile.objects.get_or_create(
+                    student=request.user,
+                    subject=task.topic.subject
+                )
+                profile.xp += xp_gained
+                profile.level = (profile.xp // 100) + 1
+                profile.save()
+
+            points_max = int(points_max or 0)
 
         # Store result so refresh/resubmit can't change it
         display_total_xp = total_xp + xp_gained
