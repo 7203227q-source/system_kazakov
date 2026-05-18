@@ -142,6 +142,15 @@
                                             <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
                                         </button>
                                     </div>
+                                    <form method="POST" action="{% url 'student_practice' %}" class="mt-3 flex justify-center">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                                        <input type="hidden" name="mode" value="{{ mode|default:'' }}">
+                                        <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                                        <button type="submit" name="give_up" value="1" class="px-6 py-2 bg-white border border-red-200 text-red-700 rounded-lg text-sm font-bold hover:bg-red-50 transition w-full sm:w-auto">
+                                            Не могу решить — показать решение
+                                        </button>
+                                    </form>
                                     <div class="mt-2 text-xs text-gray-500">После проверки задача обновит интервальное повторение и появится следующая.</div>
                                 </div>
                             {% else %}
@@ -170,6 +179,15 @@
                                         <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
                                     </button>
                                 </div>
+                                <form method="POST" action="{% url 'student_practice' %}" class="mt-3 flex justify-center w-full">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="task_id" value="{{ task.id }}">
+                                    <input type="hidden" name="mode" value="{{ mode|default:'' }}">
+                                    <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                                    <button type="submit" name="give_up" value="1" class="px-6 py-2 bg-white border border-red-200 text-red-700 rounded-lg text-sm font-bold hover:bg-red-50 transition w-full sm:w-auto">
+                                        Не могу решить — показать решение
+                                    </button>
+                                </form>
                             {% endif %}
                         </div>
 
@@ -297,6 +315,19 @@
                                 }
                             }
                         </script>
+                    {% elif is_extended %}
+                        <div class="bg-white p-6 rounded-xl border border-dashed border-indigo-200 shadow-sm text-center">
+                            <div class="text-sm text-gray-700 font-bold mb-3">Это задача 2-й части</div>
+                            <form method="POST" action="{% url 'student_practice' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="task_id" value="{{ task.id }}">
+                                <input type="hidden" name="mode" value="{{ mode|default:'' }}">
+                                <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                                <button type="submit" name="give_up" value="1" class="px-6 py-3 bg-white border border-red-200 text-red-700 rounded-lg font-bold hover:bg-red-50 transition w-full sm:w-auto">
+                                    Не могу решить — показать решение
+                                </button>
+                            </form>
+                        </div>
                     {% else %}
                         <form method="POST" action="{% url 'student_practice' %}" class="flex flex-col sm:flex-row gap-4 mb-4">
                             {% csrf_token %}
