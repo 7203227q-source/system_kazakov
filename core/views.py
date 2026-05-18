@@ -4053,9 +4053,16 @@ def tutor_task_bank(request):
         subtypes_query = subtypes_query.filter(task_type__id=type_filter)
     subtypes = subtypes_query.values('subtype_tag').annotate(task_count=models.Count('id')).order_by('subtype_tag')
 
-    # Add subtype counts directly to the displayed tasks
-    subtype_counts = dict(Task.objects.values_list('subtype_tag').annotate(c=models.Count('id')))
     tasks_list = list(page_obj.object_list)
+    subtype_tags = {t.subtype_tag for t in tasks_list if t.subtype_tag}
+    subtype_counts = {}
+    if subtype_tags:
+        subtype_counts = {
+            row["subtype_tag"]: row["c"]
+            for row in tasks.filter(subtype_tag__in=subtype_tags)
+            .values("subtype_tag")
+            .annotate(c=models.Count("id"))
+        }
     for task in tasks_list:
         task.subtype_count = subtype_counts.get(task.subtype_tag, 0)
 
