@@ -65,6 +65,15 @@ class TexReplaceMathWordsTests(SimpleTestCase):
         self.assertIn(r"x+5\ge1", out)
         self.assertIn(r"\end{cases}$", out)
 
+    def test_converts_infinity_symbol_in_plain_html(self):
+        from core.tex_replace import fix_math_words_in_html
+
+        html = "<p>(-3; ∞)</p><p>(-∞; -3)</p>"
+        out, changed = fix_math_words_in_html(html)
+        self.assertGreater(changed, 0)
+        self.assertIn(r"$\infty$", out)
+        self.assertIn(r"$-\infty$", out)
+
     def test_fix_hyphenation_in_degrees_word(self):
         from core.tex_replace import fix_math_words_in_html
 

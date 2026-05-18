@@ -151,7 +151,9 @@ def sanitize_math_latex(value: str) -> str:
         .replace("\xa0", " ")
     )
 
+    s = s.replace("−", "-")
     s = s.replace("°", r"^{\circ}")
+    s = s.replace("∞", r"\infty")
 
     s = re.sub(r"\bв\s*степени\b", "степени", s, flags=re.IGNORECASE)
     s = re.sub(r"\bвстепени\b", "степени", s, flags=re.IGNORECASE)
