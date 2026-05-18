@@ -114,6 +114,16 @@ class SdamgiaLatexTests(SimpleTestCase):
         latex = latex_from_sdamgia_alt(alt)
         self.assertEqual(latex.replace(" ", ""), r"(-3;\infty)".replace(" ", ""))
 
+    def test_infinity_symbol_converts(self):
+        alt = "(-3; ∞)"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"(-3;\infty)".replace(" ", ""))
+
+    def test_negative_infinity_symbol_converts(self):
+        alt = "(-∞; -3)"
+        latex = latex_from_sdamgia_alt(alt)
+        self.assertEqual(latex.replace(" ", ""), r"(-\infty;-3)".replace(" ", ""))
+
     def test_degrees_word_hyphenation_cleanup(self):
         alt = "Ответ дайте в гра- дусах."
         latex = latex_from_sdamgia_alt(alt)

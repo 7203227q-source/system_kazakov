@@ -7,12 +7,12 @@ from core.sdamgia_latex import latex_from_sdamgia_alt, sanitize_math_latex
 
 
 _RU_TRIG_RE = re.compile(
-    r"\b(?P<fn>синус|синуса|косинус|косинуса|тангенс|тангенса|котангенс|котангенса)\s*(?P<arg>[A-Za-zА-Яа-я])\b",
+    r"\b(?P<fn>синус|синуса|косинус|косинуса|тангенс|тангенса|котангенс|котангенса)\s*(?:∠\s*)?(?P<arg>[A-Za-zА-Яа-я])\b",
     flags=re.IGNORECASE,
 )
 
 _LAT_TRIG_RE = re.compile(
-    r"\b(?P<fn>sin|cos|tan|tg|ctg|cot)\s*(?P<arg>[A-Za-z])\b",
+    r"(?<!\\)\b(?P<fn>sin|cos|tan|tg|ctg|cot)\s*(?:∠\s*)?(?P<arg>[A-Za-z])\b",
     flags=re.IGNORECASE,
 )
 
@@ -25,6 +25,8 @@ _INF_WORD_HTML_RE = re.compile(
     r"(?P<sign>[+\-−])?\s*бесконечност[ьи]\b",
     flags=re.IGNORECASE,
 )
+
+_INF_SYMBOL_HTML_RE = re.compile(r"(?P<sign>[+\-−])?\s*∞")
 
 _DEG_HYPHENATION_RE = re.compile(
     r"гра-\s*дус(?P<suffix>ах|ов|а)?",
@@ -48,6 +50,7 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
             "гра-",
             "граду-",
             "бесконечност",
+            "∞",
             "синус",
             "косинус",
             "тангенс",
@@ -122,6 +125,7 @@ def fix_math_words_in_html(html: str) -> tuple[str, int]:
         text = _LAT_TRIG_RE.sub(trig_lat, text)
         text = _DEG_WORD_HTML_RE.sub(lambda m: rf"${m.group('num')}^{{\circ}}$", text)
         text = _INF_WORD_HTML_RE.sub(inf, text)
+        text = _INF_SYMBOL_HTML_RE.sub(inf, text)
 
         if text != original:
             node.replace_with(NavigableString(text))
