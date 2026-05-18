@@ -92,11 +92,6 @@ def convert_svg_to_latex_for_task_type(
 
 
 def convert_svg_to_latex_for_task(*, task_id: int, theme: str = "classic", dry_run: bool = False) -> dict:
-    """
-    Конвертация SVG→LaTeX для одной задачи (TaskVariant) и одного theme (по умолчанию classic).
-
-    Возвращает отчёт, включающий "до/после" для preview.
-    """
     v = (
         TaskVariant.objects.select_related("task", "task__task_type", "task__task_type__exam_format")
         .filter(task_id=int(task_id), theme=theme)
@@ -125,7 +120,6 @@ def convert_svg_to_latex_for_task(*, task_id: int, theme: str = "classic", dry_r
 
     new_content, fixed_content = fix_latex_tokens_in_html(new_content)
     new_solution, fixed_solution = fix_latex_tokens_in_html(new_solution)
-
     new_content = normalize_task_html(new_content)
     new_solution = normalize_task_html(new_solution) if new_solution else new_solution
 
@@ -140,9 +134,9 @@ def convert_svg_to_latex_for_task(*, task_id: int, theme: str = "classic", dry_r
         + fixed_words_content
         + fixed_words_solution
     )
-    is_changed = int((new_content != old_content) or (new_solution != old_solution))
+    changed = int((new_content != old_content) or (new_solution != old_solution))
 
-    if is_changed and not dry_run:
+    if changed and not dry_run:
         v.content = new_content
         v.solution = new_solution
         v.save(update_fields=["content", "solution"])
@@ -153,7 +147,7 @@ def convert_svg_to_latex_for_task(*, task_id: int, theme: str = "classic", dry_r
         "theme": theme,
         "dry_run": dry_run,
         "found": True,
-        "changed": is_changed,
+        "changed": changed,
         "replaced": int(replaced_total),
         "replaced_content": int(replaced_content),
         "replaced_solution": int(replaced_solution),

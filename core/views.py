@@ -4097,6 +4097,37 @@ def task_bank_task_edit(request, task_id: int):
 
     return render(request, "core/task_edit.html", {"task": task, "variant": variant})
 
+
+@login_required
+def task_bank_task_svg_to_latex_preview(request, task_id: int):
+    if request.user.role != "admin":
+        return redirect("tutor_task_bank")
+
+    from .services_svg_to_latex import convert_svg_to_latex_for_task
+
+    report = convert_svg_to_latex_for_task(task_id=task_id, theme="classic", dry_run=True)
+    task = get_object_or_404(Task.objects.select_related("topic", "task_type"), id=task_id)
+    variant = task.variants.filter(theme="classic").first()
+    if not variant:
+        variant = TaskVariant.objects.create(task=task, theme="classic", content="", solution="")
+    return render(request, "core/task_edit.html", {"task": task, "variant": variant, "svg_report": report})
+
+
+@login_required
+@require_POST
+def task_bank_task_svg_to_latex_apply(request, task_id: int):
+    if request.user.role != "admin":
+        return redirect("tutor_task_bank")
+
+    from .services_svg_to_latex import convert_svg_to_latex_for_task
+
+    report = convert_svg_to_latex_for_task(task_id=task_id, theme="classic", dry_run=False)
+    if report.get("changed"):
+        messages.success(request, "SVG→LaTeX применено.")
+    else:
+        messages.info(request, "Изменений не найдено.")
+    return redirect("task_bank_task_edit", task_id=task_id)
+
 @login_required
 def import_tasks_view(request):
     if request.user.role != 'admin':
