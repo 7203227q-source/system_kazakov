@@ -138,6 +138,12 @@
                                     </div>
 
                                     <div class="mt-2">
+                                        <input type="file" id="camera_file2_{{ task.id }}" class="hidden" accept="image/*" capture="environment">
+                                        <button type="button"
+                                                onclick="const el=document.getElementById('camera_file2_{{ task.id }}'); if(el){ el.value=''; el.click(); }"
+                                                class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">
+                                            {% if task.saved_submission.image_url_2 %}Переснять 2-ю страницу{% else %}Сделать фото 2-й страницы{% endif %}
+                                        </button>
                                         <input type="file" id="gallery_file2_{{ task.id }}" class="hidden" accept="image/*">
                                         <button type="button"
                                                 onclick="const el=document.getElementById('gallery_file2_{{ task.id }}'); if(el){ el.value=''; el.click(); }"
@@ -270,6 +276,7 @@
                                         const submissionId = {{ task.saved_submission.id }};
                                         const taskId = {{ task.id }};
                                         const uploadUrl = `/api/submission/${submissionId}/upload/`;
+                                        const cameraInput2 = document.getElementById(`camera_file2_${taskId}`);
                                         const input2 = document.getElementById(`gallery_file2_${taskId}`);
                                         const statusEl2 = document.getElementById(`upload2_status_${taskId}`);
 
@@ -298,6 +305,7 @@
                                             }
                                         }
 
+                                        if (cameraInput2) cameraInput2.addEventListener('change', () => handleSecond(cameraInput2.files && cameraInput2.files[0]));
                                         if (input2) input2.addEventListener('change', () => handleSecond(input2.files && input2.files[0]));
                                     });
                                 </script>
@@ -424,28 +432,10 @@
                                                 });
                                                 const data = await upRes.json();
                                                 if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
-
-                                                const block = document.getElementById(`upload_block_${taskId}`);
-                                                block.innerHTML = `
-                                                    <div class="text-center w-full animate-fade-in">
-                                                        <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                                                            <i class="fas fa-check"></i>
-                                                        </div>
-                                                        <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
-                                                        <img src="${data.image_url || (previewImg ? previewImg.src : '')}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение">
-                                                        ${Number({{ task.exam_points_effective|default:0 }}) > 1 ? `<div class="flex flex-col sm:flex-row gap-2 justify-center">
-                                                            <button type="button" onclick="verifyWithAI(${submissionId}, ${taskId})" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm check-btn w-full sm:w-auto flex items-center justify-center mx-auto" id="btn_verify_${taskId}" data-retry-after="0" data-base-label="Проверить ещё раз через ИИ">
-                                                                <i class="fas fa-robot mr-2"></i> Проверить решение через ИИ
-                                                            </button>
-                                                        </div>` : ''}
-                                                        <div class="mt-3">
-                                                            <button type="button" onclick="revealSolution(${submissionId}, ${taskId})" class="text-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg transition font-bold">
-                                                                <i class="fas fa-lightbulb mr-2 text-yellow-500"></i> Показать решение (без проверки)
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                `;
                                                 if (statusEl) statusEl.textContent = 'Загружено';
+                                                // Важно: после загрузки 1-й страницы сразу перерисуем серверный UI,
+                                                // чтобы появились кнопки "Удалить фото" и "Добавить/Заменить 2-ю страницу".
+                                                location.reload();
                                             } catch (e) {
                                                 if (statusEl) statusEl.textContent = 'Ошибка загрузки';
                                                 alert('Не удалось загрузить фото. Попробуйте ещё раз.');
