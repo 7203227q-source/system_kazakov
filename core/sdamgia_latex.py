@@ -67,6 +67,17 @@ _INFINITY_WORD_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_EQUIV_WORD_RE = re.compile(r"(?<!\\)\bравносильно\b", flags=re.IGNORECASE)
+_LEGACY_EQUAL_STRONG_RE = re.compile(r"=\s*сильно\b", flags=re.IGNORECASE)
+_V_UNIT_POWER_RE = re.compile(
+    r"(?<!\\)\bв\s*(?P<unit>мм|см|дм|м|км)\s*\^\s*(?P<pow>[0-9]+)\b",
+    flags=re.IGNORECASE,
+)
+_UNIT_POWER_RE = re.compile(
+    r"(?<!\\)\b(?P<unit>мм|см|дм|м|км)\s*\^\s*(?P<pow>[0-9]+)\b",
+    flags=re.IGNORECASE,
+)
+
 _GREEK_RU_REPLACEMENTS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"(?<!\\)\bальфа\b", flags=re.IGNORECASE), r"\alpha"),
     (re.compile(r"(?<!\\)\bбета\b", flags=re.IGNORECASE), r"\beta"),
@@ -154,6 +165,22 @@ def sanitize_math_latex(value: str) -> str:
     for pattern, repl in _TRIG_LAT_TOKEN_REPLACEMENTS:
         s = pattern.sub(lambda _m, r=repl: r, s)
 
+    s = _LEGACY_EQUAL_STRONG_RE.sub(lambda _m: r"\Leftrightarrow", s)
+    s = _EQUIV_WORD_RE.sub(lambda _m: r"\Leftrightarrow", s)
+
+    def unit_power(m: re.Match) -> str:
+        unit = (m.group("unit") or "").lower()
+        power = m.group("pow") or ""
+        return rf"\text{{{unit}}}^{{{power}}}"
+
+    def v_unit_power(m: re.Match) -> str:
+        unit = (m.group("unit") or "").lower()
+        power = m.group("pow") or ""
+        return rf"\text{{в {unit}}}^{{{power}}}"
+
+    s = _V_UNIT_POWER_RE.sub(v_unit_power, s)
+    s = _UNIT_POWER_RE.sub(unit_power, s)
+
     s = _DEGREE_WORD_RE.sub(lambda m: rf"{m.group('num')}^{{\circ}}", s)
 
     def fix_broken_frac_extra_brace(text: str) -> str:
@@ -221,6 +248,7 @@ def _convert_plain_text(value: str) -> str:
     s = s.replace("⋅", r"\cdot ")
 
     replacements = [
+        ("равносильно", r"\Leftrightarrow"),
         ("больше или равно", r"\ge"),
         ("меньше или равно", r"\le"),
         ("не меньше", r"\ge"),
@@ -244,7 +272,11 @@ def _convert_plain_text(value: str) -> str:
     lower = s.lower()
     for needle, repl in replacements:
         if needle in lower:
-            s = re.sub(re.escape(needle), lambda _m, r=repl: r, s, flags=re.IGNORECASE)
+            if " " in needle:
+                pattern = re.escape(needle)
+            else:
+                pattern = r"\b" + re.escape(needle) + r"\b"
+            s = re.sub(pattern, lambda _m, r=repl: r, s, flags=re.IGNORECASE)
             lower = s.lower()
 
     s = _DEGREE_WORD_RE.sub(lambda m: rf"{m.group('num')}^{{\circ}}", s)
