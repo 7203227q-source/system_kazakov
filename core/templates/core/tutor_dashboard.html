@@ -102,6 +102,8 @@
                              <div class="text-right shrink-0">
                                  <span class="text-sm font-extrabold text-gray-800">{{ student.total_xp|default:0 }} XP</span>
                                  <div class="mt-0.5 text-[10px] font-bold text-gray-500">Сегодня: +{{ student.today_xp|default:0 }} XP</div>
+                                 <div class="mt-0.5 text-[10px] font-bold text-gray-500">Повтор сегодня: {{ student.srs_due_today|default:0 }}</div>
+                                 <div class="mt-0.5 text-[10px] font-bold text-gray-500">Повторил: {{ student.srs_reviewed_today|default:0 }}</div>
                                 {% if student.unread_student_questions %}
                                 <div class="mt-1">
                                     <a href="{% url 'tutor_student_history' student.id %}{% if student.latest_unread_submission_id %}?submission_id={{ student.latest_unread_submission_id }}{% endif %}" class="inline-flex items-center bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">
@@ -173,6 +175,12 @@
                     <div class="flex space-x-2">
                         <span class="hidden md:inline-flex items-center bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-2 rounded-lg text-sm font-bold">
                             Сегодня: +{{ selected_student.today_xp|default:0 }} XP
+                        </span>
+                        <span class="hidden md:inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-2 rounded-lg text-sm font-bold">
+                            Повтор сегодня: {{ selected_student.srs_due_today|default:0 }}
+                        </span>
+                        <span class="hidden md:inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-2 rounded-lg text-sm font-bold">
+                            Повторил: {{ selected_student.srs_reviewed_today|default:0 }}
                         </span>
                         <button class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 shadow-sm flex items-center">
                             <i class="fas fa-chart-line mr-2 text-primary"></i> Полная статистика

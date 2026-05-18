@@ -80,6 +80,7 @@ def process_srs_review(srs_record, grade):
         srs_record.easiness_factor = 1.3
 
     srs_record.last_grade = grade
+    srs_record.last_reviewed_at = timezone.now()
     # Дата следующего повторения
     srs_record.next_review_date = timezone.now().date() + timedelta(days=srs_record.interval)
     srs_record.save()
@@ -110,4 +111,3 @@ def get_due_tasks_for_student(student):
         student=student, 
         next_review_date__lte=timezone.now().date()
     ).order_by('next_review_date')
-

@@ -277,6 +277,7 @@ class SpacedRepetition(models.Model):
     next_review_date = models.DateField(default=timezone.now, verbose_name="Дата следующего повторения")
     
     last_grade = models.IntegerField(null=True, blank=True, verbose_name="Последняя оценка (0-5)")
+    last_reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
     
     class Meta:
         unique_together = ('student', 'task')

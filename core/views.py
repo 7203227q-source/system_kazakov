@@ -2187,6 +2187,29 @@ def tutor_dashboard(request):
 
     # XP gained today (only from solving tasks, not tutor rewards)
     student_ids = list(students.values_list("id", flat=True))
+    srs_due_today_map: dict[int, int] = {}
+    srs_reviewed_today_map: dict[int, int] = {}
+    if student_ids:
+        rows = (
+            SpacedRepetition.objects.filter(
+                student_id__in=student_ids,
+                next_review_date__lte=today,
+            )
+            .values("student_id")
+            .annotate(c=Count("id"))
+            .values_list("student_id", "c")
+        )
+        srs_due_today_map = {int(sid): int(c) for sid, c in rows}
+        rows = (
+            SpacedRepetition.objects.filter(
+                student_id__in=student_ids,
+                last_reviewed_at__date=today,
+            )
+            .values("student_id")
+            .annotate(c=Count("id"))
+            .values_list("student_id", "c")
+        )
+        srs_reviewed_today_map = {int(sid): int(c) for sid, c in rows}
     today_xp_map: dict[int, int] = {}
     if student_ids:
         rows = (
@@ -2226,6 +2249,8 @@ def tutor_dashboard(request):
     for s in students:
         s.total_xp = sum(int(p.xp or 0) for p in s.subject_profiles.all())
         s.today_xp = int(today_xp_map.get(int(s.id), 0))
+        s.srs_due_today = int(srs_due_today_map.get(int(s.id), 0))
+        s.srs_reviewed_today = int(srs_reviewed_today_map.get(int(s.id), 0))
         # Fetch latest snapshot for each profile
         for profile in s.subject_profiles.all():
             profile.latest_snapshot = DailySnapshot.objects.filter(student=s, subject=profile.subject).order_by('-date').first()
@@ -2248,7 +2273,7 @@ def tutor_dashboard(request):
         # Check for active assignments
         active_assignments_count = Assignment.objects.filter(student=s, is_draft=False, is_completed=False, is_deleted=False).count()
         # Check for pending spaced repetition tasks
-        pending_srs_count = SpacedRepetition.objects.filter(student=s, next_review_date__lte=today).count()
+        pending_srs_count = int(getattr(s, "srs_due_today", 0))
         
         s.is_idle = (active_assignments_count == 0 and pending_srs_count == 0)
     
