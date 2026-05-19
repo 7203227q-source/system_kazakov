@@ -28,7 +28,7 @@ class StudentDashboardDeadlineBadgesTests(TestCase):
             is_draft=False,
             is_deleted=False,
             is_completed=False,
-            due_date=today,
+            due_date=today + datetime.timedelta(days=2),
             exam_format=ef,
         )
         self.a_later = Assignment.objects.create(
@@ -60,7 +60,8 @@ class StudentDashboardDeadlineBadgesTests(TestCase):
         self.assertEqual(res.status_code, 200)
         html = res.content.decode("utf-8")
 
-        self.assertIn("Срок сегодня/завтра", html)
+        # До дедлайна осталось 2 дня -> должен появиться бейдж "Осталось: 2 дн" (красный/urgent).
+        self.assertIn("Осталось: 2 дн", html)
 
         # Проверяем, что сортировка: ближайший due_date выше, а без due_date — внизу.
         pos_soon = html.find("Soon")

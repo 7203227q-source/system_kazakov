@@ -381,7 +381,15 @@
                                                     <a href="{% url 'tutor_assignment_summary' a.id %}" class="font-bold text-gray-800 truncate hover:underline">{{ a.title }}</a>
                                                     <a href="{% url 'tutor_assignment_view' a.id %}" class="text-xs font-bold text-primary hover:underline shrink-0">Просмотр</a>
                                                 </div>
-                                                <div class="text-xs text-gray-500 mt-1">Создан: {{ a.created_at|date:"d M H:i" }} · Задач: {{ a.total_tasks_count }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">
+                                                    Создан: {{ a.created_at|date:"d M H:i" }} · Задач: {{ a.total_tasks_count }}
+                                                    {% if a.due_date %}
+                                                        · Срок: {{ a.due_date|date:"d.m.Y" }}
+                                                        {% if a.due_days_left is not None and not a.due_is_overdue %}
+                                                            · <span class="font-bold {% if a.due_is_urgent %}text-red-600{% else %}text-gray-600{% endif %}">Осталось: {{ a.due_days_left }} дн</span>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </div>
                                             </div>
                                             <div class="shrink-0 text-right">
                                                 <div class="text-xs font-bold text-gray-700">{{ a.solved_tasks_count }}/{{ a.total_tasks_count }} выполнено</div>

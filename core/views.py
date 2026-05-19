@@ -686,10 +686,10 @@ def student_practice(request):
                     'points_earned': int(saved.get("points_earned") or 0),
                     'points_max': int(saved.get("points_max") or 0),
                     'mode': mode,
-                    'srs_due_remaining': get_due_tasks_for_student(request.user).count() if mode == "srs" else None,
+                    'srs_due_remaining': get_due_tasks_for_student(request.user, subject_id=active_subject_id).count() if mode == "srs" else None,
                     'srs_eta_minutes': _eta_minutes_for_srs(
                         request.user,
-                        int(get_due_tasks_for_student(request.user).count()),
+                        int(get_due_tasks_for_student(request.user, subject_id=active_subject_id).count()),
                     ) if mode == "srs" else None,
                 })
 
@@ -805,7 +805,7 @@ def student_practice(request):
         srs_due_remaining = None
         srs_eta_minutes = None
         if mode == "srs":
-            srs_due_remaining = get_due_tasks_for_student(request.user).count()
+            srs_due_remaining = get_due_tasks_for_student(request.user, subject_id=active_subject_id).count()
             srs_eta_minutes = _eta_minutes_for_srs(request.user, int(srs_due_remaining))
 
         return render(request, 'core/student_practice_result.html', {
@@ -820,11 +820,12 @@ def student_practice(request):
             'mode': mode,
             'srs_due_remaining': srs_due_remaining,
             'srs_eta_minutes': srs_eta_minutes,
+            'subject_id': active_subject_id,
         })
 
     # GET запрос
     if mode == 'srs':
-        due_qs = get_due_tasks_for_student(request.user).select_related('task')
+        due_qs = get_due_tasks_for_student(request.user, subject_id=active_subject_id).select_related('task')
         srs_due_total = due_qs.count()
         due = due_qs.first()
         task = due.task if due else None
@@ -868,6 +869,7 @@ def student_practice(request):
         'total_xp': total_xp,
         'total_level': total_level,
         'mode': mode,
+        'subject_id': active_subject_id,
         'attempt_token': attempt_token,
         'is_extended': is_extended,
         'practice_submission': practice_submission,
@@ -954,10 +956,10 @@ def student_dashboard(request):
     if active_subject_id:
         pending_assignments = pending_assignments.filter(tasks__topic__subject_id=active_subject_id).distinct()
 
-    # Дедлайны: подсветка "срок скоро" (порог: 1 день) + сортировка по ближайшему due_date (null внизу).
+    # Дедлайны: показываем "осталось X дней" и считаем urgent при 0–2 днях + сортировка по ближайшему due_date (null внизу).
     import datetime as _dt
     today = timezone.now().date()
-    soon = today + _dt.timedelta(days=1)
+    urgent_until = today + _dt.timedelta(days=2)
 
     pending_assignments = pending_assignments.annotate(
         due_overdue=models.Case(
@@ -966,7 +968,7 @@ def student_dashboard(request):
             output_field=models.BooleanField(),
         ),
         due_soon=models.Case(
-            models.When(due_date__isnull=False, due_date__gte=today, due_date__lte=soon, then=models.Value(True)),
+            models.When(due_date__isnull=False, due_date__gte=today, due_date__lte=urgent_until, then=models.Value(True)),
             default=models.Value(False),
             output_field=models.BooleanField(),
         ),
@@ -1041,10 +1043,13 @@ def student_dashboard(request):
         'predictions': chart_predictions
     })
 
-    due_srs_count = SpacedRepetition.objects.filter(
+    due_srs_qs = SpacedRepetition.objects.filter(
         student=request.user,
         next_review_date__lte=timezone.now().date(),
-    ).count()
+    )
+    if active_subject_id:
+        due_srs_qs = due_srs_qs.filter(task__topic__subject_id=int(active_subject_id))
+    due_srs_count = due_srs_qs.count()
 
     unread_tutor_replies_total = SubmissionComment.objects.filter(
         submission__student=request.user,
@@ -1095,6 +1100,8 @@ def student_dashboard(request):
     }
     for a in pending_assignments:
         a.unread_tutor_replies_count = int(unread_by_assignment.get(a.id, 0) or 0)
+        a.due_days_left = (a.due_date - today).days if a.due_date else None
+        a.due_is_urgent = bool(a.due_date and (0 <= int(a.due_days_left or 0) <= 2))
 
     return render(request, 'core/student_dashboard.html', {
         'recent_submissions': recent_submissions,
@@ -1485,6 +1492,15 @@ def student_solve_assignment(request, assignment_id):
     assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_deleted=False)
 
     auto_expire_assignment_if_needed(assignment)
+
+    # Deadline helpers for UI (осталось дней)
+    try:
+        _today = timezone.localdate()
+        assignment.due_days_left = (assignment.due_date - _today).days if assignment.due_date else None
+        assignment.due_is_urgent = bool(assignment.due_date and (0 <= int(assignment.due_days_left or 0) <= 2))
+    except Exception:
+        assignment.due_days_left = None
+        assignment.due_is_urgent = False
     
     if assignment.is_completed:
         return redirect('student_assignment_summary', assignment_id=assignment.id)
@@ -2448,6 +2464,14 @@ def tutor_dashboard(request):
             if a.is_completed:
                 completed_assignments.append(a)
             else:
+                try:
+                    a.due_days_left = (a.due_date - today).days if a.due_date else None
+                    a.due_is_urgent = bool(a.due_date and (0 <= int(a.due_days_left or 0) <= 2))
+                    a.due_is_overdue = bool(a.due_date and a.due_date < today)
+                except Exception:
+                    a.due_days_left = None
+                    a.due_is_urgent = False
+                    a.due_is_overdue = False
                 active_assignments.append(a)
 
         completed_assignments_total = len(completed_assignments)
@@ -2757,6 +2781,17 @@ def tutor_assignment_summary(request, assignment_id):
     else:
         assignment = get_object_or_404(qs, id=assignment_id, is_draft=False, is_deleted=False)
 
+    # Deadline helpers for UI (осталось дней)
+    try:
+        _today = timezone.localdate()
+        assignment.due_days_left = (assignment.due_date - _today).days if assignment.due_date else None
+        assignment.due_is_urgent = bool(assignment.due_date and (0 <= int(assignment.due_days_left or 0) <= 2))
+        assignment.due_is_overdue = bool(assignment.due_date and assignment.due_date < _today)
+    except Exception:
+        assignment.due_days_left = None
+        assignment.due_is_urgent = False
+        assignment.due_is_overdue = False
+
     student = assignment.student
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
     submissions = {s.task_id: s for s in Submission.objects.filter(assignment=assignment, student=student).select_related('task')}
@@ -2898,6 +2933,17 @@ def tutor_assignment_view(request, assignment_id):
         assignment = get_object_or_404(qs, id=assignment_id, is_draft=False, is_deleted=False)
 
     auto_expire_assignment_if_needed(assignment)
+
+    # Deadline helpers for UI (осталось дней)
+    try:
+        _today = timezone.localdate()
+        assignment.due_days_left = (assignment.due_date - _today).days if assignment.due_date else None
+        assignment.due_is_urgent = bool(assignment.due_date and (0 <= int(assignment.due_days_left or 0) <= 2))
+        assignment.due_is_overdue = bool(assignment.due_date and assignment.due_date < _today)
+    except Exception:
+        assignment.due_days_left = None
+        assignment.due_is_urgent = False
+        assignment.due_is_overdue = False
 
     theme = getattr(request.user, 'preferred_theme', None) or 'classic'
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
@@ -6245,7 +6291,7 @@ def api_student_pending_assignments(request):
         qs = qs.filter(tasks__topic__subject_id=int(subject_id_raw)).distinct()
     import datetime as _dt
     today = timezone.now().date()
-    soon = today + _dt.timedelta(days=1)
+    urgent_until = today + _dt.timedelta(days=2)
 
     qs = qs.annotate(
         due_overdue=models.Case(
@@ -6254,7 +6300,7 @@ def api_student_pending_assignments(request):
             output_field=models.BooleanField(),
         ),
         due_soon=models.Case(
-            models.When(due_date__isnull=False, due_date__gte=today, due_date__lte=soon, then=models.Value(True)),
+            models.When(due_date__isnull=False, due_date__gte=today, due_date__lte=urgent_until, then=models.Value(True)),
             default=models.Value(False),
             output_field=models.BooleanField(),
         ),
@@ -6274,16 +6320,21 @@ def api_student_pending_assignments(request):
     }
     items = []
     for a in qs:
+        due_days_left = None
+        if a.due_date:
+            due_days_left = (a.due_date - today).days
+
         due_status = "none"
         if a.due_overdue:
             due_status = "overdue"
-        elif a.due_soon:
-            due_status = "soon"
+        elif due_days_left is not None and 0 <= int(due_days_left) <= 2:
+            due_status = "urgent"
         items.append({
             "id": a.id,
             "title": a.title,
             "due_date": a.due_date.isoformat() if a.due_date else None,
             "due_status": due_status,
+            "due_days_left": due_days_left,
             "is_verified": bool(getattr(a, "is_verified", False)),
             "tasks_count": a.tasks.count(),
             "unread_tutor_replies_count": int(unread_by_assignment.get(a.id, 0) or 0),

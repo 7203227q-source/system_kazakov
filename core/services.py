@@ -105,9 +105,15 @@ def process_task_submission(student, task, grade):
     
     return process_srs_review(srs_record, grade)
 
-def get_due_tasks_for_student(student):
-    """Возвращает записи интервального повторения, которые нужно повторить сегодня или ранее"""
-    return SpacedRepetition.objects.filter(
-        student=student, 
-        next_review_date__lte=timezone.now().date()
-    ).order_by('next_review_date')
+def get_due_tasks_for_student(student, *, subject_id: int | None = None):
+    """Возвращает записи интервального повторения, которые нужно повторить сегодня или ранее.
+
+    Если указан subject_id, очередь ограничивается задачами этого предмета.
+    """
+    qs = SpacedRepetition.objects.filter(
+        student=student,
+        next_review_date__lte=timezone.now().date(),
+    )
+    if subject_id:
+        qs = qs.filter(task__topic__subject_id=int(subject_id))
+    return qs.order_by("next_review_date")
