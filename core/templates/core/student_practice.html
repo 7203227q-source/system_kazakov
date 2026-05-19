@@ -63,7 +63,7 @@
                         </button>
                     </form>
                     {% endif %}
-                    <a href="{% url 'student_practice' %}{% if mode == 'srs' %}?mode=srs{% endif %}" class="text-gray-500 hover:text-primary transition flex items-center">
+                    <a href="{% url 'student_practice' %}{% if mode == 'srs' %}?mode=srs{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}{% endif %}" class="text-gray-500 hover:text-primary transition flex items-center">
                     <i class="fas fa-sync-alt mr-2"></i> Пропустить
                     </a>
                 </div>
@@ -161,11 +161,25 @@
                                     <i class="fas fa-circle-notch fa-spin text-primary text-2xl"></i>
                                 </div>
                                 <div class="mt-2 text-center w-full">
-                                    <div class="flex flex-col sm:flex-row gap-2 justify-center">
-                                        <input type="file" id="srs_file_1" class="hidden" accept="image/*">
-                                        <button type="button" onclick="const el=document.getElementById('srs_file_1'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Стр. 1</button>
-                                        <input type="file" id="srs_file_2" class="hidden" accept="image/*">
-                                        <button type="button" onclick="const el=document.getElementById('srs_file_2'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Стр. 2</button>
+                                    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                                        <div class="flex flex-col gap-2 items-center">
+                                            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Стр. 1</div>
+                                            <div class="flex gap-2 justify-center">
+                                                <input type="file" id="srs_camera_1" class="hidden" accept="image/*" capture="environment">
+                                                <button type="button" onclick="const el=document.getElementById('srs_camera_1'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Сделать фото</button>
+                                                <input type="file" id="srs_gallery_1" class="hidden" accept="image/*">
+                                                <button type="button" onclick="const el=document.getElementById('srs_gallery_1'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Выбрать файл</button>
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-col gap-2 items-center">
+                                            <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Стр. 2</div>
+                                            <div class="flex gap-2 justify-center">
+                                                <input type="file" id="srs_camera_2" class="hidden" accept="image/*" capture="environment">
+                                                <button type="button" onclick="const el=document.getElementById('srs_camera_2'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Сделать фото</button>
+                                                <input type="file" id="srs_gallery_2" class="hidden" accept="image/*">
+                                                <button type="button" onclick="const el=document.getElementById('srs_gallery_2'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">Выбрать файл</button>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div id="srs_upload_status" class="text-xs text-gray-500 mt-2 hidden"></div>
                                 </div>
@@ -205,7 +219,7 @@
                                 <button type="button"
                                         id="btn_srs_next"
                                         class="px-6 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition"
-                                        onclick="window.location.href = '{% url 'student_practice' %}?mode=srs'">
+                                        onclick="window.location.href = '{% url 'student_practice' %}?mode=srs{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}'">
                                     Следующая задача
                                 </button>
                             </div>
@@ -215,8 +229,10 @@
                             document.addEventListener('DOMContentLoaded', () => {
                                 const submissionId = {{ practice_submission.id|default:0 }};
                                 const uploadUrl = `/api/submission/${submissionId}/upload/`;
-                                const file1 = document.getElementById('srs_file_1');
-                                const file2 = document.getElementById('srs_file_2');
+                                const cam1 = document.getElementById('srs_camera_1');
+                                const gal1 = document.getElementById('srs_gallery_1');
+                                const cam2 = document.getElementById('srs_camera_2');
+                                const gal2 = document.getElementById('srs_gallery_2');
                                 const statusEl = document.getElementById('srs_upload_status');
                                 const loadingEl = document.getElementById('srs_upload_loading');
 
@@ -247,8 +263,10 @@
                                     }
                                 }
 
-                                if (file1) file1.addEventListener('change', () => upload('image', file1.files && file1.files[0]));
-                                if (file2) file2.addEventListener('change', () => upload('image2', file2.files && file2.files[0]));
+                                if (cam1) cam1.addEventListener('change', () => upload('image', cam1.files && cam1.files[0]));
+                                if (gal1) gal1.addEventListener('change', () => upload('image', gal1.files && gal1.files[0]));
+                                if (cam2) cam2.addEventListener('change', () => upload('image2', cam2.files && cam2.files[0]));
+                                if (gal2) gal2.addEventListener('change', () => upload('image2', gal2.files && gal2.files[0]));
                             });
 
                             function escapeHtml(s) {
