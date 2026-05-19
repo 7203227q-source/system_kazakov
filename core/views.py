@@ -1425,12 +1425,31 @@ def student_assignment_summary(request, assignment_id):
 def auto_expire_assignment_if_needed(assignment: Assignment):
     # Просроченный вариант не должен становиться "решённым".
     # Помечаем его как expired, но оставляем is_completed=False, чтобы он оставался в активных.
-    if assignment.is_expired or assignment.is_completed:
+    # Дополнительно: если просроченный вариант НЕ решён и прошло >= 1 дня после просрочки,
+    # скрываем его (soft-delete), чтобы он исчез у ученика и у репетитора.
+    if assignment.is_deleted:
         return False
     if not assignment.due_date:
         return False
     today = timezone.now().date()
     if assignment.due_date >= today:
+        return False
+
+    # Hide after one full day since due_date passed (i.e., due_date <= today - 2 days)
+    if (not assignment.is_completed) and assignment.due_date <= (today - timedelta(days=2)):
+        assignment.is_deleted = True
+        assignment.deleted_at = timezone.now()
+        assignment.deleted_by = None
+        # Keep is_expired flag consistent
+        if not assignment.is_expired:
+            assignment.is_expired = True
+            assignment.expired_at = timezone.now()
+            assignment.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "is_expired", "expired_at"])
+        else:
+            assignment.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
+        return True
+
+    if assignment.is_expired or assignment.is_completed:
         return False
 
     assignment.is_expired = True

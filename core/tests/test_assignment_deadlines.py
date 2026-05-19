@@ -51,9 +51,29 @@ class AssignmentDeadlineTests(TestCase):
         self.assertTrue(a.is_expired)
         self.assertIsNotNone(a.expired_at)
         self.assertFalse(a.is_completed)
+        self.assertFalse(a.is_deleted)
 
         subs = Submission.objects.filter(assignment=a, student=self.student)
         self.assertEqual(subs.count(), 0)
+
+    def test_overdue_assignment_is_hidden_one_day_after_expiry(self):
+        a = Assignment.objects.create(
+            tutor=self.tutor,
+            student=self.student,
+            title='Вариант 3',
+            is_draft=False,
+            due_date=timezone.now().date() - timedelta(days=2),
+        )
+        a.tasks.add(self.t1)
+
+        self.client.force_login(self.student)
+        self.client.get(reverse('student_dashboard'))
+
+        a.refresh_from_db()
+        self.assertTrue(a.is_expired)
+        self.assertFalse(a.is_completed)
+        self.assertTrue(a.is_deleted)
+        self.assertIsNotNone(a.deleted_at)
 
     def test_tutor_approve_extension_reopens_assignment(self):
         a = Assignment.objects.create(
