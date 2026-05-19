@@ -1423,7 +1423,9 @@ def student_assignment_summary(request, assignment_id):
 
 
 def auto_expire_assignment_if_needed(assignment: Assignment):
-    if assignment.is_completed:
+    # Просроченный вариант не должен становиться "решённым".
+    # Помечаем его как expired, но оставляем is_completed=False, чтобы он оставался в активных.
+    if assignment.is_expired or assignment.is_completed:
         return False
     if not assignment.due_date:
         return False
@@ -1431,55 +1433,9 @@ def auto_expire_assignment_if_needed(assignment: Assignment):
     if assignment.due_date >= today:
         return False
 
-    assignment.is_completed = True
     assignment.is_expired = True
     assignment.expired_at = timezone.now()
-    assignment.save(update_fields=['is_completed', 'is_expired', 'expired_at'])
-
-    tasks = assignment.tasks.all()
-    for t in tasks:
-        max_points_effective = max(int(t.exam_points or 0), int(getattr(getattr(t, "task_type", None), "max_points", 0) or 0))
-        is_extended = is_extended_answer_task(t)
-        sub, created = Submission.objects.get_or_create(
-            student=assignment.student,
-            task=t,
-            assignment=assignment,
-            defaults={
-                'user_answer': '',
-                'is_correct': False,
-                'score': 0,
-                'primary_score': 0,
-            },
-        )
-        if not created:
-            if is_extended:
-                eff = getattr(sub, "tutor_primary_score", None)
-                eff = int(eff) if eff is not None else int(sub.primary_score or 0)
-                sub.primary_score = eff
-                sub.score = eff
-                sub.save(update_fields=['score', 'primary_score'])
-            else:
-                # Для тестовой части (в т.ч. ОГЭ физика) возможны частичные баллы за краткий ответ.
-                # Пересчитываем по сохранённому user_answer.
-                sub.score = int(score_short_answer(t, getattr(sub, "user_answer", "") or "") or 0)
-                sub.save(update_fields=['score'])
-
-        record_task_log(assignment.student, t, sub, assignment, 0)
-
-        # Просроченные нерешённые задачи считаем "ошибкой" и добавляем в SRS
-        if int(sub.score or 0) == 0:
-            try:
-                process_task_submission(assignment.student, t, 1)
-            except Exception:
-                pass
-
-    # Калибровка темпа по просроченному варианту (с сильным штрафом внутри калибровки).
-    try:
-        from core.analytics import calibrate_learning_velocity_for_assignment
-
-        calibrate_learning_velocity_for_assignment(assignment)
-    except Exception:
-        pass
+    assignment.save(update_fields=['is_expired', 'expired_at'])
 
     return True
 

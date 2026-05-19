@@ -34,7 +34,7 @@ class AssignmentDeadlineTests(TestCase):
         TaskVariant.objects.create(task=self.t1, theme='classic', content='<p>U1</p>', solution='<p>S1</p>')
         TaskVariant.objects.create(task=self.t2, theme='classic', content='<p>U2</p>', solution='<p>S2</p>')
 
-    def test_overdue_assignment_auto_closes_with_zero_submissions(self):
+    def test_overdue_assignment_marks_expired_but_stays_active(self):
         a = Assignment.objects.create(
             tutor=self.tutor,
             student=self.student,
@@ -48,14 +48,12 @@ class AssignmentDeadlineTests(TestCase):
         self.client.get(reverse('student_dashboard'))
 
         a.refresh_from_db()
-        self.assertTrue(a.is_completed)
         self.assertTrue(a.is_expired)
         self.assertIsNotNone(a.expired_at)
+        self.assertFalse(a.is_completed)
 
         subs = Submission.objects.filter(assignment=a, student=self.student)
-        self.assertEqual(subs.count(), 2)
-        for sub in subs:
-            self.assertEqual(int(sub.score or 0), 0)
+        self.assertEqual(subs.count(), 0)
 
     def test_tutor_approve_extension_reopens_assignment(self):
         a = Assignment.objects.create(
