@@ -3,6 +3,8 @@ from django.urls import reverse
 
 from bs4 import BeautifulSoup
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+
 from core.models import Assignment, ExamFormat, Subject, Task, TaskType, Topic, Submission, User
 
 
@@ -30,3 +32,15 @@ class StudentSolveAssignmentPart2PhotoTests(TestCase):
         self.assertIsNone(soup.select_one(f"#answer_{self.task.id}"))
         self.assertIsNotNone(soup.select_one(f"#upload_block_{self.task.id}"))
         self.assertTrue(Submission.objects.filter(student=self.student, assignment=self.assignment, task=self.task).exists())
+
+    def test_part2_second_page_controls_present_after_first_photo(self):
+        img = SimpleUploadedFile("a.png", b"\x89PNG\r\n\x1a\n", content_type="image/png")
+        Submission.objects.create(student=self.student, assignment=self.assignment, task=self.task, image_url=img)
+
+        self.client.login(username="s", password="pass")
+        res = self.client.get(reverse("student_solve_assignment", args=[self.assignment.id]))
+        self.assertEqual(res.status_code, 200)
+        html = res.content.decode("utf-8")
+        self.assertIn(f'id="camera_file2_{self.task.id}"', html)
+        self.assertIn(f'id="gallery_file2_{self.task.id}"', html)
+        self.assertIn('capture="environment"', html)
