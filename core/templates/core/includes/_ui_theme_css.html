@@ -63,4 +63,42 @@
 
   :root { --tex-scale: 0.9; }
   mjx-container { font-size: calc(var(--tex-scale, 0.9) * 1em); }
+
+  .prose,
+  .task-content {
+    max-width: 100%;
+  }
+
+  .task-content {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .prose img,
+  .task-content img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .prose pre,
+  .task-content pre {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .prose table,
+  .task-content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  mjx-container[display="true"] {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
 </style>
