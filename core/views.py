@@ -1254,9 +1254,9 @@ def student_assignment_summary(request, assignment_id):
     
     for task in tasks:
         sub = submissions.get(task.id)
+        max_points_effective = int(get_max_points_effective(task) or 0)
         points_earned = 0
         if sub:
-            max_points_effective = int(get_max_points_effective(task) or 0)
             is_extended = is_extended_answer_task(task)
             if not is_extended:
                 # В старых данных score мог не заполняться (хранился только is_correct).
