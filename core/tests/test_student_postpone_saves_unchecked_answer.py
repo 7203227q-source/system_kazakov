@@ -65,7 +65,7 @@ class StudentPostponeSavesUncheckedAnswerTests(TestCase):
         res2 = self.client.post(check_url, {"answer": "1"})
         self.assertEqual(res2.status_code, 200)
         self.assertFalse(res2.json()["is_correct"])
-        self.assertFalse(res2.json().get("locked"))
+        self.assertTrue(res2.json().get("locked"))
 
         sub.refresh_from_db()
         self.assertEqual(sub.user_answer, "1")

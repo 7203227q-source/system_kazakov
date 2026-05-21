@@ -29,6 +29,7 @@ class AssignmentAnswerLockTests(TestCase):
         res1 = self.client.post(url, {"answer": "1"})
         self.assertEqual(res1.status_code, 200)
         self.assertFalse(res1.json()["is_correct"])
+        self.assertTrue(res1.json().get("locked"))
 
         sub = Submission.objects.get(student=self.student, assignment=self.assignment, task=self.task)
         self.assertEqual(sub.user_answer, "1")
@@ -36,14 +37,14 @@ class AssignmentAnswerLockTests(TestCase):
 
         res2 = self.client.post(url, {"answer": "2"})
         self.assertEqual(res2.status_code, 200)
-        self.assertTrue(res2.json()["is_correct"])
-        self.assertFalse(res2.json().get("locked"))
+        self.assertFalse(res2.json()["is_correct"])
+        self.assertTrue(res2.json().get("locked"))
 
         sub.refresh_from_db()
-        self.assertEqual(sub.user_answer, "2")
-        self.assertTrue(sub.is_correct)
+        self.assertEqual(sub.user_answer, "1")
+        self.assertFalse(sub.is_correct)
 
-    def test_input_is_not_readonly_after_wrong_check(self):
+    def test_input_is_readonly_after_wrong_check(self):
         self.client.login(username="s", password="pass")
         check_url = reverse("student_check_assignment_task", args=[self.assignment.id, self.task.id])
         self.client.post(check_url, {"answer": "1"})
@@ -53,7 +54,7 @@ class AssignmentAnswerLockTests(TestCase):
         soup = BeautifulSoup(page.content, "html.parser")
         inp = soup.find("input", {"id": f"answer_{self.task.id}"})
         self.assertIsNotNone(inp)
-        self.assertFalse(inp.has_attr("readonly"))
+        self.assertTrue(inp.has_attr("readonly"))
 
     def test_input_is_readonly_after_correct_check(self):
         self.client.login(username="s", password="pass")
