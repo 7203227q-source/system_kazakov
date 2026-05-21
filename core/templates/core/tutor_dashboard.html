@@ -200,8 +200,89 @@
                                 {{ profile.subject.name }}
                             </a>
                         {% endfor %}
+
+                        {% if chart_subject_id %}
+                        <button
+                            type="button"
+                            onclick="openResetStatsModal()"
+                            class="ml-2 px-3 py-1 rounded-full text-xs font-bold border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition"
+                            title="Сбросить статистику ученика по выбранному предмету"
+                        >
+                            <i class="fas fa-rotate-left mr-1"></i> Сбросить статистику
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
+                {% endif %}
+
+                {% if chart_subject_id %}
+                <div id="reset-stats-modal" class="fixed inset-0 z-[110] hidden bg-black/60 flex items-center justify-center p-4">
+                    <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                            <div class="font-bold text-gray-800">Сбросить статистику по предмету</div>
+                            <button type="button" onclick="closeResetStatsModal()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                        </div>
+                        <div class="p-6">
+                            <div class="text-sm text-gray-700">
+                                Это действие необратимо. Будет удалено:
+                                <ul class="list-disc pl-5 mt-2 space-y-1 text-sm text-gray-700">
+                                    <li>все решения ученика (Submission) по предмету</li>
+                                    <li>интервальное повторение (SRS) по предмету</li>
+                                    <li>аналитика и прогноз (DailySnapshot, TaskLog) по предмету</li>
+                                    <li>варианты по предмету будут скрыты (soft-delete)</li>
+                                </ul>
+                            </div>
+
+                            <label class="mt-4 flex items-start gap-3 text-sm text-gray-700 select-none">
+                                <input id="reset_stats_confirm_checkbox" type="checkbox" class="mt-1 h-4 w-4">
+                                <span>Я понимаю, что действие необратимо</span>
+                            </label>
+
+                            <form method="POST" action="{% url 'tutor_reset_student_subject_stats' selected_student.id chart_subject_id %}" class="mt-5 flex justify-end gap-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="confirm" value="1">
+                                <button type="button" onclick="closeResetStatsModal()" class="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 font-bold hover:bg-gray-50 transition">
+                                    Отмена
+                                </button>
+                                <button id="reset_stats_submit_btn" type="submit" disabled class="px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Сбросить
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    function openResetStatsModal() {
+                        const modal = document.getElementById('reset-stats-modal');
+                        const cb = document.getElementById('reset_stats_confirm_checkbox');
+                        const btn = document.getElementById('reset_stats_submit_btn');
+                        if (cb) cb.checked = false;
+                        if (btn) btn.disabled = true;
+                        if (modal) modal.classList.remove('hidden');
+                    }
+                    function closeResetStatsModal() {
+                        const modal = document.getElementById('reset-stats-modal');
+                        if (modal) modal.classList.add('hidden');
+                    }
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const cb = document.getElementById('reset_stats_confirm_checkbox');
+                        const btn = document.getElementById('reset_stats_submit_btn');
+                        if (!cb || !btn) return;
+                        cb.addEventListener('change', () => {
+                            btn.disabled = !cb.checked;
+                        });
+                        const modal = document.getElementById('reset-stats-modal');
+                        if (modal) {
+                            modal.addEventListener('click', (e) => {
+                                if (e.target === modal) closeResetStatsModal();
+                            });
+                        }
+                        document.addEventListener('keydown', (e) => {
+                            if (e.key === 'Escape') closeResetStatsModal();
+                        });
+                    });
+                </script>
                 {% endif %}
 
                 <div id="award-xp-form" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
