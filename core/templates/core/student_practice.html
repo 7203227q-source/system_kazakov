@@ -133,6 +133,23 @@
                                         {% endif %}
                                     </div>
 
+                                    <div class="mt-2">
+                                        <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                                            <input type="file" id="srs_camera_2" class="hidden" accept="image/*" capture="environment">
+                                            <button type="button" onclick="const el=document.getElementById('srs_camera_2'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">
+                                                {% if practice_submission.image_url_2 %}Переснять стр. 2{% else %}Сделать фото стр. 2{% endif %}
+                                            </button>
+                                            <input type="file" id="srs_gallery_2" class="hidden" accept="image/*">
+                                            <button type="button" onclick="const el=document.getElementById('srs_gallery_2'); if(el){ el.value=''; el.click(); }" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">
+                                                {% if practice_submission.image_url_2 %}Заменить файл стр. 2{% else %}Выбрать файл стр. 2{% endif %}
+                                            </button>
+                                        </div>
+                                        <div id="srs_upload_status" class="text-xs text-gray-500 mt-2 hidden"></div>
+                                        <div id="srs_upload_loading" class="hidden mt-3">
+                                            <i class="fas fa-circle-notch fa-spin text-primary text-2xl"></i>
+                                        </div>
+                                    </div>
+
                                     <div class="flex flex-col sm:flex-row gap-2 justify-center">
                                         <button type="button"
                                                 onclick="verifySrsWithAI({{ practice_submission.id }})"
