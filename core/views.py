@@ -1155,25 +1155,21 @@ def student_check_assignment_task(request, assignment_id, task_id):
     points_max = get_max_points_effective(task)
     is_correct = (int(points_earned or 0) == int(points_max or 0))
     
-    # Ищем старое решение или создаем новое
-    submission, created = Submission.objects.get_or_create(
-        student=request.user,
-        task=task,
-        assignment=assignment,
-        defaults={
-            'user_answer': user_answer,
-            'is_correct': is_correct,
-            'score': int(points_earned or 0),
-        }
-    )
-    
-    locked = False
-    prev_correct = False
-    if not created:
-        prev_correct = bool(submission.is_correct)
-        if prev_correct:
-            locked = True
-            is_correct = True
+    submission = Submission.objects.filter(student=request.user, task=task, assignment=assignment).first()
+    already_checked = bool(submission and submission.is_correct is not None)
+    if already_checked:
+        is_correct = bool(submission.is_correct)
+        points_earned = int(getattr(submission, "score", 0) or 0)
+    else:
+        if submission is None:
+            submission = Submission.objects.create(
+                student=request.user,
+                task=task,
+                assignment=assignment,
+                user_answer=user_answer,
+                is_correct=is_correct,
+                score=int(points_earned or 0),
+            )
         else:
             submission.user_answer = user_answer
             submission.is_correct = is_correct
@@ -1181,15 +1177,15 @@ def student_check_assignment_task(request, assignment_id, task_id):
             submission.save(update_fields=["user_answer", "is_correct", "score"])
 
     # Автодобавление в интервальное повторение: только из вариантов и только неверные
-    if not is_correct and not locked:
+    if not is_correct and not already_checked:
         try:
             process_task_submission(request.user, task, 1)
         except Exception:
             pass
         
-    # Если решили правильно, даем XP (только если еще не давали)
+    # Если решили правильно, даем XP (только за первую проверку)
     xp_gained = max(1, int(task.difficulty / 5))
-    if is_correct and (created or (not prev_correct and not locked)):
+    if is_correct and not already_checked:
         profile, _ = StudentSubjectProfile.objects.get_or_create(
             student=request.user,
             subject=task.topic.subject,
@@ -1221,11 +1217,11 @@ def student_check_assignment_task(request, assignment_id, task_id):
         'is_correct': is_correct,
         'correct_answer': task.correct_answer,
         'solution_html': solution_html,
-        'xp_gained': xp_gained if is_correct and created else 0,
+        'xp_gained': xp_gained if is_correct and not already_checked else 0,
         'comments_count': submission.comments.count(),
         'can_view_comments': submission.is_correct is not None,
         'submission_id': submission.id,
-        'locked': locked,
+        'locked': True,
     })
 
 @login_required
