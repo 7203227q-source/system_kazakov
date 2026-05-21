@@ -4606,6 +4606,71 @@ def tutor_award_xp(request):
 
 @login_required
 @require_POST
+def tutor_reset_student_subject_stats(request, student_id, subject_id):
+    if request.user.role != "tutor":
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    if not request.user.students.filter(id=student_id).exists():
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    if (request.POST.get("confirm") or "").strip() != "1":
+        return JsonResponse({"error": "confirm_required"}, status=400)
+
+    student = User.objects.filter(id=student_id, role="student").first()
+    subject = Subject.objects.filter(id=subject_id).first()
+    if student is None or subject is None:
+        return JsonResponse({"error": "not_found"}, status=404)
+
+    from django.db import transaction
+    now = timezone.now()
+
+    with transaction.atomic():
+        profile = StudentSubjectProfile.objects.filter(student=student, subject=subject).first()
+        if profile:
+            profile.xp = 0
+            profile.level = 1
+            profile.current_streak = 0
+            profile.avg_model_error = 0.0
+            profile.trust_factor = 0.6
+            profile.learning_velocity = 1.0
+            profile.last_verified_date = None
+            profile.last_streak_date = None
+            profile.save(
+                update_fields=[
+                    "xp",
+                    "level",
+                    "current_streak",
+                    "avg_model_error",
+                    "trust_factor",
+                    "learning_velocity",
+                    "last_verified_date",
+                    "last_streak_date",
+                ]
+            )
+
+        DailySnapshot.objects.filter(student=student, subject=subject).delete()
+        TaskLog.objects.filter(student=student, task__topic__subject=subject).delete()
+        SpacedRepetition.objects.filter(student=student, task__topic__subject=subject).delete()
+        Submission.objects.filter(student=student, task__topic__subject=subject).delete()
+
+        ids = []
+        for a in Assignment.objects.filter(student=student, is_deleted=False):
+            total = a.tasks.count()
+            if total and total == a.tasks.filter(topic__subject=subject).count():
+                ids.append(a.id)
+        if ids:
+            Assignment.objects.filter(id__in=ids).update(
+                is_deleted=True,
+                deleted_at=now,
+                deleted_by=request.user,
+            )
+
+    messages.success(request, f"Статистика по предмету «{subject.name}» сброшена.")
+    return redirect(f"{reverse('tutor_dashboard')}?student_id={student.id}&subject_id={subject.id}")
+
+
+@login_required
+@require_POST
 def tutor_add_submission_comment(request, submission_id):
     if request.user.role != "tutor":
         return JsonResponse({"error": "forbidden"}, status=403)

@@ -46,6 +46,11 @@ urlpatterns = [
     path('tutor/student/<int:student_id>/add-subject/', views.tutor_add_student_subject, name='tutor_add_student_subject'),
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
     path('tutor/student/<int:student_id>/srs/remove/<int:task_id>/', views.tutor_student_srs_remove, name='tutor_student_srs_remove'),
+    path(
+        'tutor/student/<int:student_id>/subject/<int:subject_id>/reset/',
+        views.tutor_reset_student_subject_stats,
+        name='tutor_reset_student_subject_stats',
+    ),
     path('tutor/submission/<int:submission_id>/comment/', views.tutor_add_submission_comment, name='tutor_add_submission_comment'),
     path('tutor/tasks/', views.tutor_task_bank, name='tutor_task_bank'),
     path('tutor/tasks/uniqualize/', views.tutor_bulk_uniqualize, name='tutor_bulk_uniqualize'),
