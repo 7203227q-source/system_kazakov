@@ -63,8 +63,8 @@ class StudentDashboardDeadlineBadgesTests(TestCase):
         # До дедлайна осталось 2 дня -> должен появиться бейдж "Осталось: 2 дн" (красный/urgent).
         self.assertIn("Осталось: 2 дн", html)
 
-        # Проверяем, что сортировка: ближайший due_date выше, а без due_date — внизу.
+        # Проверяем, что сортировка: самые новые (по created_at) — выше.
         pos_soon = html.find("Soon")
         pos_later = html.find("Later")
         pos_none = html.find("NoDue")
-        self.assertTrue(0 <= pos_soon < pos_later < pos_none)
+        self.assertTrue(0 <= pos_none < pos_later < pos_soon)

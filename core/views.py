@@ -956,7 +956,7 @@ def student_dashboard(request):
     if active_subject_id:
         pending_assignments = pending_assignments.filter(tasks__topic__subject_id=active_subject_id).distinct()
 
-    # Дедлайны: показываем "осталось X дней" и считаем urgent при 0–2 днях + сортировка по ближайшему due_date (null внизу).
+    # Дедлайны: показываем "осталось X дней" и считаем urgent при 0–2 днях + сортировка по дате генерации (created_at).
     import datetime as _dt
     today = timezone.now().date()
     urgent_until = today + _dt.timedelta(days=2)
@@ -972,7 +972,7 @@ def student_dashboard(request):
             default=models.Value(False),
             output_field=models.BooleanField(),
         ),
-    ).order_by(models.F("due_date").asc(nulls_last=True), "-created_at")
+    ).order_by("-created_at", "-id")
 
     # Gamification calculations (total across subjects)
     latest_snapshot = None
@@ -6686,7 +6686,7 @@ def api_student_pending_assignments(request):
             default=models.Value(False),
             output_field=models.BooleanField(),
         ),
-    ).order_by(models.F("due_date").asc(nulls_last=True), "-created_at")[:50]
+    ).order_by("-created_at", "-id")[:50]
 
     assignment_ids = list(qs.values_list("id", flat=True))
     unread_by_assignment = {

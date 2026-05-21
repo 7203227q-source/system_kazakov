@@ -15,12 +15,16 @@ class StudentPendingAssignmentsApiTests(TestCase):
         topic = Topic.objects.create(subject=subj, name="T")
         tt = TaskType.objects.create(exam_format=ef, number=1, name="1", max_points=1)
         task = Task.objects.create(topic=topic, task_type=tt, correct_answer="1", difficulty=10, exam_points=1)
-        a = Assignment.objects.create(tutor=tutor, student=student, title="A", is_draft=False, is_completed=False, exam_format=ef)
-        a.tasks.add(task)
+        a1 = Assignment.objects.create(tutor=tutor, student=student, title="A1", is_draft=False, is_completed=False, exam_format=ef)
+        a1.tasks.add(task)
+        a2 = Assignment.objects.create(tutor=tutor, student=student, title="A2", is_draft=False, is_completed=False, exam_format=ef)
+        a2.tasks.add(task)
 
         self.client.login(username="s", password="pass")
         r = self.client.get(reverse("api_student_pending_assignments"))
         self.assertEqual(r.status_code, 200)
         data = r.json()
-        self.assertTrue(any(x.get("id") == a.id for x in data.get("assignments", [])))
-
+        ids = [x.get("id") for x in data.get("assignments", [])]
+        self.assertTrue(a1.id in ids)
+        self.assertTrue(a2.id in ids)
+        self.assertEqual(ids[0], a2.id)
