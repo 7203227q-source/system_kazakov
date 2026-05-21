@@ -56,21 +56,34 @@ class SubmissionVerifyOpenRouterStructuredTests(TestCase):
     def test_verify_saves_structured_fields(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
 
+        recognition = {
+            "photo_valid": True,
+            "photo_valid_reason": "",
+            "recognition_confidence": 0.8,
+            "recognized_solution": "1) Перенёс влево\n2) Сократил",
+        }
         structured = {
             "primary_score": 1,
             "is_correct": False,
-            "recognized_solution": "1) Перенёс влево\n2) Сократил",
             "mistakes": ["На шаге 2 нельзя сокращать на 0", "Потерян знак минус"],
             "verdict": ["Оценка: 1/2.", "Рекомендация: перепроверь ОДЗ."],
             "feedback": "",
         }
-        dummy_response = {"choices": [{"message": {"content": json.dumps(structured, ensure_ascii=False)}}]}
+        dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+        dummy_response_2 = {"choices": [{"message": {"content": json.dumps(structured, ensure_ascii=False)}}]}
 
         from unittest.mock import patch
 
         with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy_response
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
 
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
@@ -79,13 +92,14 @@ class SubmissionVerifyOpenRouterStructuredTests(TestCase):
         data = res.json()
         self.assertEqual(data["primary_score"], 1)
         self.assertFalse(data["is_correct"])
-        self.assertEqual(data["recognized_solution"], structured["recognized_solution"])
+        self.assertEqual(data["recognized_solution"], recognition["recognized_solution"])
         self.assertEqual(data["mistakes"], structured["mistakes"])
         self.assertEqual(data["verdict"][: len(structured["verdict"])], structured["verdict"])
         self.assertTrue(
             any("Неуверенность распознавания" in (v or "") for v in (data.get("verdict") or [])),
             msg="Ожидали строку про неуверенность распознавания в verdict",
         )
+        self.assertEqual(post.call_count, 2)
 
         self.submission.refresh_from_db()
         self.assertTrue(self.submission.ai_recognized_solution)

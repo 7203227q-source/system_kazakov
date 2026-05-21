@@ -32,21 +32,39 @@ class SubmissionVerifyOpenRouterTwoImagesTests(TestCase):
 
     def test_verify_sends_both_images(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
-        dummy_response = {
-            "choices": [{"message": {"content": json.dumps({"primary_score": 1, "is_correct": True, "feedback": "ok"})}}]
+        recognition = {
+            "photo_valid": True,
+            "photo_valid_reason": "",
+            "recognition_confidence": 0.9,
+            "recognized_solution": "x=1",
         }
+        grading = {"primary_score": 1, "is_correct": False, "feedback": "ok"}
+        dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+        dummy_response_2 = {"choices": [{"message": {"content": json.dumps(grading, ensure_ascii=False)}}]}
 
         from unittest.mock import patch
         with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy_response
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
 
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
         self.assertEqual(res.status_code, 200)
-        sent_payload = post.call_args.kwargs["json"]
-        user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
-        imgs = [p for p in user_msg["content"] if p["type"] == "image_url"]
-        self.assertGreaterEqual(len(imgs), 2)
+        self.assertEqual(post.call_count, 2)
 
+        sent_payload_1 = post.call_args_list[0].kwargs["json"]
+        user_msg_1 = next(m for m in sent_payload_1["messages"] if m["role"] == "user")
+        imgs_1 = [p for p in user_msg_1["content"] if p["type"] == "image_url"]
+        self.assertEqual(len(imgs_1), 2)
+
+        sent_payload_2 = post.call_args_list[1].kwargs["json"]
+        user_msg_2 = next(m for m in sent_payload_2["messages"] if m["role"] == "user")
+        self.assertIsInstance(user_msg_2["content"], str)

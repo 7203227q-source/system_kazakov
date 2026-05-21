@@ -14,6 +14,7 @@ from core.models import (
     Submission,
     Task,
     TaskType,
+    TaskVariant,
     Topic,
     User,
 )
@@ -65,3 +66,53 @@ class TutorVerifyAiCooldownTests(TestCase):
             self.assertEqual(r1.status_code, 200, r1.content)
             r2 = self.client.post(url)
             self.assertEqual(r2.status_code, 429)
+
+    def test_tutor_verify_ai_uses_two_step_when_solution_exists(self):
+        TaskVariant.objects.create(task=self.task, theme="classic", content="<p>Q</p>", solution="<p>S</p>")
+        check_model = OpenRouterModel.objects.create(code="check-model", label="Check", is_active=True)
+        SubjectAIConfig.objects.update(solution_check_model=check_model)
+
+        self.client.login(username="t", password="pass")
+        url = reverse("api_tutor_verify_with_ai", args=[self.sub.id])
+
+        recognition = {
+            "photo_valid": True,
+            "photo_valid_reason": "",
+            "recognition_confidence": 0.8,
+            "recognized_solution": "x=1",
+        }
+        grading = {
+            "primary_score": 1,
+            "is_correct": False,
+            "mistakes": ["m1"],
+            "verdict": ["v1"],
+            "feedback": "",
+        }
+        dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+        dummy_response_2 = {"choices": [{"message": {"content": json.dumps(grading, ensure_ascii=False)}}]}
+
+        from unittest.mock import patch
+
+        with patch("core.views.requests.post") as post:
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
+
+            r1 = self.client.post(url)
+
+        self.assertEqual(r1.status_code, 200, r1.content)
+        data = r1.json()
+        self.assertEqual(data["recognized_solution"], recognition["recognized_solution"])
+        self.assertEqual(data["mistakes"], grading["mistakes"])
+        self.assertTrue(
+            any("Неуверенность распознавания" in (v or "") for v in (data.get("verdict") or [])),
+            msg="Ожидали строку про неуверенность распознавания в verdict",
+        )
+        self.assertEqual(data.get("model"), "check-model")
+        self.assertEqual(post.call_count, 2)

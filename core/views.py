@@ -5499,6 +5499,7 @@ def api_verify_with_ai(request, submission_id):
         request.session['whiteboard_unlocked'] = unlocked
         request.session.modified = True
 
+    cfg = None
     model = ""
     try:
         from .models import SubjectAIConfig
@@ -5506,6 +5507,7 @@ def api_verify_with_ai(request, submission_id):
             SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id)
             .select_related(
                 'photo_analysis_model',
+                'solution_check_model',
                 'photo_compare_model_1',
                 'photo_compare_model_2',
                 'photo_compare_model_3',
@@ -5517,6 +5519,7 @@ def api_verify_with_ai(request, submission_id):
         if cfg and cfg.photo_analysis_model:
             model = cfg.photo_analysis_model.code
     except Exception:
+        cfg = None
         model = ""
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
@@ -5541,6 +5544,11 @@ def api_verify_with_ai(request, submission_id):
             task_html = task.get_content_for_theme(theme) or ""
         except Exception:
             task_html = ""
+        solution_html = ""
+        try:
+            solution_html = task.get_solution_for_theme(theme) or ""
+        except Exception:
+            solution_html = ""
 
         def _filefield_to_data_url(ff) -> str:
             file_path_local = ff.path
@@ -5677,44 +5685,6 @@ def api_verify_with_ai(request, submission_id):
         for u in task_image_data_urls:
             user_content.append({"type": "image_url", "image_url": {"url": u}})
 
-        feedback = ""
-        is_correct = False
-        primary_score = 0
-
-        res = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": referer,
-                "X-Title": title,
-            },
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
-                    {
-                        "role": "user",
-                        "content": user_content,
-                    },
-                ],
-            },
-            timeout=90,
-        )
-
-        if res.status_code != 200:
-            detail = None
-            try:
-                detail = res.json()
-            except Exception:
-                detail = (res.text or "").strip()[:500]
-            return JsonResponse(
-                {'error': 'ai_failed', 'upstream_status': res.status_code, 'upstream_message': detail},
-                status=400,
-            )
-
-        data = res.json()
-        content = data["choices"][0]["message"]["content"]
         def _repair_json_for_latex(raw: str) -> str:
             if not isinstance(raw, str):
                 return raw
@@ -5722,34 +5692,252 @@ def api_verify_with_ai(request, submission_id):
             raw = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', raw)
             raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
             return raw
-        content = _repair_json_for_latex(content)
-        try:
-            parsed = pyjson.loads(content)
-        except Exception:
-            match = re.search(r"\{[\s\S]*\}", str(content))
-            if not match:
-                parsed = None
-            else:
-                try:
-                    parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
-                except Exception:
-                    parsed = None
 
-        if not isinstance(parsed, dict):
-            raw = str(content)
-            ps_m = re.search(r'["\']primary_score["\']\s*:\s*(-?\d+)', raw, re.IGNORECASE)
-            ic_m = re.search(r'["\']is_correct["\']\s*:\s*(true|false)', raw, re.IGNORECASE)
-            fb_m = re.search(r'["\']feedback["\']\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw, re.IGNORECASE)
-            if ps_m or ic_m or fb_m:
-                parsed = {
-                    "primary_score": int(ps_m.group(1)) if ps_m else 0,
-                    "is_correct": (ic_m.group(1).lower() == "true") if ic_m else False,
-                    "feedback": fb_m.group(1) if fb_m else raw,
+        def _parse_json_content(content_raw: str):
+            fixed = _repair_json_for_latex(content_raw)
+            try:
+                return pyjson.loads(fixed)
+            except Exception:
+                match = re.search(r"\{[\s\S]*\}", str(fixed))
+                if not match:
+                    return None
+                try:
+                    return pyjson.loads(_repair_json_for_latex(match.group(0)))
+                except Exception:
+                    return None
+
+        feedback = ""
+        is_correct = False
+        primary_score = 0
+        photo_valid = True
+        photo_valid_reason = ""
+        recognition_confidence = None
+        score_breakdown = []
+
+        model_used = model
+        if not (solution_html or "").strip():
+            res = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": referer,
+                    "X-Title": title,
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                        {
+                            "role": "user",
+                            "content": user_content,
+                        },
+                    ],
+                },
+                timeout=90,
+            )
+
+            if res.status_code != 200:
+                detail = None
+                try:
+                    detail = res.json()
+                except Exception:
+                    detail = (res.text or "").strip()[:500]
+                return JsonResponse(
+                    {'error': 'ai_failed', 'upstream_status': res.status_code, 'upstream_message': detail},
+                    status=400,
+                )
+
+            data = res.json()
+            content = data["choices"][0]["message"]["content"]
+            parsed = _parse_json_content(content)
+            if not isinstance(parsed, dict):
+                raw = str(content)
+                ps_m = re.search(r'["\']primary_score["\']\s*:\s*(-?\d+)', raw, re.IGNORECASE)
+                ic_m = re.search(r'["\']is_correct["\']\s*:\s*(true|false)', raw, re.IGNORECASE)
+                fb_m = re.search(r'["\']feedback["\']\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw, re.IGNORECASE)
+                if ps_m or ic_m or fb_m:
+                    parsed = {
+                        "primary_score": int(ps_m.group(1)) if ps_m else 0,
+                        "is_correct": (ic_m.group(1).lower() == "true") if ic_m else False,
+                        "feedback": fb_m.group(1) if fb_m else raw,
+                    }
+                else:
+                    return JsonResponse({'error': 'ai_failed'}, status=400)
+            ai = parse_ai_photo_verdict(parsed, max_points, confidence_threshold=0.35)
+        else:
+            recognition_prompt = (
+                "Проанализируй фото решения ученика.\n"
+                "Твоя задача — ТОЛЬКО распознать, что написано на фото, и проверить, относится ли фото к этой задаче.\n"
+                "\n"
+                "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
+                "- photo_valid: boolean\n"
+                "- photo_valid_reason: string\n"
+                "- recognition_confidence: number (0..1)\n"
+                "- recognized_solution: string (что именно видно на фото; допускаются переносы строк)\n"
+                "\n"
+                "ВАЖНО:\n"
+                "- Не выставляй баллы и не оценивай правильность.\n"
+                "- Описывай ТОЛЬКО то, что реально видно на фото.\n"
+                "- Если часть не читается — помечай: [неразборчиво]/[не видно].\n"
+                "- Не додумывай шаги. Любые предположения помечай как «ПРЕДПОЛОЖЕНИЕ: ...».\n"
+                "\n"
+                "Формулы в LaTeX: $...$ / $$...$$. Так как ответ JSON — экранируй обратные слэши (двойной обратный слэш)."
+            )
+            if task_text:
+                recognition_prompt = f"{recognition_prompt}\n\nУсловие:\n{task_text}"
+
+            recognition_content = [{"type": "text", "text": recognition_prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
+            if data_url_2:
+                recognition_content.append({"type": "image_url", "image_url": {"url": data_url_2}})
+            for u in task_image_data_urls:
+                recognition_content.append({"type": "image_url", "image_url": {"url": u}})
+
+            res_1 = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": referer,
+                    "X-Title": title,
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                        {"role": "user", "content": recognition_content},
+                    ],
+                },
+                timeout=90,
+            )
+
+            if res_1.status_code != 200:
+                detail = None
+                try:
+                    detail = res_1.json()
+                except Exception:
+                    detail = (res_1.text or "").strip()[:500]
+                return JsonResponse(
+                    {'error': 'ai_failed', 'upstream_status': res_1.status_code, 'upstream_message': detail},
+                    status=400,
+                )
+
+            data_1 = res_1.json()
+            content_1 = data_1["choices"][0]["message"]["content"]
+            parsed_1 = _parse_json_content(content_1) or {}
+            if not isinstance(parsed_1, dict):
+                parsed_1 = {}
+
+            photo_valid = bool(parsed_1.get("photo_valid", True))
+            photo_valid_reason = str(parsed_1.get("photo_valid_reason") or "").strip()
+            recognized_solution = normalize_tex_in_feedback(str(parsed_1.get("recognized_solution") or "").strip())
+            try:
+                recognition_confidence = float(parsed_1.get("recognition_confidence"))
+            except Exception:
+                recognition_confidence = None
+
+            gate_fail = (photo_valid is False) or (
+                recognition_confidence is not None and recognition_confidence < 0.35
+            )
+            if gate_fail:
+                ai = {
+                    "primary_score": 0,
+                    "is_correct": False,
+                    "feedback": "",
+                    "recognized_solution": recognized_solution,
+                    "mistakes": [],
+                    "verdict": [],
+                    "photo_valid": photo_valid,
+                    "photo_valid_reason": photo_valid_reason,
+                    "recognition_confidence": recognition_confidence,
+                    "score_breakdown": [],
                 }
             else:
-                return JsonResponse({'error': 'ai_failed'}, status=400)
+                grade_model = model
+                try:
+                    if cfg and cfg.solution_check_model:
+                        grade_model = cfg.solution_check_model.code
+                except Exception:
+                    grade_model = model
 
-        ai = parse_ai_photo_verdict(parsed, max_points, confidence_threshold=0.35)
+                solution_soup = BeautifulSoup(solution_html, "html.parser")
+                for t in solution_soup(["script", "style", "noscript"]):
+                    t.decompose()
+                solution_text = re.sub(r"\s+", " ", solution_soup.get_text(" ", strip=True) or "").strip()
+                solution_text = solution_text.replace("\\", "\\\\")
+
+                grading_prompt = (
+                    "Ты проверяешь решение ученика по распознанному тексту (не по фото).\n"
+                    f"Максимум баллов: {max_points}.\n"
+                    "\n"
+                    "Дано:\n"
+                    "- Условие задачи\n"
+                    "- Эталонное решение\n"
+                    "- Распознанное решение ученика (может быть неполным)\n"
+                    "\n"
+                    "Оцени, насколько распознанное решение соответствует эталону.\n"
+                    "ВАЖНО:\n"
+                    "- НЕ додумывай шаги, которых нет в распознанном решении.\n"
+                    "- Если распознанное решение неполное/не хватает данных — снизь балл и явно укажи, чего не хватает.\n"
+                    "\n"
+                    "Верни ТОЛЬКО JSON (без markdown):\n"
+                    f"- primary_score: number (целое 0..{int(max_points or 0)})\n"
+                    "- score_breakdown: array of objects (label, awarded, max, reason) (сумма awarded = primary_score)\n"
+                    "- mistakes: array of strings\n"
+                    "- verdict: array of strings (каждый элемент — абзац; включи пункт «Неуверенность распознавания: ...»)\n"
+                    "- feedback: string (опционально)\n"
+                    "\n"
+                    "Формулы в LaTeX: $...$ / $$...$$. В JSON экранируй обратные слэши."
+                )
+
+                grading_payload = (
+                    f"{grading_prompt}\n\n"
+                    f"Условие:\n{task_text}\n\n"
+                    f"Эталонное решение:\n{solution_text}\n\n"
+                    f"Распознанное решение ученика:\n{recognized_solution}"
+                )
+
+                res_2 = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": referer,
+                        "X-Title": title,
+                    },
+                    json={
+                        "model": grade_model,
+                        "messages": [
+                            {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                            {"role": "user", "content": grading_payload},
+                        ],
+                    },
+                    timeout=90,
+                )
+
+                if res_2.status_code != 200:
+                    detail = None
+                    try:
+                        detail = res_2.json()
+                    except Exception:
+                        detail = (res_2.text or "").strip()[:500]
+                    return JsonResponse(
+                        {'error': 'ai_failed', 'upstream_status': res_2.status_code, 'upstream_message': detail},
+                        status=400,
+                    )
+
+                data_2 = res_2.json()
+                content_2 = data_2["choices"][0]["message"]["content"]
+                parsed_2 = _parse_json_content(content_2)
+                if not isinstance(parsed_2, dict):
+                    return JsonResponse({'error': 'ai_failed'}, status=400)
+                parsed_2.setdefault("recognized_solution", recognized_solution)
+                parsed_2.setdefault("recognition_confidence", recognition_confidence)
+                parsed_2.setdefault("photo_valid", photo_valid)
+                parsed_2.setdefault("photo_valid_reason", photo_valid_reason)
+                ai = parse_ai_photo_verdict(parsed_2, max_points, confidence_threshold=0.35)
+                model_used = grade_model
+
         primary_score = int(ai.get("primary_score") or 0)
         is_correct = bool(ai.get("is_correct"))
         feedback = str(ai.get("feedback") or "")
@@ -5821,12 +6009,6 @@ def api_verify_with_ai(request, submission_id):
         except Exception:
             pass
 
-        solution_html = ""
-        try:
-            solution_html = task.get_solution_for_theme(theme) or ""
-        except Exception:
-            solution_html = ""
-
         return JsonResponse({
             'status': 'ok',
             'primary_score': primary_score,
@@ -5842,7 +6024,7 @@ def api_verify_with_ai(request, submission_id):
             'is_correct': is_correct,
             'xp_gained': xp_gained,
             'solution_html': solution_html,
-            'model': model,
+            'model': model_used,
             'cooldown_seconds': cooldown_seconds,
         })
     except Exception as e:
@@ -5903,17 +6085,19 @@ def api_tutor_verify_with_ai(request, submission_id):
     if not is_extended_answer_task(task):
         return JsonResponse({'error': 'only_second_part'}, status=400)
 
+    cfg = None
     model = ""
     try:
         from .models import SubjectAIConfig
         cfg = (
             SubjectAIConfig.objects.filter(subject_id=task.topic.subject_id)
-            .select_related('photo_analysis_model')
+            .select_related('photo_analysis_model', 'solution_check_model')
             .first()
         )
         if cfg and cfg.photo_analysis_model:
             model = cfg.photo_analysis_model.code
     except Exception:
+        cfg = None
         model = ""
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip().strip('"').strip("'")
@@ -5927,11 +6111,21 @@ def api_tutor_verify_with_ai(request, submission_id):
         import mimetypes
         import json as pyjson
 
+        recognized_solution = ""
+        mistakes = []
+        verdict = []
+
+        theme = getattr(student, "preferred_theme", None) or "classic"
         task_html = ""
         try:
-            task_html = task.get_content_for_theme() or ""
+            task_html = task.get_content_for_theme(theme) or ""
         except Exception:
             task_html = ""
+        solution_html = ""
+        try:
+            solution_html = task.get_solution_for_theme(theme) or ""
+        except Exception:
+            solution_html = ""
 
         def _filefield_to_data_url(ff) -> str:
             file_path_local = ff.path
@@ -5975,6 +6169,37 @@ def api_tutor_verify_with_ai(request, submission_id):
             task_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True) or "").strip()
             task_text = task_text.replace("\\", "\\\\")
 
+            seen = set()
+            from django.conf import settings as dj_settings
+            from urllib.parse import unquote
+            allowed_mimes = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+            for img in soup.find_all("img"):
+                src = (img.get("src") or img.get("data-src") or img.get("data-original") or "").strip().strip('"').strip("'")
+                if not src:
+                    continue
+                low = src.lower()
+                if low.startswith("data:") or low.startswith("javascript:") or low.startswith("file:"):
+                    continue
+                if not src.startswith("/media/"):
+                    continue
+                clean_src = src.split("?", 1)[0].split("#", 1)[0]
+                rel = unquote(clean_src[len("/media/"):].lstrip("/"))
+                rel_norm = os.path.normpath(rel)
+                if not rel_norm or rel_norm.startswith("..") or rel_norm.startswith("/"):
+                    continue
+                file_full = os.path.join(dj_settings.MEDIA_ROOT, rel_norm)
+                if file_full in seen:
+                    continue
+                seen.add(file_full)
+                if not os.path.exists(file_full) or not os.path.isfile(file_full):
+                    continue
+                mime_img = mimetypes.guess_type(file_full)[0] or ""
+                if mime_img not in allowed_mimes:
+                    continue
+                with open(file_full, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                task_image_data_urls.append(f"data:{mime_img};base64,{b64}")
+
         try:
             data_url = _filefield_to_data_url(submission.image_url)
         except ValueError as e:
@@ -5991,81 +6216,6 @@ def api_tutor_verify_with_ai(request, submission_id):
         referer = sanitize_header_value(os.environ.get("OPENROUTER_HTTP_REFERER", "").strip() or "https://kazakov-system.ru") or "https://kazakov-system.ru"
         title = sanitize_header_value(os.environ.get("OPENROUTER_APP_NAME", "").strip() or "kazakov-system") or "kazakov-system"
 
-        prompt = (
-            "Оцени решение по фото как репетитор-эксперт экзамена.\n"
-            f"Максимум баллов: {max_points}.\n"
-            f"Поставь первичный балл primary_score как целое число от 0 до {int(max_points or 0)}.\n"
-            "Если решение полностью верное — primary_score = максимум.\n"
-            "Если решение частично верное — поставь частичный балл.\n"
-            "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
-            "\n"
-            "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
-            "- primary_score: number\n"
-            "- is_correct: boolean\n"
-            "- photo_valid: boolean (валидно ли фото для проверки именно этой задачи; false если это не решение/другая задача/нечитабельно)\n"
-            "- photo_valid_reason: string (почему photo_valid=false; если true — можно пустую строку)\n"
-            "- recognition_confidence: number (0..1; насколько уверенно распознано решение)\n"
-            "- recognized_solution: string (что именно ты видишь на фото в решении ученика; допускаются переносы строк)\n"
-            "- mistakes: array of strings (ошибки/замечания; каждый элемент — отдельный пункт)\n"
-            "- score_breakdown: array of objects (разбивка снятия баллов; сумма awarded должна равняться primary_score)\n"
-            "  - label: string (например К1/К2 или Ошибка 1)\n"
-            "  - awarded: number (целое)\n"
-            "  - max: number (целое)\n"
-            "  - reason: string (за что снято/почему не максимум)\n"
-            "- verdict: array of strings (итоговый вердикт и рекомендации; каждый элемент — отдельный абзац; обязательно укажи, за что сняты баллы; ОБЯЗАТЕЛЬНО добавь отдельным пунктом «Неуверенность распознавания: ...»)\n"
-            "- feedback: string (опционально; если заполнишь — это краткий общий текст)\n"
-            "\n"
-            "ВАЖНО (распознавание):\n"
-            "- Описывай в recognized_solution ТОЛЬКО то, что реально видно на фото (формулы, преобразования, подстановки).\n"
-            "- Если часть не читается/не видна — явно помечай: [неразборчиво], [не видно], [сомнение].\n"
-            "- Не додумывай шаги решения. Если всё же вынужден предположить — явно пометь строку как «ПРЕДПОЛОЖЕНИЕ: ...».\n"
-            "- Если фото нерелевантно задаче или из-за качества нельзя надёжно оценить — поставь photo_valid=false, primary_score=0 и объясни причину.\n"
-            "\n"
-            "Формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
-            "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши в LaTeX (используй двойной обратный слэш)."
-        )
-
-        if task_text:
-            prompt = f"{prompt}\n\nУсловие:\n{task_text}"
-
-        user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
-        if data_url_2:
-            user_content.append({"type": "image_url", "image_url": {"url": data_url_2}})
-        for u in task_image_data_urls:
-            user_content.append({"type": "image_url", "image_url": {"url": u}})
-
-        res = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": referer,
-                "X-Title": title,
-            },
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
-                    {"role": "user", "content": user_content},
-                ],
-            },
-            timeout=90,
-        )
-
-        if res.status_code != 200:
-            detail = None
-            try:
-                detail = res.json()
-            except Exception:
-                detail = (res.text or "").strip()[:500]
-            return JsonResponse(
-                {'error': 'ai_failed', 'upstream_status': res.status_code, 'upstream_message': detail},
-                status=400,
-            )
-
-        data = res.json()
-        content = data["choices"][0]["message"]["content"]
-
         def _repair_json_for_latex(raw: str) -> str:
             if not isinstance(raw, str):
                 return raw
@@ -6074,34 +6224,291 @@ def api_tutor_verify_with_ai(request, submission_id):
             raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
             return raw
 
-        content = _repair_json_for_latex(content)
-        try:
-            parsed = pyjson.loads(content)
-        except Exception:
-            match = re.search(r"\{[\s\S]*\}", str(content))
-            if not match:
-                parsed = None
-            else:
+        def _parse_json_content(content_raw: str):
+            fixed = _repair_json_for_latex(content_raw)
+            try:
+                return pyjson.loads(fixed)
+            except Exception:
+                match = re.search(r"\{[\s\S]*\}", str(fixed))
+                if not match:
+                    return None
                 try:
-                    parsed = pyjson.loads(_repair_json_for_latex(match.group(0)))
+                    return pyjson.loads(_repair_json_for_latex(match.group(0)))
                 except Exception:
-                    parsed = None
+                    return None
 
-        if not isinstance(parsed, dict):
-            raw = str(content)
-            ps_m = re.search(r'["\']primary_score["\']\s*:\s*(-?\d+)', raw, re.IGNORECASE)
-            ic_m = re.search(r'["\']is_correct["\']\s*:\s*(true|false)', raw, re.IGNORECASE)
-            fb_m = re.search(r'["\']feedback["\']\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw, re.IGNORECASE)
-            if ps_m or ic_m or fb_m:
-                parsed = {
-                    "primary_score": int(ps_m.group(1)) if ps_m else 0,
-                    "is_correct": (ic_m.group(1).lower() == "true") if ic_m else False,
-                    "feedback": fb_m.group(1) if fb_m else raw,
+        feedback = ""
+        is_correct = False
+        primary_score = 0
+        photo_valid = True
+        photo_valid_reason = ""
+        recognition_confidence = None
+        score_breakdown = []
+
+        model_used = model
+        if not (solution_html or "").strip():
+            prompt = (
+                "Оцени решение по фото как репетитор-эксперт экзамена.\n"
+                f"Максимум баллов: {max_points}.\n"
+                f"Поставь первичный балл primary_score как целое число от 0 до {int(max_points or 0)}.\n"
+                "Если решение полностью верное — primary_score = максимум.\n"
+                "Если решение частично верное — поставь частичный балл.\n"
+                "Поле is_correct = true только если primary_score == максимум, иначе false.\n"
+                "\n"
+                "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
+                "- primary_score: number\n"
+                "- is_correct: boolean\n"
+                "- photo_valid: boolean (валидно ли фото для проверки именно этой задачи; false если это не решение/другая задача/нечитабельно)\n"
+                "- photo_valid_reason: string (почему photo_valid=false; если true — можно пустую строку)\n"
+                "- recognition_confidence: number (0..1; насколько уверенно распознано решение)\n"
+                "- recognized_solution: string (что именно ты видишь на фото в решении ученика; допускаются переносы строк)\n"
+                "- mistakes: array of strings (ошибки/замечания; каждый элемент — отдельный пункт)\n"
+                "- score_breakdown: array of objects (разбивка снятия баллов; сумма awarded должна равняться primary_score)\n"
+                "  - label: string (например К1/К2 или Ошибка 1)\n"
+                "  - awarded: number (целое)\n"
+                "  - max: number (целое)\n"
+                "  - reason: string (за что снято/почему не максимум)\n"
+                "- verdict: array of strings (итоговый вердикт и рекомендации; каждый элемент — отдельный абзац; обязательно укажи, за что сняты баллы; ОБЯЗАТЕЛЬНО добавь отдельным пунктом «Неуверенность распознавания: ...»)\n"
+                "- feedback: string (опционально; если заполнишь — это краткий общий текст)\n"
+                "\n"
+                "ВАЖНО (распознавание):\n"
+                "- Описывай в recognized_solution ТОЛЬКО то, что реально видно на фото (формулы, преобразования, подстановки).\n"
+                "- Если часть не читается/не видна — явно помечай: [неразборчиво], [не видно], [сомнение].\n"
+                "- Не додумывай шаги решения. Если всё же вынужден предположить — явно пометь строку как «ПРЕДПОЛОЖЕНИЕ: ...».\n"
+                "- Если фото нерелевантно задаче или из-за качества нельзя надёжно оценить — поставь photo_valid=false, primary_score=0 и объясни причину.\n"
+                "\n"
+                "Формулы записывай в LaTeX: инлайн $...$, блочно $$...$$.\n"
+                "ВАЖНО: так как ответ должен быть JSON, в строках обязательно экранируй обратные слэши в LaTeX (используй двойной обратный слэш)."
+            )
+
+            if task_text:
+                prompt = f"{prompt}\n\nУсловие:\n{task_text}"
+
+            user_content = [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
+            if data_url_2:
+                user_content.append({"type": "image_url", "image_url": {"url": data_url_2}})
+            for u in task_image_data_urls:
+                user_content.append({"type": "image_url", "image_url": {"url": u}})
+
+            res = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": referer,
+                    "X-Title": title,
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                        {"role": "user", "content": user_content},
+                    ],
+                },
+                timeout=90,
+            )
+
+            if res.status_code != 200:
+                detail = None
+                try:
+                    detail = res.json()
+                except Exception:
+                    detail = (res.text or "").strip()[:500]
+                return JsonResponse(
+                    {'error': 'ai_failed', 'upstream_status': res.status_code, 'upstream_message': detail},
+                    status=400,
+                )
+
+            data = res.json()
+            content = data["choices"][0]["message"]["content"]
+            parsed = _parse_json_content(content)
+            if not isinstance(parsed, dict):
+                raw = str(content)
+                ps_m = re.search(r'["\']primary_score["\']\s*:\s*(-?\d+)', raw, re.IGNORECASE)
+                ic_m = re.search(r'["\']is_correct["\']\s*:\s*(true|false)', raw, re.IGNORECASE)
+                fb_m = re.search(r'["\']feedback["\']\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw, re.IGNORECASE)
+                if ps_m or ic_m or fb_m:
+                    parsed = {
+                        "primary_score": int(ps_m.group(1)) if ps_m else 0,
+                        "is_correct": (ic_m.group(1).lower() == "true") if ic_m else False,
+                        "feedback": fb_m.group(1) if fb_m else raw,
+                    }
+                else:
+                    return JsonResponse({'error': 'ai_failed'}, status=400)
+            ai = parse_ai_photo_verdict(parsed, max_points, confidence_threshold=0.35)
+        else:
+            recognition_prompt = (
+                "Проанализируй фото решения ученика.\n"
+                "Твоя задача — ТОЛЬКО распознать, что написано на фото, и проверить, относится ли фото к этой задаче.\n"
+                "\n"
+                "Верни ТОЛЬКО JSON (без markdown) со следующими полями:\n"
+                "- photo_valid: boolean\n"
+                "- photo_valid_reason: string\n"
+                "- recognition_confidence: number (0..1)\n"
+                "- recognized_solution: string (что именно видно на фото; допускаются переносы строк)\n"
+                "\n"
+                "ВАЖНО:\n"
+                "- Не выставляй баллы и не оценивай правильность.\n"
+                "- Описывай ТОЛЬКО то, что реально видно на фото.\n"
+                "- Если часть не читается — помечай: [неразборчиво]/[не видно].\n"
+                "- Не додумывай шаги. Любые предположения помечай как «ПРЕДПОЛОЖЕНИЕ: ...».\n"
+                "\n"
+                "Формулы в LaTeX: $...$ / $$...$$. Так как ответ JSON — экранируй обратные слэши (двойной обратный слэш)."
+            )
+            if task_text:
+                recognition_prompt = f"{recognition_prompt}\n\nУсловие:\n{task_text}"
+
+            recognition_content = [{"type": "text", "text": recognition_prompt}, {"type": "image_url", "image_url": {"url": data_url}}]
+            if data_url_2:
+                recognition_content.append({"type": "image_url", "image_url": {"url": data_url_2}})
+            for u in task_image_data_urls:
+                recognition_content.append({"type": "image_url", "image_url": {"url": u}})
+
+            res_1 = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": referer,
+                    "X-Title": title,
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                        {"role": "user", "content": recognition_content},
+                    ],
+                },
+                timeout=90,
+            )
+
+            if res_1.status_code != 200:
+                detail = None
+                try:
+                    detail = res_1.json()
+                except Exception:
+                    detail = (res_1.text or "").strip()[:500]
+                return JsonResponse(
+                    {'error': 'ai_failed', 'upstream_status': res_1.status_code, 'upstream_message': detail},
+                    status=400,
+                )
+
+            data_1 = res_1.json()
+            content_1 = data_1["choices"][0]["message"]["content"]
+            parsed_1 = _parse_json_content(content_1) or {}
+            if not isinstance(parsed_1, dict):
+                parsed_1 = {}
+
+            photo_valid = bool(parsed_1.get("photo_valid", True))
+            photo_valid_reason = str(parsed_1.get("photo_valid_reason") or "").strip()
+            recognized_solution = normalize_tex_in_feedback(str(parsed_1.get("recognized_solution") or "").strip())
+            try:
+                recognition_confidence = float(parsed_1.get("recognition_confidence"))
+            except Exception:
+                recognition_confidence = None
+
+            gate_fail = (photo_valid is False) or (
+                recognition_confidence is not None and recognition_confidence < 0.35
+            )
+            if gate_fail:
+                ai = {
+                    "primary_score": 0,
+                    "is_correct": False,
+                    "feedback": "",
+                    "recognized_solution": recognized_solution,
+                    "mistakes": [],
+                    "verdict": [],
+                    "photo_valid": photo_valid,
+                    "photo_valid_reason": photo_valid_reason,
+                    "recognition_confidence": recognition_confidence,
+                    "score_breakdown": [],
                 }
             else:
-                return JsonResponse({'error': 'ai_failed'}, status=400)
+                grade_model = model
+                try:
+                    if cfg and cfg.solution_check_model:
+                        grade_model = cfg.solution_check_model.code
+                except Exception:
+                    grade_model = model
 
-        ai = parse_ai_photo_verdict(parsed, max_points, confidence_threshold=0.35)
+                solution_soup = BeautifulSoup(solution_html, "html.parser")
+                for t in solution_soup(["script", "style", "noscript"]):
+                    t.decompose()
+                solution_text = re.sub(r"\s+", " ", solution_soup.get_text(" ", strip=True) or "").strip()
+                solution_text = solution_text.replace("\\", "\\\\")
+
+                grading_prompt = (
+                    "Ты проверяешь решение ученика по распознанному тексту (не по фото).\n"
+                    f"Максимум баллов: {max_points}.\n"
+                    "\n"
+                    "Дано:\n"
+                    "- Условие задачи\n"
+                    "- Эталонное решение\n"
+                    "- Распознанное решение ученика (может быть неполным)\n"
+                    "\n"
+                    "Оцени, насколько распознанное решение соответствует эталону.\n"
+                    "ВАЖНО:\n"
+                    "- НЕ додумывай шаги, которых нет в распознанном решении.\n"
+                    "- Если распознанное решение неполное/не хватает данных — снизь балл и явно укажи, чего не хватает.\n"
+                    "\n"
+                    "Верни ТОЛЬКО JSON (без markdown):\n"
+                    f"- primary_score: number (целое 0..{int(max_points or 0)})\n"
+                    "- score_breakdown: array of objects (label, awarded, max, reason) (сумма awarded = primary_score)\n"
+                    "- mistakes: array of strings\n"
+                    "- verdict: array of strings (каждый элемент — абзац; включи пункт «Неуверенность распознавания: ...»)\n"
+                    "- feedback: string (опционально)\n"
+                    "\n"
+                    "Формулы в LaTeX: $...$ / $$...$$. В JSON экранируй обратные слэши."
+                )
+
+                grading_payload = (
+                    f"{grading_prompt}\n\n"
+                    f"Условие:\n{task_text}\n\n"
+                    f"Эталонное решение:\n{solution_text}\n\n"
+                    f"Распознанное решение ученика:\n{recognized_solution}"
+                )
+
+                res_2 = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": referer,
+                        "X-Title": title,
+                    },
+                    json={
+                        "model": grade_model,
+                        "messages": [
+                            {"role": "system", "content": "Return ONLY valid JSON. No markdown."},
+                            {"role": "user", "content": grading_payload},
+                        ],
+                    },
+                    timeout=90,
+                )
+
+                if res_2.status_code != 200:
+                    detail = None
+                    try:
+                        detail = res_2.json()
+                    except Exception:
+                        detail = (res_2.text or "").strip()[:500]
+                    return JsonResponse(
+                        {'error': 'ai_failed', 'upstream_status': res_2.status_code, 'upstream_message': detail},
+                        status=400,
+                    )
+
+                data_2 = res_2.json()
+                content_2 = data_2["choices"][0]["message"]["content"]
+                parsed_2 = _parse_json_content(content_2)
+                if not isinstance(parsed_2, dict):
+                    return JsonResponse({'error': 'ai_failed'}, status=400)
+                parsed_2.setdefault("recognized_solution", recognized_solution)
+                parsed_2.setdefault("recognition_confidence", recognition_confidence)
+                parsed_2.setdefault("photo_valid", photo_valid)
+                parsed_2.setdefault("photo_valid_reason", photo_valid_reason)
+                ai = parse_ai_photo_verdict(parsed_2, max_points, confidence_threshold=0.35)
+                model_used = grade_model
+
         primary_score = int(ai.get("primary_score") or 0)
         is_correct = bool(ai.get("is_correct"))
         feedback = str(ai.get("feedback") or "")
@@ -6194,7 +6601,7 @@ def api_tutor_verify_with_ai(request, submission_id):
             'is_correct': is_correct,
             'xp_gained': xp_gained,
             'solution_html': solution_html,
-            'model': model,
+            'model': model_used,
             'cooldown_seconds': cooldown_seconds,
         })
     except Exception as e:

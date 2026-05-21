@@ -41,77 +41,130 @@ class SubmissionVerifyOpenRouterTests(TestCase):
     def test_verify_uses_openrouter_when_configured(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
 
-        dummy_response = {
-            "choices": [
-                {"message": {"content": json.dumps({"primary_score": 1, "is_correct": True, "feedback": "ok"})}}
-            ]
+        recognition = {
+            "photo_valid": True,
+            "photo_valid_reason": "",
+            "recognition_confidence": 0.9,
+            "recognized_solution": "x=1",
         }
+        grading = {"primary_score": 2, "is_correct": True, "feedback": "ok"}
+        dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+        dummy_response_2 = {"choices": [{"message": {"content": json.dumps(grading, ensure_ascii=False)}}]}
 
         from unittest.mock import patch
         with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy_response
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
 
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
-        sent_payload = post.call_args.kwargs["json"]
-        self.assertNotIn("response_format", sent_payload)
-        user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
-        prompt_text = next(p["text"] for p in user_msg["content"] if p["type"] == "text")
-        self.assertIn("0 до", prompt_text)
-        self.assertIn("сняты", prompt_text)
-        self.assertIn("$...$", prompt_text)
-        self.assertIn("$$...$$", prompt_text)
+        self.assertEqual(post.call_count, 2)
+        sent_payload_1 = post.call_args_list[0].kwargs["json"]
+        sent_payload_2 = post.call_args_list[1].kwargs["json"]
+        self.assertNotIn("response_format", sent_payload_1)
+        self.assertNotIn("response_format", sent_payload_2)
+
+        user_msg_1 = next(m for m in sent_payload_1["messages"] if m["role"] == "user")
+        prompt_text_1 = next(p["text"] for p in user_msg_1["content"] if p["type"] == "text")
+        self.assertIn("ТОЛЬКО распознать", prompt_text_1)
+        self.assertIn("recognition_confidence", prompt_text_1)
+        self.assertIn("$...$", prompt_text_1)
+        self.assertIn("$$...$$", prompt_text_1)
+
+        user_msg_2 = next(m for m in sent_payload_2["messages"] if m["role"] == "user")
+        self.assertIsInstance(user_msg_2["content"], str)
+        self.assertIn("Эталонное решение:", user_msg_2["content"])
+        self.assertIn("Распознанное решение ученика:", user_msg_2["content"])
+        self.assertIn(recognition["recognized_solution"], user_msg_2["content"])
 
         self.assertEqual(res.status_code, 200)
         payload = res.json()
-        self.assertEqual(payload["primary_score"], 1)
+        self.assertEqual(payload["primary_score"], 2)
         self.assertTrue(payload["is_correct"])
         self.assertEqual(payload["model"], "google/gemini-2.0-flash")
 
     def test_verify_repairs_invalid_json_backslashes_in_feedback(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
 
-        content = '{"primary_score": 1, "is_correct": true, "feedback": "$\\pi$"}'
-        dummy_response = {"choices": [{"message": {"content": content}}]}
+        recognition = {
+            "photo_valid": True,
+            "photo_valid_reason": "",
+            "recognition_confidence": 0.9,
+            "recognized_solution": "x=1",
+        }
+        content = '{"primary_score": 2, "is_correct": true, "feedback": "$\\pi$"}'
+        dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+        dummy_response_2 = {"choices": [{"message": {"content": content}}]}
 
         from unittest.mock import patch
         with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy_response
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
 
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
         self.assertEqual(res.status_code, 200)
         payload = res.json()
-        self.assertEqual(payload["primary_score"], 1)
+        self.assertEqual(payload["primary_score"], 2)
         self.assertTrue(payload["is_correct"])
         self.assertIn("\\pi", payload["feedback"])
 
     def test_verify_repairs_invalid_json_u_escape_in_feedback(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
 
-        content = '{"primary_score": 1, "is_correct": true, "feedback": "$\\underline{x}$"}'
-        dummy_response = {"choices": [{"message": {"content": content}}]}
+        recognition = {
+            "photo_valid": True,
+            "photo_valid_reason": "",
+            "recognition_confidence": 0.9,
+            "recognized_solution": "x=1",
+        }
+        content = '{"primary_score": 2, "is_correct": true, "feedback": "$\\underline{x}$"}'
+        dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+        dummy_response_2 = {"choices": [{"message": {"content": content}}]}
 
         from unittest.mock import patch
         with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy_response
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
 
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
         self.assertEqual(res.status_code, 200)
         payload = res.json()
-        self.assertEqual(payload["primary_score"], 1)
+        self.assertEqual(payload["primary_score"], 2)
         self.assertTrue(payload["is_correct"])
         self.assertIn("\\underline", payload["feedback"])
 
     def test_verify_handles_non_json_response_missing_comma(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
+
+        v = self.task.variants.filter(theme="classic").first()
+        v.solution = ""
+        v.save(update_fields=["solution"])
 
         content = '{"primary_score": 1 "is_correct": true, "feedback": "ok"}'
         dummy_response = {"choices": [{"message": {"content": content}}]}
@@ -127,8 +180,32 @@ class SubmissionVerifyOpenRouterTests(TestCase):
         self.assertEqual(res.status_code, 200)
         payload = res.json()
         self.assertEqual(payload["primary_score"], 1)
-        self.assertTrue(payload["is_correct"])
+        self.assertFalse(payload["is_correct"])
         self.assertIn("ok", payload["feedback"])
+
+    def test_verify_fallback_one_call_when_solution_missing(self):
+        os.environ["OPENROUTER_API_KEY"] = "test"
+
+        v = self.task.variants.filter(theme="classic").first()
+        v.solution = ""
+        v.save(update_fields=["solution"])
+
+        dummy_response = {
+            "choices": [
+                {"message": {"content": json.dumps({"primary_score": 1, "is_correct": True, "feedback": "ok"})}}
+            ]
+        }
+
+        from unittest.mock import patch
+        with patch("core.views.requests.post") as post:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = dummy_response
+
+            self.client.force_login(self.student)
+            res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(post.call_count, 1)
 
     def test_verify_inlines_task_media_images_as_data_urls(self):
         os.environ["OPENROUTER_API_KEY"] = "test"
@@ -153,15 +230,31 @@ class SubmissionVerifyOpenRouterTests(TestCase):
 
         from unittest.mock import patch
         with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy_response
+            recognition = {
+                "photo_valid": True,
+                "photo_valid_reason": "",
+                "recognition_confidence": 0.9,
+                "recognized_solution": "x=1",
+            }
+            dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+            dummy_response_2 = dummy_response
+
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
 
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
         self.assertEqual(res.status_code, 200)
 
-        sent_payload = post.call_args.kwargs["json"]
+        sent_payload = post.call_args_list[0].kwargs["json"]
         user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
         urls = [p["image_url"]["url"] for p in user_msg["content"] if p["type"] == "image_url"]
         self.assertTrue(any(u.startswith("data:image/png;base64,") for u in urls))
@@ -187,15 +280,31 @@ class SubmissionVerifyOpenRouterTests(TestCase):
 
         from unittest.mock import patch
         with patch("core.views.requests.post") as post:
-            post.return_value.status_code = 200
-            post.return_value.json.return_value = dummy_response
+            recognition = {
+                "photo_valid": True,
+                "photo_valid_reason": "",
+                "recognition_confidence": 0.9,
+                "recognized_solution": "x=1",
+            }
+            dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
+            dummy_response_2 = dummy_response
+
+            class R:
+                def __init__(self, payload):
+                    self.status_code = 200
+                    self._payload = payload
+
+                def json(self):
+                    return self._payload
+
+            post.side_effect = [R(dummy_response_1), R(dummy_response_2)]
 
             self.client.force_login(self.student)
             res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
 
         self.assertEqual(res.status_code, 200)
 
-        sent_payload = post.call_args.kwargs["json"]
+        sent_payload = post.call_args_list[0].kwargs["json"]
         user_msg = next(m for m in sent_payload["messages"] if m["role"] == "user")
         urls = [p["image_url"]["url"] for p in user_msg["content"] if p["type"] == "image_url"]
         self.assertFalse(any("t.svg" in u for u in urls))
