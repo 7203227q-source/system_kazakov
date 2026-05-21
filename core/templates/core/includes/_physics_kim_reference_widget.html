@@ -1,0 +1,85 @@
+{% if physics_kim_ref_enabled %}
+<div id="physics-kim-ref-root" class="fixed z-[60] bottom-5 right-5">
+  <button
+    id="physics-kim-fab"
+    type="button"
+    class="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-lg flex items-center justify-center text-2xl font-bold"
+    aria-label="Справочные данные КИМ"
+  >
+    ?
+  </button>
+</div>
+
+<div id="physics-kim-modal-overlay" class="hidden fixed inset-0 z-[70] bg-black/50"></div>
+<div id="physics-kim-modal" class="hidden fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-6">
+  <div class="bg-white w-full sm:max-w-3xl sm:rounded-2xl rounded-t-2xl shadow-xl max-h-[85dvh] flex flex-col overflow-hidden">
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
+      <div class="font-bold text-gray-800">Справочные данные (КИМ)</div>
+      <button type="button" id="physics-kim-close" class="text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg">
+        <span class="sr-only">Закрыть</span>
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="px-4 sm:px-6 pt-3">
+      <div class="flex flex-wrap gap-2">
+        <button type="button" class="physics-kim-tab px-3 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white" data-tab="constants">Константы</button>
+        <button type="button" class="physics-kim-tab px-3 py-2 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200" data-tab="prefixes">Приставки</button>
+        <button type="button" class="physics-kim-tab px-3 py-2 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200" data-tab="units">Единицы</button>
+        <button type="button" class="physics-kim-tab px-3 py-2 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200" data-tab="other">Прочее</button>
+      </div>
+    </div>
+
+    <div class="px-4 sm:px-6 py-4 overflow-y-auto">
+      {% if physics_kim_ref_kind == "ege" %}
+        {% include "core/includes/_physics_kim_reference_content_ege.html" %}
+      {% elif physics_kim_ref_kind == "oge" %}
+        {% include "core/includes/_physics_kim_reference_content_oge.html" %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const fab = document.getElementById("physics-kim-fab");
+    const overlay = document.getElementById("physics-kim-modal-overlay");
+    const modal = document.getElementById("physics-kim-modal");
+    const closeBtn = document.getElementById("physics-kim-close");
+    if (!fab || !overlay || !modal || !closeBtn) return;
+
+    const tabs = Array.from(document.querySelectorAll(".physics-kim-tab"));
+    const panels = Array.from(document.querySelectorAll("[data-panel]"));
+
+    function setOpen(isOpen) {
+      overlay.classList.toggle("hidden", !isOpen);
+      modal.classList.toggle("hidden", !isOpen);
+      document.body.classList.toggle("overflow-hidden", isOpen);
+    }
+
+    function setActiveTab(key) {
+      tabs.forEach((t) => {
+        const active = (t.getAttribute("data-tab") || "") === key;
+        t.classList.toggle("bg-indigo-600", active);
+        t.classList.toggle("text-white", active);
+        t.classList.toggle("bg-gray-100", !active);
+        t.classList.toggle("text-gray-700", !active);
+      });
+      panels.forEach((p) => {
+        const show = (p.getAttribute("data-panel") || "") === key;
+        p.classList.toggle("hidden", !show);
+      });
+    }
+
+    fab.addEventListener("click", () => setOpen(true));
+    closeBtn.addEventListener("click", () => setOpen(false));
+    overlay.addEventListener("click", () => setOpen(false));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") setOpen(false);
+    });
+    tabs.forEach((t) => t.addEventListener("click", () => setActiveTab(t.getAttribute("data-tab") || "constants")));
+
+    setActiveTab("constants");
+  })();
+</script>
+{% endif %}

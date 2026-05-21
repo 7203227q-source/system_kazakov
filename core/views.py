@@ -626,6 +626,18 @@ def login_view(request):
             return render(request, 'core/login.html', {'error': 'Неверный логин или пароль'})
             
     return render(request, 'core/login.html')
+
+
+def _physics_kim_ref_flags(*, subject_name: str, exam_format_name: str):
+    s = (subject_name or "").strip().lower()
+    e = (exam_format_name or "").strip().lower()
+    is_physics = "физ" in s
+    is_ege = "егэ" in e
+    is_oge = "огэ" in e
+    enabled = bool(is_physics and (is_ege or is_oge))
+    kind = "ege" if enabled and is_ege else ("oge" if enabled and is_oge else "")
+    return enabled, kind
+
 @login_required
 def student_practice(request):
     """Страница тренажера (решение одной задачи)"""
@@ -864,6 +876,21 @@ def student_practice(request):
                 primary_score=0,
             )
 
+    physics_subject_name = ""
+    physics_exam_format_name = ""
+    try:
+        if active_profile and getattr(active_profile, "subject", None):
+            physics_subject_name = str(getattr(active_profile.subject, "name", "") or "")
+        if active_profile and getattr(active_profile, "exam_format", None):
+            physics_exam_format_name = str(getattr(active_profile.exam_format, "name", "") or "")
+    except Exception:
+        physics_subject_name = ""
+        physics_exam_format_name = ""
+    physics_kim_ref_enabled, physics_kim_ref_kind = _physics_kim_ref_flags(
+        subject_name=physics_subject_name,
+        exam_format_name=physics_exam_format_name,
+    )
+
     return render(request, 'core/student_practice.html', {
         'task': task,
         'total_xp': total_xp,
@@ -878,6 +905,8 @@ def student_practice(request):
         'srs_due_total': srs_due_total,
         'srs_due_left_after_current': srs_due_left_after_current,
         'srs_eta_minutes': srs_eta_minutes,
+        'physics_kim_ref_enabled': bool(physics_kim_ref_enabled),
+        'physics_kim_ref_kind': physics_kim_ref_kind,
     })
 
 
@@ -1617,12 +1646,43 @@ def student_solve_assignment(request, assignment_id):
                     else:
                         missing_part2_labels.append(f"№{idx}")
 
+        physics_subject_name = ""
+        physics_exam_format_name = ""
+        try:
+            ef = getattr(assignment, "exam_format", None)
+            if ef:
+                physics_exam_format_name = str(getattr(ef, "name", "") or "")
+                subj = getattr(ef, "subject", None)
+                if subj:
+                    physics_subject_name = str(getattr(subj, "name", "") or "")
+        except Exception:
+            physics_subject_name = ""
+            physics_exam_format_name = ""
+
+        if not physics_subject_name:
+            try:
+                for t in tasks_list:
+                    topic = getattr(t, "topic", None)
+                    subj = getattr(topic, "subject", None) if topic else None
+                    if subj and getattr(subj, "name", None):
+                        physics_subject_name = str(getattr(subj, "name", "") or "")
+                        break
+            except Exception:
+                physics_subject_name = ""
+
+        physics_kim_ref_enabled, physics_kim_ref_kind = _physics_kim_ref_flags(
+            subject_name=physics_subject_name,
+            exam_format_name=physics_exam_format_name,
+        )
+
         return render(request, 'core/student_solve_assignment.html', {
             'assignment': assignment,
             'tasks': tasks_list,
             'unread_tutor_replies_total': unread_tutor_replies_total,
             'needs_force_finish': bool(needs_force_finish),
             'missing_part2_labels': missing_part2_labels,
+            'physics_kim_ref_enabled': bool(physics_kim_ref_enabled),
+            'physics_kim_ref_kind': physics_kim_ref_kind,
         })
     
     if request.method == 'POST':
