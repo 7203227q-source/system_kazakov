@@ -1,0 +1,62 @@
+<h2>Справочник по физике — структура модального окна</h2>
+<p class="subtitle">Только справка из КИМа. Выбери, как удобнее её листать на телефоне.</p>
+
+<div class="options">
+  <div class="option" data-choice="tabs" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Вкладки</h3>
+      <p>Сверху вкладки: «Константы», «Приставки», «Единицы», «Прочее»</p>
+      <div class="mockup">
+        <div class="mockup-header">Справочник (модалка)</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="padding:6px 10px;border-radius:999px;background:#4f46e5;color:#fff;font-weight:800;font-size:12px">Константы</span>
+            <span style="padding:6px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-weight:800;font-size:12px">Приставки</span>
+            <span style="padding:6px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-weight:800;font-size:12px">Единицы</span>
+            <span style="padding:6px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-weight:800;font-size:12px">Прочее</span>
+          </div>
+          <div class="placeholder" style="height:140px;margin-top:12px">Таблица констант из КИМа</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="anchors" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Один скролл + якоря</h3>
+      <p>Вверху быстрые кнопки-ярлыки, дальше единая прокрутка</p>
+      <div class="mockup">
+        <div class="mockup-header">Справочник (модалка)</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="padding:6px 10px;border-radius:10px;background:#f3f4f6;color:#374151;font-weight:800;font-size:12px">Константы ↓</span>
+            <span style="padding:6px 10px;border-radius:10px;background:#f3f4f6;color:#374151;font-weight:800;font-size:12px">Приставки ↓</span>
+            <span style="padding:6px 10px;border-radius:10px;background:#f3f4f6;color:#374151;font-weight:800;font-size:12px">Единицы ↓</span>
+          </div>
+          <div class="placeholder" style="height:60px;margin-top:12px">Раздел «Константы»</div>
+          <div class="placeholder" style="height:60px;margin-top:10px">Раздел «Приставки»</div>
+          <div class="placeholder" style="height:60px;margin-top:10px">Раздел «Единицы»</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="accordion" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Аккордеон</h3>
+      <p>Список разделов, каждый раскрывается отдельно</p>
+      <div class="mockup">
+        <div class="mockup-header">Справочник (модалка)</div>
+        <div class="mockup-body">
+          <div class="placeholder" style="height:42px">▸ Константы</div>
+          <div class="placeholder" style="height:42px;margin-top:8px">▾ Приставки</div>
+          <div class="placeholder" style="height:90px;margin-top:8px">Таблица приставок (внутри)</div>
+          <div class="placeholder" style="height:42px;margin-top:8px">▸ Единицы</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
