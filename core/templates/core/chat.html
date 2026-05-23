@@ -141,40 +141,6 @@
                         <i class="fas fa-circle-notch fa-spin mr-2"></i> Загрузка истории...
                     </div>
                 </div>
-
-                <!-- Input Area -->
-                <div class="bg-white border-t border-gray-200 p-4">
-                    <form id="chat-form" class="flex items-end space-x-2 relative" onsubmit="sendMessage(event)">
-                        {% csrf_token %}
-
-                        <!-- File Upload Preview -->
-                        <div id="file-preview-container" class="hidden absolute bottom-full mb-2 left-0 right-0 bg-white border border-gray-200 rounded-lg p-3 shadow-lg flex items-center justify-between">
-                            <div class="flex items-center">
-                                <i class="fas fa-file-alt text-indigo-500 text-2xl mr-3" id="file-icon"></i>
-                                <span class="text-sm font-medium text-gray-700 truncate max-w-xs" id="file-name">filename.jpg</span>
-                            </div>
-                            <button type="button" onclick="clearFile()" class="text-gray-400 hover:text-red-500 transition">
-                                <i class="fas fa-times-circle text-lg"></i>
-                            </button>
-                        </div>
-
-                        <!-- Attachment Button -->
-                        <label class="cursor-pointer p-3 text-gray-400 hover:text-indigo-600 transition bg-gray-50 rounded-full shrink-0">
-                            <i class="fas fa-paperclip text-lg"></i>
-                            <input type="file" id="chat-attachment" class="hidden" onchange="handleFileSelect(event)">
-                        </label>
-
-                        <!-- Textarea -->
-                        <div class="flex-1 relative">
-                            <textarea id="chat-input" rows="1" class="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white resize-none transition" placeholder="Напишите сообщение..." style="min-height: 44px; max-height: 120px;" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
-                        </div>
-
-                        <!-- Send Button -->
-                        <button type="submit" id="send-btn" class="p-3 bg-primary text-white rounded-full hover:bg-indigo-700 transition shrink-0 shadow-sm flex items-center justify-center w-12 h-12 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </form>
-                </div>
             {% else %}
                 <!-- Empty State for Desktop -->
                 <div class="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 text-center">
@@ -185,6 +151,40 @@
                     <p class="text-sm max-w-md">Выберите собеседника из списка слева, чтобы начать общение.</p>
                 </div>
             {% endif %}
+
+            <!-- Input Area -->
+            <div class="bg-white border-t border-gray-200 p-4">
+                <form id="chat-form" class="flex items-end space-x-2 relative" {% if active_dialog %}onsubmit="sendMessage(event)"{% else %}onsubmit="return false"{% endif %}>
+                    {% csrf_token %}
+
+                    <!-- File Upload Preview -->
+                    <div id="file-preview-container" class="hidden absolute bottom-full mb-2 left-0 right-0 bg-white border border-gray-200 rounded-lg p-3 shadow-lg flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fas fa-file-alt text-indigo-500 text-2xl mr-3" id="file-icon"></i>
+                            <span class="text-sm font-medium text-gray-700 truncate max-w-xs" id="file-name">filename.jpg</span>
+                        </div>
+                        <button type="button" {% if active_dialog %}onclick="clearFile()"{% endif %} class="text-gray-400 hover:text-red-500 transition">
+                            <i class="fas fa-times-circle text-lg"></i>
+                        </button>
+                    </div>
+
+                    <!-- Attachment Button -->
+                    <label class="cursor-pointer p-3 text-gray-400 hover:text-indigo-600 transition bg-gray-50 rounded-full shrink-0">
+                        <i class="fas fa-paperclip text-lg"></i>
+                        <input type="file" id="chat-attachment" class="hidden" {% if not active_dialog %}disabled{% endif %} {% if active_dialog %}onchange="handleFileSelect(event)"{% endif %}>
+                    </label>
+
+                    <!-- Textarea -->
+                    <div class="flex-1 relative">
+                        <textarea id="chat-input" rows="1" class="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white resize-none transition" {% if active_dialog %}placeholder="Напишите сообщение..."{% else %}placeholder="Выберите диалог, чтобы написать сообщение" disabled{% endif %} style="min-height: 44px; max-height: 120px;" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                    </div>
+
+                    <!-- Send Button -->
+                    <button type="submit" id="send-btn" class="p-3 bg-primary text-white rounded-full hover:bg-indigo-700 transition shrink-0 shadow-sm flex items-center justify-center w-12 h-12 disabled:opacity-50 disabled:cursor-not-allowed" {% if not active_dialog %}disabled{% endif %}>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
