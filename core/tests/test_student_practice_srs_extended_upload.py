@@ -37,7 +37,7 @@ class StudentPracticeSrsExtendedUploadTests(TestCase):
         # Место для вывода вердикта ИИ после проверки
         self.assertIn("id=\"srs_ai_verdict\"", html)
 
-    def test_srs_extended_task_keeps_second_page_upload_after_first_page(self):
+    def test_srs_extended_task_does_not_show_previous_solution_photos(self):
         student = User.objects.create_user(username="s2", password="pass", role="student")
         subj = Subject.objects.create(name="Физика")
         ef = ExamFormat.objects.create(subject=subj, name="ЕГЭ физика", year=2026, is_active=True)
@@ -54,6 +54,35 @@ class StudentPracticeSrsExtendedUploadTests(TestCase):
         r = self.client.get(reverse("student_practice") + "?mode=srs")
         self.assertEqual(r.status_code, 200)
         html = r.content.decode("utf-8")
-        self.assertIn("Решение загружено", html)
+        self.assertIn("Загрузите решение", html)
+        self.assertNotIn("Решение загружено", html)
         self.assertIn('id="srs_camera_2"', html)
         self.assertIn('id="srs_gallery_2"', html)
+
+    def test_srs_extended_task_keeps_uploaded_photos_on_refresh_in_same_attempt(self):
+        student = User.objects.create_user(username="s3", password="pass", role="student")
+        subj = Subject.objects.create(name="Физика")
+        ef = ExamFormat.objects.create(subject=subj, name="ЕГЭ физика", year=2026, is_active=True)
+        tt = TaskType.objects.create(exam_format=ef, number=21, name="21", max_points=3, is_extended_answer=True)
+        topic = Topic.objects.create(subject=subj, name="T")
+        task = Task.objects.create(topic=topic, task_type=tt, correct_answer="1", difficulty=10, exam_points=3)
+        TaskVariant.objects.create(task=task, theme="classic", content="<p>Q</p>", solution="<p>S</p>")
+        SpacedRepetition.objects.create(student=student, task=task, next_review_date=timezone.now().date())
+
+        self.client.force_login(student)
+        r1 = self.client.get(reverse("student_practice") + "?mode=srs")
+        self.assertEqual(r1.status_code, 200)
+        submission = r1.context.get("practice_submission")
+        self.assertIsNotNone(submission)
+
+        img = SimpleUploadedFile("a.png", b"\x89PNG\r\n\x1a\n", content_type="image/png")
+        upload_resp = self.client.post(
+            reverse("api_submission_upload", args=[submission.id]),
+            data={"image": img},
+        )
+        self.assertEqual(upload_resp.status_code, 200)
+
+        r2 = self.client.get(reverse("student_practice") + "?mode=srs")
+        self.assertEqual(r2.status_code, 200)
+        html2 = r2.content.decode("utf-8")
+        self.assertIn("Решение загружено", html2)
