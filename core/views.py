@@ -2565,6 +2565,33 @@ def tutor_dashboard(request):
                 ensure_ascii=False,
             )
 
+        def _earned_max_fraction(*, is_correct, tutor_primary_score, primary_score, task_exam_points, task_type_max_points):
+            mp = int(task_exam_points or 0) if int(task_exam_points or 0) > 0 else int(task_type_max_points or 0)
+            if mp <= 0:
+                mp = 1
+
+            if is_correct is True:
+                earned = float(mp)
+            else:
+                if tutor_primary_score is not None:
+                    earned = float(tutor_primary_score)
+                elif primary_score is not None:
+                    earned = float(primary_score)
+                else:
+                    earned = 0.0
+
+            if earned < 0.0:
+                earned = 0.0
+            if earned > float(mp):
+                earned = float(mp)
+
+            frac = (earned / float(mp)) if mp > 0 else 0.0
+            if frac < 0.0:
+                frac = 0.0
+            if frac > 1.0:
+                frac = 1.0
+            return earned, mp, frac
+
         if chart_subject_id:
             from datetime import timedelta
 
@@ -2578,27 +2605,41 @@ def tutor_dashboard(request):
                     student=selected_student,
                     created_at__date__gte=start_week,
                     created_at__date__lte=today,
-                    is_correct__isnull=False,
                 )
                 .filter(task__topic__subject_id=chart_subject_id)
+                .filter(Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False))
                 .order_by("created_at")
-                .values_list("created_at", "task_id", "is_correct")
+                .values_list(
+                    "created_at",
+                    "task_id",
+                    "is_correct",
+                    "tutor_primary_score",
+                    "primary_score",
+                    "task__exam_points",
+                    "task__task_type__max_points",
+                )
             )
 
-            last_by_day_task: dict[tuple, bool] = {}
-            for created_at, task_id, is_correct in qs:
-                last_by_day_task[(created_at.date(), int(task_id))] = bool(is_correct)
+            last_by_day_task: dict[tuple, tuple[float, int]] = {}
+            for created_at, task_id, is_correct, tutor_primary_score, primary_score, task_exam_points, task_type_max_points in qs:
+                earned, mp, _ = _earned_max_fraction(
+                    is_correct=is_correct,
+                    tutor_primary_score=tutor_primary_score,
+                    primary_score=primary_score,
+                    task_exam_points=task_exam_points,
+                    task_type_max_points=task_type_max_points,
+                )
+                last_by_day_task[(created_at.date(), int(task_id))] = (float(earned), int(mp))
 
             by_day: dict = {}
             for (d, _tid), v in last_by_day_task.items():
-                cell = by_day.setdefault(d, {"correct": 0, "incorrect": 0})
-                if v:
-                    cell["correct"] = int(cell["correct"]) + 1
-                else:
-                    cell["incorrect"] = int(cell["incorrect"]) + 1
+                earned, mp = v
+                cell = by_day.setdefault(d, {"correct": 0.0, "incorrect": 0.0})
+                cell["correct"] = float(cell["correct"]) + float(earned)
+                cell["incorrect"] = float(cell["incorrect"]) + float(mp - earned)
 
-            weekly_correct = [int(by_day.get(d, {}).get("correct", 0)) for d in day_list]
-            weekly_incorrect = [int(by_day.get(d, {}).get("incorrect", 0)) for d in day_list]
+            weekly_correct = [int(round(float(by_day.get(d, {}).get("correct", 0.0)))) for d in day_list]
+            weekly_incorrect = [int(round(float(by_day.get(d, {}).get("incorrect", 0.0)))) for d in day_list]
             weekly_solved_chart_data = json.dumps(
                 {"labels": weekly_labels, "correct": weekly_correct, "incorrect": weekly_incorrect},
                 ensure_ascii=False,
@@ -2679,14 +2720,22 @@ def tutor_dashboard(request):
         if active_exam_format:
             submissions_base = submissions_base.filter(task__task_type__exam_format=active_exam_format)
         submissions_base = submissions_base.exclude(task__task_type__number__isnull=True)
+        submissions_base = submissions_base.filter(Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False))
 
         last_sub = submissions_base.filter(task_id=OuterRef("task_id")).order_by("-created_at")
         latest_rows = (
-            submissions_base.values("task_id", "task__task_type__number")
+            submissions_base.values(
+                "task_id",
+                "task__task_type__number",
+                "task__exam_points",
+                "task__task_type__max_points",
+            )
             .distinct()
             .annotate(
                 last_created_at=Subquery(last_sub.values("created_at")[:1]),
                 last_is_correct=Subquery(last_sub.values("is_correct")[:1]),
+                last_tutor_primary_score=Subquery(last_sub.values("tutor_primary_score")[:1]),
+                last_primary_score=Subquery(last_sub.values("primary_score")[:1]),
             )
         )
 
@@ -2703,20 +2752,48 @@ def tutor_dashboard(request):
             if age_days < 0:
                 age_days = 0
             weight = 0.5 ** (age_days / half_life_days)
-            is_corr = bool(r.get("last_is_correct"))
             n = int(n_raw)
-            a = agg.setdefault(n, {"wt": 0.0, "wc": 0.0, "total": 0, "correct": 0})
+            earned, mp, frac = _earned_max_fraction(
+                is_correct=r.get("last_is_correct"),
+                tutor_primary_score=r.get("last_tutor_primary_score"),
+                primary_score=r.get("last_primary_score"),
+                task_exam_points=r.get("task__exam_points"),
+                task_type_max_points=r.get("task__task_type__max_points"),
+            )
+            a = agg.setdefault(n, {"wt": 0.0, "ws": 0.0, "total": 0.0, "correct": 0.0})
             a["wt"] = float(a["wt"]) + float(weight)
-            a["wc"] = float(a["wc"]) + (float(weight) * (1.0 if is_corr else 0.0))
-            a["total"] = int(a["total"]) + 1
-            a["correct"] = int(a["correct"]) + (1 if is_corr else 0)
-        totals = submissions_subject.aggregate(
-            total=models.Count('id'),
-            correct=models.Count('id', filter=Q(is_correct=True)),
+            a["ws"] = float(a["ws"]) + (float(weight) * float(frac))
+            a["total"] = float(a["total"]) + float(mp)
+            a["correct"] = float(a["correct"]) + float(earned)
+        attempts_total = submissions_subject.aggregate(total=models.Count("id"))
+        student_total_submissions = int(attempts_total.get("total") or 0)
+
+        from django.db.models import Case, FloatField, IntegerField, Value, When
+        from django.db.models.functions import Cast, Coalesce
+
+        scored_submissions = submissions_subject.filter(
+            Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False)
         )
-        student_total_submissions = int(totals.get('total') or 0)
-        correct_total = int(totals.get('correct') or 0)
-        student_correct_rate = (correct_total / student_total_submissions * 100.0) if student_total_submissions else None
+
+        max_points_expr = Case(
+            When(task__exam_points__gt=0, then=Coalesce("task__exam_points", Value(1))),
+            default=Coalesce("task__task_type__max_points", Value(1)),
+            output_field=IntegerField(),
+        )
+
+        earned_expr = Case(
+            When(is_correct=True, then=Cast(max_points_expr, FloatField())),
+            default=Coalesce("tutor_primary_score", "primary_score", Value(0)),
+            output_field=FloatField(),
+        )
+
+        pts = scored_submissions.aggregate(
+            max_total=models.Sum(max_points_expr),
+            earned_total=models.Sum(earned_expr),
+        )
+        max_total = float(pts.get("max_total") or 0.0)
+        earned_total = float(pts.get("earned_total") or 0.0)
+        student_correct_rate = (earned_total / max_total * 100.0) if max_total > 0 else None
         numbers = []
         if active_exam_format:
             active_exam_format_label = f"{active_exam_format.name} {active_exam_format.year}"
@@ -2731,8 +2808,8 @@ def tutor_dashboard(request):
             if not a or float(a.get("wt") or 0.0) <= 0:
                 task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': None, 'total': 0, 'correct': 0})
                 continue
-            rate = (float(a["wc"]) / float(a["wt"]) * 100.0) if float(a["wt"]) > 0 else None
-            task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': rate, 'total': int(a["total"]), 'correct': int(a["correct"])})
+            rate = (float(a["ws"]) / float(a["wt"]) * 100.0) if float(a["wt"]) > 0 else None
+            task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': rate, 'total': int(round(float(a["total"]))), 'correct': int(round(float(a["correct"])))})
 
         from core.models import TutorReward
 
