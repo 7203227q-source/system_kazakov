@@ -852,8 +852,29 @@ def student_practice(request):
 
     attempt_token = None
     if task is not None:
-        attempt_token = uuid.uuid4().hex
-        request.session["practice_current"] = {"token": attempt_token, "task_id": int(task.id), "mode": mode}
+        current = request.session.get("practice_current") or {}
+        if not isinstance(current, dict):
+            current = {}
+
+        today_iso = timezone.now().date().isoformat()
+        can_reuse = True
+        if mode == "srs":
+            can_reuse = (current.get("srs_date") == today_iso)
+
+        if (
+            current.get("token")
+            and int(current.get("task_id") or 0) == int(task.id)
+            and (current.get("mode") or "") == mode
+            and can_reuse
+        ):
+            attempt_token = current.get("token")
+        else:
+            attempt_token = uuid.uuid4().hex
+            current = {"token": attempt_token, "task_id": int(task.id), "mode": mode}
+            if mode == "srs":
+                current["srs_date"] = today_iso
+
+        request.session["practice_current"] = current
         request.session.setdefault("practice_results", {})
         request.session.modified = True
 
@@ -861,11 +882,23 @@ def student_practice(request):
     practice_submission = None
     if task is not None and mode == 'srs' and is_extended:
         # Для развёрнутой части в режиме SRS нам нужен Submission, чтобы загрузить фото и проверить ИИ.
-        practice_submission = (
-            Submission.objects.filter(student=request.user, task=task, assignment__isnull=True)
-            .order_by("-created_at")
-            .first()
-        )
+        current = request.session.get("practice_current") or {}
+        if not isinstance(current, dict):
+            current = {}
+
+        submission_id = current.get("submission_id")
+        if submission_id:
+            practice_submission = (
+                Submission.objects.filter(
+                    id=submission_id,
+                    student=request.user,
+                    task=task,
+                    assignment__isnull=True,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+
         if practice_submission is None:
             practice_submission = Submission.objects.create(
                 student=request.user,
@@ -875,6 +908,9 @@ def student_practice(request):
                 score=0,
                 primary_score=0,
             )
+            current["submission_id"] = int(practice_submission.id)
+            request.session["practice_current"] = current
+            request.session.modified = True
 
     physics_subject_name = ""
     physics_exam_format_name = ""
