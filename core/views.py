@@ -2281,12 +2281,25 @@ def tutor_dashboard(request):
         .order_by("-created_at")
         .values("submission_id")[:1]
     )
+    pending_extension_qs = (
+        AssignmentExtensionRequest.objects.filter(
+            student_id=OuterRef("pk"),
+            tutor=request.user,
+            status="pending",
+            assignment__is_draft=False,
+            assignment__is_deleted=False,
+        )
+        .values("student_id")
+        .annotate(c=Count("id"))
+        .values("c")[:1]
+    )
     students = (
         request.user.students.all()
         .prefetch_related('subject_profiles', 'subject_profiles__subject')
         .annotate(
             unread_student_questions=Coalesce(Subquery(unresolved_qs, output_field=IntegerField()), 0),
             latest_unread_submission_id=Subquery(latest_unread_submission_qs, output_field=IntegerField()),
+            pending_extension_requests=Coalesce(Subquery(pending_extension_qs, output_field=IntegerField()), 0),
         )
     )
     selected_student_id = request.GET.get('student_id')
@@ -2296,6 +2309,7 @@ def tutor_dashboard(request):
     recent_payment = None
     active_assignments = []
     completed_assignments = []
+    pending_extension_requests = []
     chart_data = None
     weekly_solved_chart_data = None
     chart_range = None
@@ -2411,6 +2425,19 @@ def tutor_dashboard(request):
         ensure_parent_invite_code(selected_student)
         recent_payment = Payment.objects.filter(student=selected_student, tutor=request.user).order_by('-created_at').first()
 
+        pending_extension_requests = list(
+            AssignmentExtensionRequest.objects.filter(
+                tutor=request.user,
+                student=selected_student,
+                status="pending",
+                assignment__is_draft=False,
+                assignment__is_deleted=False,
+            )
+            .select_related("assignment")
+            .order_by("-created_at")
+        )
+        pending_ext_by_assignment_id = {int(r.assignment_id): r for r in pending_extension_requests}
+
         profiles = list(selected_student.subject_profiles.all())
         for p in profiles:
             p.exam_formats_for_subject = ExamFormat.objects.filter(subject_id=p.subject_id).order_by('-is_active', '-year', 'name')
@@ -2454,6 +2481,7 @@ def tutor_dashboard(request):
 
         for a in assignments:
             auto_expire_assignment_if_needed(a)
+            a.pending_extension = pending_ext_by_assignment_id.get(int(a.id))
             tasks = list(a.tasks.all())
             max_primary_possible = sum(int(get_max_points_effective(t) or 0) for t in tasks)
             subs = Submission.objects.filter(assignment=a, student=selected_student).select_related('task')
@@ -2768,6 +2796,7 @@ def tutor_dashboard(request):
         'recent_rewards': recent_rewards,
         'profiles': profiles if selected_student else [],
         'available_subjects': available_subjects if selected_student else [],
+        'pending_extension_requests': pending_extension_requests if selected_student else [],
     }
     return render(request, 'core/tutor_dashboard.html', context)
 
