@@ -645,7 +645,7 @@ def student_practice(request):
     total_level = (int(total_xp) // 100) + 1
     mode = (request.POST.get('mode') or request.GET.get('mode') or '').strip()
     subject_id_raw = (request.POST.get("subject_id") or request.GET.get("subject_id") or "").strip()
-    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related("subject", "exam_format")
+    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related("subject", "exam_format").order_by("id")
     active_subject_id = None
     if subject_id_raw.isdigit():
         active_subject_id = int(subject_id_raw)
@@ -679,6 +679,11 @@ def student_practice(request):
         give_up = (request.POST.get("give_up") or "").strip()
         attempt_token = (request.POST.get("attempt_token") or "").strip()
         task = get_object_or_404(Task, id=task_id)
+        if mode == "srs":
+            try:
+                active_subject_id = int(getattr(getattr(task, "topic", None), "subject_id", None) or 0) or active_subject_id
+            except Exception:
+                pass
 
         # Protect against re-submitting the same "checked" attempt (back button / refresh / multi-click)
         results = request.session.get("practice_results") or {}
