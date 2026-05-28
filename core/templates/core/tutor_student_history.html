@@ -55,6 +55,16 @@
                 </div>
             </div>
 
+            {% if profiles %}
+            <div class="mb-6 flex flex-wrap gap-2">
+                {% for profile in profiles %}
+                <a href="?subject_id={{ profile.subject.id }}" class="px-6 py-2 rounded-full font-bold text-sm transition shadow-sm {% if active_subject_id == profile.subject.id %}bg-indigo-600 text-white{% else %}bg-white text-gray-600 hover:bg-gray-50 border border-gray-200{% endif %}">
+                    {{ profile.subject.name }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             <div class="space-y-6">
                 {% for day in history_days %}
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -344,6 +354,7 @@
 
                                     <form method="POST" action="{% url 'tutor_student_srs_remove' student.id sub.task.id %}" class="not-prose mt-3" onsubmit="return confirm('Убрать задачу из повторения?');">
                                         {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'tutor_student_history' student.id %}?page={{ page_obj.number }}&submission_id={{ sub.id }}{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}">
                                         <button type="submit" class="bg-white border border-red-200 text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg text-xs font-bold transition">
                                             <i class="fas fa-ban mr-2"></i> Убрать из повторения
                                         </button>
@@ -396,13 +407,13 @@
                 <div class="flex gap-2">
                   {% if page_obj.has_previous %}
                     <a class="px-3 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                       href="?page={{ page_obj.previous_page_number }}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}">Назад</a>
+                       href="?page={{ page_obj.previous_page_number }}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}">Назад</a>
                   {% else %}
                     <span class="px-3 py-2 text-sm font-bold bg-gray-100 border border-gray-200 rounded-lg text-gray-400">Назад</span>
                   {% endif %}
                   {% if page_obj.has_next %}
                     <a class="px-3 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                       href="?page={{ page_obj.next_page_number }}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}">Вперёд</a>
+                       href="?page={{ page_obj.next_page_number }}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}">Вперёд</a>
                   {% else %}
                     <span class="px-3 py-2 text-sm font-bold bg-gray-100 border border-gray-200 rounded-lg text-gray-400">Вперёд</span>
                   {% endif %}
@@ -454,6 +465,10 @@
                     detail.classList.remove('hidden');
                     detail.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     detail.classList.add('ring-2', 'ring-yellow-300');
+                    setTimeout(() => {
+                        const focusable = detail.querySelector('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])');
+                        if (focusable) focusable.focus({ preventScroll: true });
+                    }, 50);
                     setTimeout(() => {
                         detail.classList.remove('ring-2', 'ring-yellow-300');
                     }, 2500);

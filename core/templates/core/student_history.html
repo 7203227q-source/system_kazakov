@@ -51,6 +51,16 @@
             
             <h1 class="text-xl md:text-2xl font-bold text-gray-800 mb-6">Журнал учебных сессий</h1>
 
+            {% if profiles %}
+            <div class="mb-4 flex flex-wrap gap-2">
+                {% for profile in profiles %}
+                <a href="?subject_id={{ profile.subject.id }}" class="px-6 py-2 rounded-full font-bold text-sm transition shadow-sm {% if active_subject_id == profile.subject.id %}bg-indigo-600 text-white{% else %}bg-white text-gray-600 hover:bg-gray-50 border border-gray-200{% endif %}">
+                    {{ profile.subject.name }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <!-- Filters -->
                 <div class="bg-gray-50 px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex gap-2 md:gap-4 overflow-x-auto whitespace-nowrap scrollbar-hide">
@@ -223,13 +233,13 @@
                 <div class="flex gap-2">
                   {% if page_obj.has_previous %}
                     <a class="px-3 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                       href="?page={{ page_obj.previous_page_number }}">Назад</a>
+                       href="?page={{ page_obj.previous_page_number }}{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}">Назад</a>
                   {% else %}
                     <span class="px-3 py-2 text-sm font-bold bg-gray-100 border border-gray-200 rounded-lg text-gray-400">Назад</span>
                   {% endif %}
                   {% if page_obj.has_next %}
                     <a class="px-3 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-                       href="?page={{ page_obj.next_page_number }}">Вперёд</a>
+                       href="?page={{ page_obj.next_page_number }}{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}{% if submission_id %}&submission_id={{ submission_id }}{% endif %}">Вперёд</a>
                   {% else %}
                     <span class="px-3 py-2 text-sm font-bold bg-gray-100 border border-gray-200 rounded-lg text-gray-400">Вперёд</span>
                   {% endif %}
