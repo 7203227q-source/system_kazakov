@@ -1991,22 +1991,33 @@ def student_history(request):
     """История решений (Журнал) ученика"""
     import json as pyjson
 
+    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related("subject")
+    active_subject_id_raw = (request.GET.get("subject_id") or "").strip()
+    if not active_subject_id_raw:
+        active_subject_id = profiles.first().subject_id if profiles.exists() else None
+    elif active_subject_id_raw.isdigit():
+        active_subject_id = int(active_subject_id_raw)
+    else:
+        active_subject_id = None
+
     submissions_qs = (
         Submission.objects.filter(student=request.user)
-        .select_related('task', 'assignment')
+        .select_related('task', 'task__topic', 'task__topic__subject', 'assignment')
         .prefetch_related('comments', 'comments__author')
         .order_by('-created_at', '-id')
     )
+    if active_subject_id:
+        submissions_qs = submissions_qs.filter(task__topic__subject_id=active_subject_id)
 
     submission_id_raw = (request.GET.get("submission_id") or "").strip()
     page_raw = (request.GET.get("page") or "").strip()
 
     # Deep-link: если submission_id находится не на текущей странице пагинации, перенаправляем на нужную.
     if submission_id_raw.isdigit():
-        target = Submission.objects.filter(
-            id=int(submission_id_raw),
-            student=request.user,
-        ).only("id", "created_at").first()
+        target_qs = Submission.objects.filter(student=request.user)
+        if active_subject_id:
+            target_qs = target_qs.filter(task__topic__subject_id=active_subject_id)
+        target = target_qs.filter(id=int(submission_id_raw)).only("id", "created_at").first()
         if target:
             from django.db.models import Q
             newer_count = submissions_qs.filter(
@@ -2015,7 +2026,8 @@ def student_history(request):
             ).count()
             target_page = (newer_count // 20) + 1
             if (not page_raw) or (page_raw.isdigit() and int(page_raw) != target_page):
-                return redirect(f"{reverse('student_history')}?page={target_page}&submission_id={target.id}")
+                subject_q = f"&subject_id={active_subject_id}" if active_subject_id else ""
+                return redirect(f"{reverse('student_history')}?page={target_page}&submission_id={target.id}{subject_q}")
 
     per_page = 20
     page_number = (request.GET.get("page") or "1").strip()
@@ -2050,6 +2062,8 @@ def student_history(request):
             'submissions': submissions,
             'page_obj': page_obj,
             'submission_id': submission_id_raw,
+            'profiles': profiles,
+            'active_subject_id': active_subject_id,
             'total_xp': total_xp,
             'total_level': total_level,
             'unread_tutor_replies_total': unread_tutor_replies_total,
@@ -2255,6 +2269,16 @@ def tutor_student_srs_remove(request, student_id, task_id):
 
     SpacedRepetition.objects.filter(student=student, task_id=task_id).delete()
     messages.success(request, "Задача убрана из повторения.")
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url:
+        from django.utils.http import url_has_allowed_host_and_scheme
+        if url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
+
     return redirect(request.META.get('HTTP_REFERER', reverse('tutor_student_history', args=[student.id])))
 
 @login_required
@@ -4643,6 +4667,15 @@ def tutor_student_history(request, student_id):
         
     student = get_object_or_404(User, id=student_id, role='student')
 
+    profiles = StudentSubjectProfile.objects.filter(student=student).select_related("subject")
+    active_subject_id_raw = (request.GET.get("subject_id") or "").strip()
+    if not active_subject_id_raw:
+        active_subject_id = profiles.first().subject_id if profiles.exists() else None
+    elif active_subject_id_raw.isdigit():
+        active_subject_id = int(active_subject_id_raw)
+    else:
+        active_subject_id = None
+
     submission_id_raw = (request.GET.get("submission_id") or "").strip()
     page_raw = (request.GET.get("page") or "").strip()
 
@@ -4650,9 +4683,11 @@ def tutor_student_history(request, student_id):
 
     submissions_qs = (
         Submission.objects.filter(student=student)
-        .select_related('task', 'task__task_type', 'assignment')
+        .select_related('task', 'task__topic', 'task__topic__subject', 'task__task_type', 'assignment')
         .prefetch_related('comments', 'comments__author')
     )
+    if active_subject_id:
+        submissions_qs = submissions_qs.filter(task__topic__subject_id=active_subject_id)
 
     tz = timezone.get_current_timezone()
     days_list = list(
@@ -4665,18 +4700,19 @@ def tutor_student_history(request, student_id):
 
     # Deep-link: если пришли с ?submission_id=<id>, отправляем на страницу, где лежит нужный день
     if submission_id_raw.isdigit():
-        target = Submission.objects.filter(
-            id=int(submission_id_raw),
-            student=student,
-        ).only("id", "created_at").first()
+        target_qs = Submission.objects.filter(student=student)
+        if active_subject_id:
+            target_qs = target_qs.filter(task__topic__subject_id=active_subject_id)
+        target = target_qs.filter(id=int(submission_id_raw)).only("id", "created_at").first()
         if target:
             target_day = localtime(target.created_at).date()
             idx_map = {d: i for i, d in enumerate(days_list)}
             if target_day in idx_map:
                 target_page = (idx_map[target_day] // 14) + 1
                 if (not page_raw) or (page_raw.isdigit() and int(page_raw) != target_page):
+                    subject_q = f"&subject_id={active_subject_id}" if active_subject_id else ""
                     return redirect(
-                        f"{reverse('tutor_student_history', args=[student.id])}?page={target_page}&submission_id={target.id}"
+                        f"{reverse('tutor_student_history', args=[student.id])}?page={target_page}&submission_id={target.id}{subject_q}"
                     )
 
     page_number = (request.GET.get("page") or "1").strip()
@@ -4756,6 +4792,8 @@ def tutor_student_history(request, student_id):
 
     return render(request, 'core/tutor_student_history.html', {
         'student': student,
+        'profiles': profiles,
+        'active_subject_id': active_subject_id,
         'history_days': history_days,
         'page_obj': page_obj,
         'submission_id': submission_id_raw,
