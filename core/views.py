@@ -1790,6 +1790,57 @@ def student_solve_assignment(request, assignment_id):
         # Защита от неявного сабмита формы (Enter/Space): завершаем/откладываем только при явном action.
         if action not in {'finish', 'postpone'}:
             return redirect('student_solve_assignment', assignment_id=assignment.id)
+
+        force_finish = (request.POST.get("force_finish") == "1")
+
+        if action == "finish" and not force_finish:
+            subs_by_task_id = {}
+            missing_part2 = []
+            for t in tasks:
+                if not is_extended_answer_task(t):
+                    continue
+                sub, _created = Submission.objects.get_or_create(
+                    student=request.user,
+                    task=t,
+                    assignment=assignment,
+                    defaults={
+                        "user_answer": "",
+                        "is_correct": None,
+                        "score": 0,
+                        "primary_score": 0,
+                    },
+                )
+                subs_by_task_id[t.id] = sub
+                if not sub.image_url:
+                    missing_part2.append(t)
+
+            if missing_part2:
+                for t in tasks:
+                    if is_extended_answer_task(t):
+                        continue
+                    user_answer = request.POST.get(f"answer_{t.id}", "").strip()
+                    sub, created = Submission.objects.get_or_create(
+                        student=request.user,
+                        task=t,
+                        assignment=assignment,
+                        defaults={
+                            "user_answer": user_answer,
+                            "is_correct": None,
+                            "score": 0,
+                        },
+                    )
+                    if not created and sub.is_correct is None:
+                        sub.user_answer = user_answer
+                        sub.score = 0
+                        sub.save(update_fields=["user_answer", "score"])
+                    subs_by_task_id[t.id] = sub
+
+                messages.warning(
+                    request,
+                    "Не все задания 2-й части сданы: по некоторым задачам нет фото решения. "
+                    "Вы можете вернуться и загрузить фото, либо завершить вариант всё равно.",
+                )
+                return _render_student_solve_assignment(needs_force_finish=True, missing_part2_tasks=missing_part2)
         
         # Calculate time spent per task
         start_time = request.session.get(f'assignment_{assignment.id}_start')
@@ -1884,7 +1935,6 @@ def student_solve_assignment(request, assignment_id):
         # Если ученик пытается завершить вариант, но по заданиям 2-й части нет загруженного фото —
         # просим подтвердить завершение (force_finish=1).
         if action == 'finish':
-            force_finish = (request.POST.get("force_finish") == "1")
             missing_part2 = []
             for t in tasks:
                 is_extended = is_extended_answer_task(t)
