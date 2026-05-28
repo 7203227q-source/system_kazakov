@@ -147,27 +147,32 @@
                                 {% endif %}
                             </div>
 
-                            {% if item.submission.image_url %}
-                            <div class="mt-4">
+                            <div
+                                id="tutor_upload_block_{{ item.task.id }}"
+                                class="mt-4 {% if not item.submission.image_url %}hidden{% endif %}"
+                                data-submission-id="{{ item.submission.id }}"
+                                data-task-id="{{ item.task.id }}"
+                            >
                                 <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Загруженное решение</div>
                                 <div class="flex flex-col sm:flex-row gap-3">
                                     <img
-                                        src="{{ item.submission.image_url.url }}"
+                                        data-task-id="{{ item.task.id }}"
+                                        data-page="1"
+                                        {% if item.submission.image_url %}src="{{ item.submission.image_url.url }}"{% endif %}
                                         alt="Решение ученика (стр. 1)"
-                                        class="max-w-full sm:max-w-md rounded-lg border border-gray-200 shadow-sm"
-                                        onclick="openImageModal('{{ item.submission.image_url.url }}')"
+                                        class="js-submission-image max-w-full sm:max-w-md rounded-lg border border-gray-200 shadow-sm cursor-pointer {% if not item.submission.image_url %}hidden{% endif %}"
+                                        onclick="openImageModal(this.src)"
                                     >
-                                    {% if item.submission.image_url_2 %}
                                     <img
-                                        src="{{ item.submission.image_url_2.url }}"
+                                        data-task-id="{{ item.task.id }}"
+                                        data-page="2"
+                                        {% if item.submission.image_url_2 %}src="{{ item.submission.image_url_2.url }}"{% endif %}
                                         alt="Решение ученика (стр. 2)"
-                                        class="max-w-full sm:max-w-md rounded-lg border border-gray-200 shadow-sm"
-                                        onclick="openImageModal('{{ item.submission.image_url_2.url }}')"
+                                        class="js-submission-image max-w-full sm:max-w-md rounded-lg border border-gray-200 shadow-sm cursor-pointer {% if not item.submission.image_url_2 %}hidden{% endif %}"
+                                        onclick="openImageModal(this.src)"
                                     >
-                                    {% endif %}
                                 </div>
                             </div>
-                            {% endif %}
 
                             {% if item.submission.ai_feedback %}
                             <div class="mt-4 bg-white border border-gray-200 rounded-xl p-4">
@@ -518,6 +523,52 @@
             const remain = parseInt(btn.getAttribute('data-retry-after') || "0", 10);
             if (remain > 0) startCooldown(btn, remain, 'Перепроверить ИИ');
         });
+
+        function applySubmissionStatus(taskId, data) {
+            const block = document.getElementById(`tutor_upload_block_${taskId}`);
+            if (!block) return;
+            const url1 = data && data.image_url ? String(data.image_url) : '';
+            const url2 = data && data.image_url_2 ? String(data.image_url_2) : '';
+            const img1 = block.querySelector('img.js-submission-image[data-page="1"]');
+            const img2 = block.querySelector('img.js-submission-image[data-page="2"]');
+
+            if (url1) {
+                block.classList.remove('hidden');
+                if (img1) {
+                    img1.src = url1;
+                    img1.classList.remove('hidden');
+                }
+            }
+            if (url2 && img2) {
+                img2.src = url2;
+                img2.classList.remove('hidden');
+            }
+        }
+
+        const targets = Array.from(document.querySelectorAll('[id^="tutor_upload_block_"][data-submission-id][data-task-id]'));
+        if (!targets.length) return;
+
+        const tick = async () => {
+            await Promise.all(targets.map(async (el) => {
+                const submissionId = el.getAttribute('data-submission-id');
+                const taskId = el.getAttribute('data-task-id');
+                if (!submissionId || !taskId) return;
+
+                const needs1 = el.classList.contains('hidden') || !el.querySelector('img.js-submission-image[data-page="1"]:not(.hidden)');
+                const needs2 = !el.querySelector('img.js-submission-image[data-page="2"]:not(.hidden)');
+                if (!needs1 && !needs2) return;
+
+                try {
+                    const res = await fetch(`/api/submission/${submissionId}/status/`, { credentials: 'same-origin' });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    applySubmissionStatus(taskId, data);
+                } catch (e) {}
+            }));
+        };
+
+        tick();
+        setInterval(tick, 4000);
     });
 </script>
 
