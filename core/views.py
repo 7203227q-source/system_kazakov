@@ -5292,6 +5292,21 @@ def mobile_upload_draft(request, token):
 
 def api_submission_status(request, submission_id):
     submission = get_object_or_404(Submission, id=submission_id)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    if request.user.is_staff:
+        pass
+    elif request.user.role == 'student':
+        if submission.student_id != request.user.id:
+            return JsonResponse({'error': 'forbidden'}, status=403)
+    elif request.user.role == 'tutor':
+        if not submission.assignment_id or submission.assignment.tutor_id != request.user.id:
+            return JsonResponse({'error': 'forbidden'}, status=403)
+    elif request.user.role == 'parent':
+        if not submission.student.parents.filter(id=request.user.id).exists():
+            return JsonResponse({'error': 'forbidden'}, status=403)
+    else:
+        return JsonResponse({'error': 'forbidden'}, status=403)
     has_image = bool(submission.image_url)
     image_url = submission.image_url.url if has_image else None
     has_image_2 = bool(getattr(submission, "image_url_2", None))

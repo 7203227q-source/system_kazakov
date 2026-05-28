@@ -124,19 +124,34 @@
                     <div class="bg-indigo-50 border-t border-indigo-100 p-4 sm:p-6">
                         {% if task.needs_photo %}
                         
-                        <div class="flex flex-col items-center bg-white p-6 rounded-xl border border-dashed border-indigo-300 shadow-sm" id="upload_block_{{ task.id }}">
-                            {% if task.saved_submission.image_url %}
-                                <!-- Фото уже загружено -->
-                                <div class="text-center w-full">
+                        <div
+                            class="flex flex-col items-center bg-white p-6 rounded-xl border border-dashed border-indigo-300 shadow-sm"
+                            id="upload_block_{{ task.id }}"
+                            data-submission-id="{{ task.saved_submission.id }}"
+                            data-task-id="{{ task.id }}"
+                        >
+                            <div id="upload_state_uploaded_{{ task.id }}" class="text-center w-full {% if not task.saved_submission.image_url %}hidden{% endif %}">
                                     <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
                                         <i class="fas fa-check"></i>
                                     </div>
                                     <h4 class="font-bold text-gray-800 mb-2">Решение загружено</h4>
                                     <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                                        <img src="{{ task.saved_submission.image_url.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение (стр. 1)" onclick="openImageModal('{{ task.saved_submission.image_url.url }}')">
-                                        {% if task.saved_submission.image_url_2 %}
-                                        <img src="{{ task.saved_submission.image_url_2.url }}" class="max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm" alt="Ваше решение (стр. 2)" onclick="openImageModal('{{ task.saved_submission.image_url_2.url }}')">
-                                        {% endif %}
+                                        <img
+                                            data-task-id="{{ task.id }}"
+                                            data-page="1"
+                                            {% if task.saved_submission.image_url %}src="{{ task.saved_submission.image_url.url }}"{% endif %}
+                                            class="js-submission-image max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm cursor-pointer"
+                                            alt="Ваше решение (стр. 1)"
+                                            onclick="openImageModal(this.src)"
+                                        >
+                                        <img
+                                            data-task-id="{{ task.id }}"
+                                            data-page="2"
+                                            {% if task.saved_submission.image_url_2 %}src="{{ task.saved_submission.image_url_2.url }}"{% endif %}
+                                            class="js-submission-image max-w-xs mx-auto rounded-lg border border-gray-200 mb-4 shadow-sm cursor-pointer {% if not task.saved_submission.image_url_2 %}hidden{% endif %}"
+                                            alt="Ваше решение (стр. 2)"
+                                            onclick="openImageModal(this.src)"
+                                        >
                                     </div>
 
                                     <div class="mt-2">
@@ -144,13 +159,13 @@
                                         <button type="button"
                                                 onclick="const el=document.getElementById('camera_file2_{{ task.id }}'); if(el){ el.value=''; el.click(); }"
                                                 class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">
-                                            {% if task.saved_submission.image_url_2 %}Переснять 2-ю страницу{% else %}Сделать фото 2-й страницы{% endif %}
+                                            Сделать/переснять 2-ю страницу
                                         </button>
                                         <input type="file" id="gallery_file2_{{ task.id }}" class="hidden" accept="image/*">
                                         <button type="button"
                                                 onclick="const el=document.getElementById('gallery_file2_{{ task.id }}'); if(el){ el.value=''; el.click(); }"
                                                 class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg transition font-bold">
-                                            {% if task.saved_submission.image_url_2 %}Заменить 2-ю страницу{% else %}Добавить 2-ю страницу{% endif %}
+                                            Добавить/заменить 2-ю страницу
                                         </button>
                                         <div id="upload2_status_{{ task.id }}" class="text-xs text-gray-500 mt-2 hidden"></div>
                                     </div>
@@ -337,8 +352,7 @@
                                                 const data = await upRes.json();
                                                 if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
                                                 if (statusEl2) statusEl2.textContent = '2-я страница загружена';
-                                                // проще и надёжнее: обновим страницу, чтобы ИИ видел оба фото и UI отрисовался корректно
-                                                location.reload();
+                                                if (typeof applySubmissionStatusForTask === 'function') applySubmissionStatusForTask(taskId, data);
                                             } catch (e) {
                                                 if (statusEl2) statusEl2.textContent = 'Ошибка загрузки 2-й страницы';
                                                 alert('Не удалось загрузить 2-ю страницу. Попробуйте ещё раз.');
@@ -349,7 +363,9 @@
                                         if (input2) input2.addEventListener('change', () => handleSecond(input2.files && input2.files[0]));
                                     });
                                 </script>
-                            {% else %}
+                            </div>
+
+                            <div id="upload_state_empty_{{ task.id }}" class="{% if task.saved_submission.image_url %}hidden{% endif %}">
                                 <!-- Ожидание загрузки -->
                                 <h4 class="font-bold text-indigo-900 mb-2 text-center">Загрузите решение</h4>
                                 <p class="text-xs text-gray-500 mb-4 text-center max-w-sm">С телефона можно сразу сделать фото. С компьютера — выбрать файл.</p>
@@ -473,9 +489,7 @@
                                                 const data = await upRes.json();
                                                 if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
                                                 if (statusEl) statusEl.textContent = 'Загружено';
-                                                // Важно: после загрузки 1-й страницы сразу перерисуем серверный UI,
-                                                // чтобы появились кнопки "Удалить фото" и "Добавить/Заменить 2-ю страницу".
-                                                location.reload();
+                                            if (typeof applySubmissionStatusForTask === 'function') applySubmissionStatusForTask(taskId, data);
                                             } catch (e) {
                                                 if (statusEl) statusEl.textContent = 'Ошибка загрузки';
                                                 alert('Не удалось загрузить фото. Попробуйте ещё раз.');
@@ -488,7 +502,7 @@
                                         if (galleryInput) galleryInput.addEventListener('change', () => handleFile(galleryInput.files && galleryInput.files[0]));
                                     });
                                 </script>
-                            {% endif %}
+                            </div>
                         </div>
                         
                         {% if task.exam_points_effective == 1 %}
@@ -1116,7 +1130,13 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error((data && data.error) ? data.error : 'clear_failed');
-            location.reload();
+            const block = document.querySelector(`[id^="upload_block_"][data-submission-id="${submissionId}"]`);
+            const taskId = block ? block.getAttribute('data-task-id') : null;
+            if (taskId && typeof applySubmissionStatusForTask === 'function') {
+                applySubmissionStatusForTask(taskId, { has_image: false, image_url: null, has_image_2: false, image_url_2: null });
+            } else {
+                location.reload();
+            }
         } catch (e) {
             alert('Не удалось удалить фото. Попробуйте ещё раз.');
         }
@@ -1305,6 +1325,44 @@
 {% include "core/includes/_physics_kim_reference_widget.html" %}
 {% include "core/image_modal.html" %}
 <script>
+    function applySubmissionStatusForTask(taskId, data) {
+        const uploaded = document.getElementById(`upload_state_uploaded_${taskId}`);
+        const empty = document.getElementById(`upload_state_empty_${taskId}`);
+        const has1 = !!(data && (data.has_image || data.image_url));
+        const has2 = !!(data && (data.has_image_2 || data.image_url_2));
+        const url1 = data && data.image_url ? String(data.image_url) : '';
+        const url2 = data && data.image_url_2 ? String(data.image_url_2) : '';
+
+        if (uploaded && empty) {
+            if (has1) {
+                uploaded.classList.remove('hidden');
+                empty.classList.add('hidden');
+            } else {
+                uploaded.classList.add('hidden');
+                empty.classList.remove('hidden');
+            }
+        }
+
+        document.querySelectorAll(`img.js-submission-image[data-task-id="${taskId}"][data-page="1"]`).forEach((img) => {
+            if (has1 && url1) {
+                img.src = url1;
+                img.classList.remove('hidden');
+            } else {
+                img.removeAttribute('src');
+                img.classList.add('hidden');
+            }
+        });
+        document.querySelectorAll(`img.js-submission-image[data-task-id="${taskId}"][data-page="2"]`).forEach((img) => {
+            if (has2 && url2) {
+                img.src = url2;
+                img.classList.remove('hidden');
+            } else {
+                img.removeAttribute('src');
+                img.classList.add('hidden');
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         try {
             document.querySelectorAll('.ai-feedback-block').forEach(el => {
@@ -1317,6 +1375,31 @@
                 }
             });
         } catch (e) {}
+
+        const blocks = Array.from(document.querySelectorAll('[id^="upload_block_"][data-submission-id][data-task-id]'));
+        if (!blocks.length) return;
+
+        const tick = async () => {
+            await Promise.all(blocks.map(async (el) => {
+                const submissionId = el.getAttribute('data-submission-id');
+                const taskId = el.getAttribute('data-task-id');
+                if (!submissionId || !taskId) return;
+
+                const hasVisible1 = !!el.querySelector(`#upload_state_uploaded_${taskId}:not(.hidden) img.js-submission-image[data-page="1"]:not(.hidden)`);
+                const hasVisible2 = !!el.querySelector(`#upload_state_uploaded_${taskId}:not(.hidden) img.js-submission-image[data-page="2"]:not(.hidden)`);
+                if (hasVisible1 && hasVisible2) return;
+
+                try {
+                    const res = await fetch(`/api/submission/${submissionId}/status/`, { credentials: 'same-origin' });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    applySubmissionStatusForTask(taskId, data);
+                } catch (e) {}
+            }));
+        };
+
+        tick();
+        setInterval(tick, 3000);
     });
 </script>
 </body>
