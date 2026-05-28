@@ -197,3 +197,31 @@ def score_short_answer(task, user_answer: str) -> int:
     norm_user = ans_raw.lower().replace(",", ".")
     norm_correct = correct_raw.lower().replace(",", ".")
     return max_points if norm_user == norm_correct else 0
+
+
+def score_short_answer_srs(task, user_answer: str) -> int:
+    max_points = int(get_max_points_effective(task) or 0)
+    if max_points <= 0:
+        return 0
+
+    if max_points != 2:
+        return score_short_answer(task, user_answer)
+
+    correct_raw = (getattr(task, "correct_answer", "") or "").strip()
+    ans_raw = (user_answer or "").strip()
+
+    correct = _normalize_digits_sequence(correct_raw)
+    ans = _normalize_digits_sequence(ans_raw)
+
+    if not correct or not ans:
+        return 0
+
+    if len(ans) > len(correct):
+        return 0
+
+    if ans == correct and len(ans) == len(correct):
+        return 2
+
+    limit = min(len(ans), len(correct))
+    matches = sum(1 for i in range(limit) if ans[i] == correct[i])
+    return 1 if matches >= 1 else 0

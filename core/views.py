@@ -759,7 +759,12 @@ def student_practice(request):
 
             xp_gained = 0
         else:
-            points_earned = score_short_answer(task, user_answer)
+            if mode == "srs":
+                from core.scoring import score_short_answer_srs
+
+                points_earned = score_short_answer_srs(task, user_answer)
+            else:
+                points_earned = score_short_answer(task, user_answer)
             points_max = get_max_points_effective(task)
             is_correct = (points_earned == int(points_max or 0))
             grade = 5 if is_correct else 1
