@@ -118,6 +118,13 @@
                                     </a>
                                 </div>
                                 {% endif %}
+                                {% if student.pending_srs_removal_requests %}
+                                <div class="mt-1">
+                                    <a href="?student_id={{ student.id }}" class="inline-flex items-center bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 hover:bg-red-200 transition">
+                                        Повтор: {{ student.pending_srs_removal_requests }}
+                                    </a>
+                                </div>
+                                {% endif %}
                              </div>
                          </div>
                          <div class="mt-2 flex justify-between items-center text-[11px] text-gray-500">
@@ -455,6 +462,41 @@
                         </h3>
 
                         <div class="space-y-6">
+                            {% if pending_srs_removal_requests %}
+                            <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+                                <div class="text-xs font-bold text-red-700 uppercase tracking-wider mb-3">Запросы убрать из повторения</div>
+                                <div class="space-y-2">
+                                    {% for r in pending_srs_removal_requests %}
+                                    <div class="bg-white border border-red-200 rounded-lg p-3">
+                                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                                                    <div class="text-sm font-bold text-gray-800 truncate">
+                                                        {% if r.task.task_type %}{{ r.task.task_type.label }}{% else %}{{ r.task.topic.name }}{% endif %}
+                                                    </div>
+                                                    <span class="text-[10px] font-bold bg-red-100 text-red-800 px-2 py-0.5 rounded-full border border-red-200 shrink-0">ID: {{ r.task.fipi_id|default:r.task.id }}</span>
+                                                </div>
+                                                <div class="text-xs text-gray-500 mt-1">{{ r.created_at|date:"d M H:i" }}</div>
+                                                {% if r.comment %}
+                                                <div class="text-xs text-gray-700 mt-1">{{ r.comment }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex gap-2 shrink-0">
+                                                <form method="POST" action="{% url 'tutor_srs_removal_request_approve' r.id %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="text-xs font-bold bg-white border border-red-200 text-red-700 hover:bg-red-100 px-3 py-2 rounded-lg transition">Одобрить</button>
+                                                </form>
+                                                <form method="POST" action="{% url 'tutor_srs_removal_request_reject' r.id %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg transition">Отклонить</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
                             {% if pending_extension_requests %}
                             <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                                 <div class="text-xs font-bold text-yellow-700 uppercase tracking-wider mb-3">Запросы на продление</div>

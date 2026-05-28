@@ -2,6 +2,7 @@ import uuid
 import re
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
 
@@ -305,12 +306,53 @@ class SpacedRepetition(models.Model):
     
     last_grade = models.IntegerField(null=True, blank=True, verbose_name="Последняя оценка (0-5)")
     last_reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    is_suspended = models.BooleanField(default=False, db_index=True)
     
     class Meta:
         unique_together = ('student', 'task')
         
     def __str__(self):
         return f"SRS: {self.student.username} -> Task {self.task.id} (Next: {self.next_review_date})"
+
+
+class SpacedRepetitionRemovalRequest(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Ожидает"),
+        ("approved", "Одобрено"),
+        ("rejected", "Отклонено"),
+    ]
+
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="srs_removal_requests_as_student",
+        limit_choices_to={"role": "student"},
+    )
+    tutor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="srs_removal_requests_as_tutor",
+        limit_choices_to={"role": "tutor"},
+    )
+    task = models.ForeignKey("Task", on_delete=models.CASCADE)
+    comment = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["tutor", "status", "created_at"]),
+            models.Index(fields=["student", "status", "created_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "task"],
+                condition=Q(status="pending"),
+                name="uniq_pending_srs_removal_request",
+            )
+        ]
 
 
 class Assignment(models.Model):

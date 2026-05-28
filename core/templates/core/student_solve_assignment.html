@@ -107,7 +107,7 @@
             <input type="hidden" name="action" id="assignment_action" value="">
             <div class="space-y-6">
                 {% for task in tasks %}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden task-card" data-task-id="{{ task.id }}">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden task-card" data-task-id="{{ task.id }}" id="task_{{ task.id }}">
                     <div class="bg-gray-50 px-6 py-3 border-b border-gray-100 flex justify-between items-center gap-3">
                         <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">
                             {% if task.task_type %}{{ task.task_type.label }}{% else %}Задача №{{ forloop.counter }}{% endif %}
@@ -172,7 +172,7 @@
 
                                     <div class="mt-3">
                                         <button type="button"
-                                                onclick="clearUploadedPhotos({{ task.saved_submission.id }})"
+                                                onclick="clearUploadedPhotos({{ task.saved_submission.id }}, {{ task.id }})"
                                                 class="text-xs bg-red-50 text-red-700 hover:bg-red-100 px-4 py-2 rounded-lg transition font-bold">
                                             <i class="fas fa-trash mr-2"></i> Удалить фото
                                         </button>
@@ -352,7 +352,9 @@
                                                 const data = await upRes.json();
                                                 if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
                                                 if (statusEl2) statusEl2.textContent = '2-я страница загружена';
+                                                setFocusTask(taskId);
                                                 if (typeof applySubmissionStatusForTask === 'function') applySubmissionStatusForTask(taskId, data);
+                                                else location.reload();
                                             } catch (e) {
                                                 if (statusEl2) statusEl2.textContent = 'Ошибка загрузки 2-й страницы';
                                                 alert('Не удалось загрузить 2-ю страницу. Попробуйте ещё раз.');
@@ -489,7 +491,9 @@
                                                 const data = await upRes.json();
                                                 if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
                                                 if (statusEl) statusEl.textContent = 'Загружено';
-                                            if (typeof applySubmissionStatusForTask === 'function') applySubmissionStatusForTask(taskId, data);
+                                                setFocusTask(taskId);
+                                                if (typeof applySubmissionStatusForTask === 'function') applySubmissionStatusForTask(taskId, data);
+                                                else location.reload();
                                             } catch (e) {
                                                 if (statusEl) statusEl.textContent = 'Ошибка загрузки';
                                                 alert('Не удалось загрузить фото. Попробуйте ещё раз.');
@@ -1120,7 +1124,28 @@
         }
     }
 
-    async function clearUploadedPhotos(submissionId) {
+    function setFocusTask(taskId) {
+        try {
+            if (taskId) sessionStorage.setItem('focus_task_id', String(taskId));
+        } catch (e) {}
+    }
+
+    function scrollToFocusTask() {
+        let id = null;
+        try { id = sessionStorage.getItem('focus_task_id'); } catch (e) {}
+        if (!id) return;
+        const el = document.getElementById(`task_${id}`);
+        if (!el) return;
+        setTimeout(() => {
+            try {
+                el.scrollIntoView({ block: 'start', behavior: 'auto' });
+                const input = el.querySelector('input.answer-input');
+                if (input) input.focus({ preventScroll: true });
+            } catch (e) {}
+        }, 50);
+    }
+
+    async function clearUploadedPhotos(submissionId, taskId) {
         if (!confirm('Удалить прикреплённые фото и сбросить проверку ИИ?')) return;
         try {
             const res = await fetch(`/api/submission/${submissionId}/clear-images/`, {
@@ -1130,10 +1155,14 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error((data && data.error) ? data.error : 'clear_failed');
-            const block = document.querySelector(`[id^="upload_block_"][data-submission-id="${submissionId}"]`);
-            const taskId = block ? block.getAttribute('data-task-id') : null;
-            if (taskId && typeof applySubmissionStatusForTask === 'function') {
-                applySubmissionStatusForTask(taskId, { has_image: false, image_url: null, has_image_2: false, image_url_2: null });
+            let effectiveTaskId = taskId;
+            if (!effectiveTaskId) {
+                const block = document.querySelector(`[id^="upload_block_"][data-submission-id="${submissionId}"]`);
+                effectiveTaskId = block ? block.getAttribute('data-task-id') : null;
+            }
+            setFocusTask(effectiveTaskId);
+            if (effectiveTaskId && typeof applySubmissionStatusForTask === 'function') {
+                applySubmissionStatusForTask(effectiveTaskId, { has_image: false, image_url: null, has_image_2: false, image_url_2: null });
             } else {
                 location.reload();
             }
@@ -1141,6 +1170,18 @@
             alert('Не удалось удалить фото. Попробуйте ещё раз.');
         }
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.task-card').forEach((card) => {
+            const tid = card.getAttribute('data-task-id');
+            if (!tid) return;
+            card.addEventListener('click', () => setFocusTask(tid));
+            card.addEventListener('focusin', () => setFocusTask(tid));
+        });
+        scrollToFocusTask();
+        window.addEventListener('orientationchange', scrollToFocusTask);
+        window.addEventListener('resize', scrollToFocusTask);
+    });
 
     async function revealSolution(submissionId, taskId) {
         const btn = document.getElementById(`btn_reveal_solution_${taskId}`);
