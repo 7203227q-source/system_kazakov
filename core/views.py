@@ -2255,7 +2255,14 @@ def tutor_student_srs_remove(request, student_id, task_id):
 
     SpacedRepetition.objects.filter(student=student, task_id=task_id).delete()
     messages.success(request, "Задача убрана из повторения.")
-    return redirect(request.META.get('HTTP_REFERER', reverse('tutor_student_history', args=[student.id])))
+    return_to = (request.POST.get("return_to") or "").strip()
+    if not return_to or not url_has_allowed_host_and_scheme(
+        url=return_to,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return_to = request.META.get("HTTP_REFERER", "") or reverse("tutor_student_history", args=[student.id])
+    return redirect(return_to)
 
 @login_required
 def tutor_update_student_contacts(request, student_id):
@@ -5300,7 +5307,7 @@ def api_submission_status(request, submission_id):
         if submission.student_id != request.user.id:
             return JsonResponse({'error': 'forbidden'}, status=403)
     elif request.user.role == 'tutor':
-        if not submission.assignment_id or submission.assignment.tutor_id != request.user.id:
+        if not request.user.students.filter(id=submission.student_id).exists():
             return JsonResponse({'error': 'forbidden'}, status=403)
     elif request.user.role == 'parent':
         if not submission.student.parents.filter(id=request.user.id).exists():
