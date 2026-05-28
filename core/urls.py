@@ -9,6 +9,7 @@ urlpatterns = [
     path('student/practice/', views.student_practice, name='student_practice'),
     path('student/practice/<int:task_id>/submit/', views.student_practice_submit, name='student_practice_submit'),
     path('student/practice/<int:task_id>/srs-add/', views.student_srs_add, name='student_srs_add'),
+    path('student/practice/<int:task_id>/srs-remove-request/', views.student_srs_remove_request, name='student_srs_remove_request'),
     path('student/assignment/<int:assignment_id>/summary/', views.student_assignment_summary, name='student_assignment_summary'),
     path('student/history/', views.student_history, name='student_history'),
     
@@ -46,6 +47,8 @@ urlpatterns = [
     path('tutor/student/<int:student_id>/add-subject/', views.tutor_add_student_subject, name='tutor_add_student_subject'),
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
     path('tutor/student/<int:student_id>/srs/remove/<int:task_id>/', views.tutor_student_srs_remove, name='tutor_student_srs_remove'),
+    path('tutor/srs-removal-request/<int:req_id>/approve/', views.tutor_srs_removal_request_approve, name='tutor_srs_removal_request_approve'),
+    path('tutor/srs-removal-request/<int:req_id>/reject/', views.tutor_srs_removal_request_reject, name='tutor_srs_removal_request_reject'),
     path(
         'tutor/student/<int:student_id>/subject/<int:subject_id>/reset/',
         views.tutor_reset_student_subject_stats,

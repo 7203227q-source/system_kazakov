@@ -55,7 +55,22 @@
                     {% if mode == 'srs' %}Тренажер: Повторить сегодня{% else %}Тренажер: Адаптивное задание{% endif %}
                 </h1>
                 <div class="flex items-center gap-2 self-start sm:self-auto">
-                    {% if task and mode != 'srs' %}
+            {% if task and mode == 'srs' %}
+                <form method="POST" action="{% url 'student_srs_remove_request' task.id %}">
+                    {% csrf_token %}
+                    {% if active_subject_id %}
+                        <input type="hidden" name="subject_id" value="{{ active_subject_id }}">
+                    {% endif %}
+                    <button
+                        type="submit"
+                        class="text-gray-600 hover:text-gray-900 transition flex items-center text-sm font-bold bg-white border border-gray-200 px-3 py-2 rounded-lg {% if srs_remove_request_pending %}opacity-60 cursor-not-allowed{% endif %}"
+                        {% if srs_remove_request_pending %}disabled{% endif %}
+                    >
+                        <i class="fas fa-ban mr-2"></i>
+                        {% if srs_remove_request_pending %}Заявка отправлена{% else %}Убрать из повторения{% endif %}
+                    </button>
+                </form>
+            {% elif task and mode != 'srs' %}
                     <form method="POST" action="{% url 'student_srs_add' task.id %}">
                         {% csrf_token %}
                         <button type="submit" class="text-gray-600 hover:text-gray-900 transition flex items-center text-sm font-bold bg-white border border-gray-200 px-3 py-2 rounded-lg">
@@ -92,7 +107,7 @@
             {% endif %}
 
             {% if task %}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6" id="practice_task_card">
                 <!-- Task Header -->
                 <div class="bg-indigo-50/50 px-4 md:px-6 py-3 md:py-4 border-b border-indigo-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
                     <div class="flex flex-wrap items-center gap-2">
@@ -148,6 +163,14 @@
                                         <div id="srs_upload_loading" class="hidden mt-3">
                                             <i class="fas fa-circle-notch fa-spin text-primary text-2xl"></i>
                                         </div>
+                                    </div>
+
+                                    <div class="mt-3 flex justify-center">
+                                        <button type="button"
+                                                onclick="clearSrsUploadedPhotos({{ practice_submission.id }})"
+                                                class="text-xs bg-red-50 text-red-700 hover:bg-red-100 px-4 py-2 rounded-lg transition font-bold">
+                                            <i class="fas fa-trash mr-2"></i> Удалить фото
+                                        </button>
                                     </div>
 
                                     <div class="flex flex-col sm:flex-row gap-2 justify-center">
@@ -277,6 +300,7 @@
                                         const data = await upRes.json();
                                         if (!upRes.ok) throw new Error(data && data.error ? data.error : 'upload_failed');
                                         if (statusEl) statusEl.textContent = 'Загружено';
+                                        setPracticeFocus();
                                         location.reload();
                                     } catch (e) {
                                         if (statusEl) statusEl.textContent = 'Ошибка загрузки';
@@ -290,6 +314,45 @@
                                 if (gal1) gal1.addEventListener('change', () => upload('image', gal1.files && gal1.files[0]));
                                 if (cam2) cam2.addEventListener('change', () => upload('image2', cam2.files && cam2.files[0]));
                                 if (gal2) gal2.addEventListener('change', () => upload('image2', gal2.files && gal2.files[0]));
+                            });
+
+                            function setPracticeFocus() {
+                                try { sessionStorage.setItem('practice_focus', '1'); } catch (e) {}
+                            }
+
+                            function scrollToPractice() {
+                                let flag = null;
+                                try { flag = sessionStorage.getItem('practice_focus'); } catch (e) {}
+                                if (!flag) return;
+                                const el = document.getElementById('practice_task_card');
+                                if (!el) return;
+                                setTimeout(() => {
+                                    try { el.scrollIntoView({ block: 'start', behavior: 'auto' }); } catch (e) {}
+                                }, 50);
+                            }
+
+                            async function clearSrsUploadedPhotos(submissionId) {
+                                if (!confirm('Удалить прикреплённые фото и сбросить проверку ИИ?')) return;
+                                try {
+                                    const res = await fetch(`/api/submission/${submissionId}/clear-images/`, {
+                                        method: 'POST',
+                                        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                                        credentials: 'same-origin',
+                                    });
+                                    const data = await res.json().catch(() => ({}));
+                                    if (!res.ok) throw new Error((data && data.error) ? data.error : 'clear_failed');
+                                    setPracticeFocus();
+                                    location.reload();
+                                } catch (e) {
+                                    alert('Не удалось удалить фото. Попробуйте ещё раз.');
+                                }
+                            }
+
+                            document.addEventListener('DOMContentLoaded', () => {
+                                setPracticeFocus();
+                                scrollToPractice();
+                                window.addEventListener('orientationchange', scrollToPractice);
+                                window.addEventListener('resize', scrollToPractice);
                             });
 
                             function escapeHtml(s) {

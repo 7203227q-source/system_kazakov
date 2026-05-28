@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import timedelta, date
 import uuid
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, TaskLog
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, SpacedRepetitionRemovalRequest, TaskLog
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
@@ -917,6 +917,14 @@ def student_practice(request):
             request.session["practice_current"] = current
             request.session.modified = True
 
+    srs_remove_request_pending = False
+    if mode == "srs" and task is not None:
+        srs_remove_request_pending = SpacedRepetitionRemovalRequest.objects.filter(
+            student=request.user,
+            task=task,
+            status="pending",
+        ).exists()
+
     physics_subject_name = ""
     physics_exam_format_name = ""
     try:
@@ -948,6 +956,7 @@ def student_practice(request):
         'srs_eta_minutes': srs_eta_minutes,
         'physics_kim_ref_enabled': bool(physics_kim_ref_enabled),
         'physics_kim_ref_kind': physics_kim_ref_kind,
+        'srs_remove_request_pending': bool(srs_remove_request_pending),
     })
 
 
@@ -962,6 +971,55 @@ def student_srs_add(request, task_id):
     rec.save(update_fields=['next_review_date'])
     messages.success(request, "Добавлено в интервальное повторение.")
     return redirect(request.META.get('HTTP_REFERER', reverse('student_practice')))
+
+@login_required
+@require_POST
+def student_srs_remove_request(request, task_id):
+    if request.user.role != "student":
+        return redirect("login")
+
+    task = get_object_or_404(Task, id=task_id)
+    tutor = request.user.tutors.order_by("id").first()
+    if tutor is None:
+        messages.error(request, "Не найден репетитор для отправки заявки.")
+        return redirect(request.META.get("HTTP_REFERER", reverse("student_practice")))
+
+    comment = (request.POST.get("comment") or "").strip()
+    comment = comment if comment else None
+    req = None
+    created = False
+    try:
+        req, created = SpacedRepetitionRemovalRequest.objects.get_or_create(
+            student=request.user,
+            task=task,
+            status="pending",
+            defaults={"tutor": tutor, "comment": comment},
+        )
+    except IntegrityError:
+        req = SpacedRepetitionRemovalRequest.objects.filter(
+            student=request.user,
+            task=task,
+            status="pending",
+        ).first()
+
+    if req and not created and (comment is not None) and (req.comment != comment):
+        req.comment = comment
+        req.tutor = tutor
+        req.save(update_fields=["comment", "tutor"])
+
+    SpacedRepetition.objects.filter(student=request.user, task=task).update(is_suspended=True)
+    messages.success(request, "Заявка отправлена репетитору. Задача временно скрыта из повторения.")
+
+    subject_id_raw = (request.POST.get("subject_id") or "").strip()
+    if subject_id_raw.isdigit():
+        return redirect(f"{reverse('student_practice')}?mode=srs&subject_id={int(subject_id_raw)}")
+    try:
+        sid = int(getattr(getattr(task, "topic", None), "subject_id", None) or 0) or 0
+    except Exception:
+        sid = 0
+    if sid:
+        return redirect(f"{reverse('student_practice')}?mode=srs&subject_id={sid}")
+    return redirect(f"{reverse('student_practice')}?mode=srs")
 
 @login_required
 def student_dashboard(request):
@@ -1991,22 +2049,33 @@ def student_history(request):
     """История решений (Журнал) ученика"""
     import json as pyjson
 
+    profiles = StudentSubjectProfile.objects.filter(student=request.user).select_related("subject")
+    active_subject_id_raw = (request.GET.get("subject_id") or "").strip()
+    if not active_subject_id_raw:
+        active_subject_id = profiles.first().subject_id if profiles.exists() else None
+    elif active_subject_id_raw.isdigit():
+        active_subject_id = int(active_subject_id_raw)
+    else:
+        active_subject_id = None
+
     submissions_qs = (
         Submission.objects.filter(student=request.user)
-        .select_related('task', 'assignment')
+        .select_related('task', 'task__topic', 'task__topic__subject', 'assignment')
         .prefetch_related('comments', 'comments__author')
         .order_by('-created_at', '-id')
     )
+    if active_subject_id:
+        submissions_qs = submissions_qs.filter(task__topic__subject_id=active_subject_id)
 
     submission_id_raw = (request.GET.get("submission_id") or "").strip()
     page_raw = (request.GET.get("page") or "").strip()
 
     # Deep-link: если submission_id находится не на текущей странице пагинации, перенаправляем на нужную.
     if submission_id_raw.isdigit():
-        target = Submission.objects.filter(
-            id=int(submission_id_raw),
-            student=request.user,
-        ).only("id", "created_at").first()
+        target_qs = Submission.objects.filter(student=request.user)
+        if active_subject_id:
+            target_qs = target_qs.filter(task__topic__subject_id=active_subject_id)
+        target = target_qs.filter(id=int(submission_id_raw)).only("id", "created_at").first()
         if target:
             from django.db.models import Q
             newer_count = submissions_qs.filter(
@@ -2015,7 +2084,8 @@ def student_history(request):
             ).count()
             target_page = (newer_count // 20) + 1
             if (not page_raw) or (page_raw.isdigit() and int(page_raw) != target_page):
-                return redirect(f"{reverse('student_history')}?page={target_page}&submission_id={target.id}")
+                subject_q = f"&subject_id={active_subject_id}" if active_subject_id else ""
+                return redirect(f"{reverse('student_history')}?page={target_page}&submission_id={target.id}{subject_q}")
 
     per_page = 20
     page_number = (request.GET.get("page") or "1").strip()
@@ -2050,6 +2120,8 @@ def student_history(request):
             'submissions': submissions,
             'page_obj': page_obj,
             'submission_id': submission_id_raw,
+            'profiles': profiles,
+            'active_subject_id': active_subject_id,
             'total_xp': total_xp,
             'total_level': total_level,
             'unread_tutor_replies_total': unread_tutor_replies_total,
@@ -2255,7 +2327,7 @@ def tutor_student_srs_remove(request, student_id, task_id):
 
     SpacedRepetition.objects.filter(student=student, task_id=task_id).delete()
     messages.success(request, "Задача убрана из повторения.")
-    return_to = (request.POST.get("return_to") or "").strip()
+    return_to = (request.POST.get("return_to") or request.POST.get("next") or "").strip()
     if not return_to or not url_has_allowed_host_and_scheme(
         url=return_to,
         allowed_hosts={request.get_host()},
@@ -2263,6 +2335,40 @@ def tutor_student_srs_remove(request, student_id, task_id):
     ):
         return_to = request.META.get("HTTP_REFERER", "") or reverse("tutor_student_history", args=[student.id])
     return redirect(return_to)
+
+@login_required
+@require_POST
+def tutor_srs_removal_request_approve(request, req_id):
+    if request.user.role != "tutor":
+        return redirect("login")
+
+    req = get_object_or_404(SpacedRepetitionRemovalRequest, id=req_id, tutor=request.user)
+    if req.status != "pending":
+        return redirect(request.META.get("HTTP_REFERER", reverse("tutor_dashboard")))
+
+    req.status = "approved"
+    req.resolved_at = timezone.now()
+    req.save(update_fields=["status", "resolved_at"])
+    SpacedRepetition.objects.filter(student=req.student, task=req.task).delete()
+    messages.success(request, "Задача убрана из повторения.")
+    return redirect(request.META.get("HTTP_REFERER", reverse("tutor_dashboard")))
+
+@login_required
+@require_POST
+def tutor_srs_removal_request_reject(request, req_id):
+    if request.user.role != "tutor":
+        return redirect("login")
+
+    req = get_object_or_404(SpacedRepetitionRemovalRequest, id=req_id, tutor=request.user)
+    if req.status != "pending":
+        return redirect(request.META.get("HTTP_REFERER", reverse("tutor_dashboard")))
+
+    req.status = "rejected"
+    req.resolved_at = timezone.now()
+    req.save(update_fields=["status", "resolved_at"])
+    SpacedRepetition.objects.filter(student=req.student, task=req.task).update(is_suspended=False)
+    messages.success(request, "Заявка отклонена.")
+    return redirect(request.META.get("HTTP_REFERER", reverse("tutor_dashboard")))
 
 @login_required
 def tutor_update_student_contacts(request, student_id):
@@ -2341,6 +2447,16 @@ def tutor_dashboard(request):
         .annotate(c=Count("id"))
         .values("c")[:1]
     )
+    pending_srs_removal_qs = (
+        SpacedRepetitionRemovalRequest.objects.filter(
+            student_id=OuterRef("pk"),
+            tutor=request.user,
+            status="pending",
+        )
+        .values("student_id")
+        .annotate(c=Count("id"))
+        .values("c")[:1]
+    )
     students = (
         request.user.students.all()
         .prefetch_related('subject_profiles', 'subject_profiles__subject')
@@ -2348,6 +2464,7 @@ def tutor_dashboard(request):
             unread_student_questions=Coalesce(Subquery(unresolved_qs, output_field=IntegerField()), 0),
             latest_unread_submission_id=Subquery(latest_unread_submission_qs, output_field=IntegerField()),
             pending_extension_requests=Coalesce(Subquery(pending_extension_qs, output_field=IntegerField()), 0),
+            pending_srs_removal_requests=Coalesce(Subquery(pending_srs_removal_qs, output_field=IntegerField()), 0),
         )
     )
     selected_student_id = request.GET.get('student_id')
@@ -2358,6 +2475,7 @@ def tutor_dashboard(request):
     active_assignments = []
     completed_assignments = []
     pending_extension_requests = []
+    pending_srs_removal_requests = []
     chart_data = None
     weekly_solved_chart_data = None
     chart_range = None
@@ -2381,6 +2499,7 @@ def tutor_dashboard(request):
             SpacedRepetition.objects.filter(
                 student_id__in=student_ids,
                 next_review_date__lte=today,
+                is_suspended=False,
             )
             .values("student_id")
             .annotate(c=Count("id"))
@@ -2485,6 +2604,16 @@ def tutor_dashboard(request):
             .order_by("-created_at")
         )
         pending_ext_by_assignment_id = {int(r.assignment_id): r for r in pending_extension_requests}
+
+        pending_srs_removal_requests = list(
+            SpacedRepetitionRemovalRequest.objects.filter(
+                tutor=request.user,
+                student=selected_student,
+                status="pending",
+            )
+            .select_related("task", "task__task_type", "task__topic")
+            .order_by("-created_at")
+        )
 
         profiles = list(selected_student.subject_profiles.all())
         for p in profiles:
@@ -2922,6 +3051,7 @@ def tutor_dashboard(request):
         'profiles': profiles if selected_student else [],
         'available_subjects': available_subjects if selected_student else [],
         'pending_extension_requests': pending_extension_requests if selected_student else [],
+        'pending_srs_removal_requests': pending_srs_removal_requests if selected_student else [],
     }
     return render(request, 'core/tutor_dashboard.html', context)
 
@@ -4650,6 +4780,15 @@ def tutor_student_history(request, student_id):
         
     student = get_object_or_404(User, id=student_id, role='student')
 
+    profiles = StudentSubjectProfile.objects.filter(student=student).select_related("subject")
+    active_subject_id_raw = (request.GET.get("subject_id") or "").strip()
+    if not active_subject_id_raw:
+        active_subject_id = profiles.first().subject_id if profiles.exists() else None
+    elif active_subject_id_raw.isdigit():
+        active_subject_id = int(active_subject_id_raw)
+    else:
+        active_subject_id = None
+
     submission_id_raw = (request.GET.get("submission_id") or "").strip()
     page_raw = (request.GET.get("page") or "").strip()
 
@@ -4657,9 +4796,11 @@ def tutor_student_history(request, student_id):
 
     submissions_qs = (
         Submission.objects.filter(student=student)
-        .select_related('task', 'task__task_type', 'assignment')
+        .select_related('task', 'task__topic', 'task__topic__subject', 'task__task_type', 'assignment')
         .prefetch_related('comments', 'comments__author')
     )
+    if active_subject_id:
+        submissions_qs = submissions_qs.filter(task__topic__subject_id=active_subject_id)
 
     tz = timezone.get_current_timezone()
     days_list = list(
@@ -4672,18 +4813,19 @@ def tutor_student_history(request, student_id):
 
     # Deep-link: если пришли с ?submission_id=<id>, отправляем на страницу, где лежит нужный день
     if submission_id_raw.isdigit():
-        target = Submission.objects.filter(
-            id=int(submission_id_raw),
-            student=student,
-        ).only("id", "created_at").first()
+        target_qs = Submission.objects.filter(student=student)
+        if active_subject_id:
+            target_qs = target_qs.filter(task__topic__subject_id=active_subject_id)
+        target = target_qs.filter(id=int(submission_id_raw)).only("id", "created_at").first()
         if target:
             target_day = localtime(target.created_at).date()
             idx_map = {d: i for i, d in enumerate(days_list)}
             if target_day in idx_map:
                 target_page = (idx_map[target_day] // 14) + 1
                 if (not page_raw) or (page_raw.isdigit() and int(page_raw) != target_page):
+                    subject_q = f"&subject_id={active_subject_id}" if active_subject_id else ""
                     return redirect(
-                        f"{reverse('tutor_student_history', args=[student.id])}?page={target_page}&submission_id={target.id}"
+                        f"{reverse('tutor_student_history', args=[student.id])}?page={target_page}&submission_id={target.id}{subject_q}"
                     )
 
     page_number = (request.GET.get("page") or "1").strip()
@@ -4763,6 +4905,8 @@ def tutor_student_history(request, student_id):
 
     return render(request, 'core/tutor_student_history.html', {
         'student': student,
+        'profiles': profiles,
+        'active_subject_id': active_subject_id,
         'history_days': history_days,
         'page_obj': page_obj,
         'submission_id': submission_id_raw,

@@ -113,6 +113,7 @@ def get_due_tasks_for_student(student, *, subject_id: int | None = None):
     qs = SpacedRepetition.objects.filter(
         student=student,
         next_review_date__lte=timezone.now().date(),
+        is_suspended=False,
     )
     if subject_id:
         qs = qs.filter(task__topic__subject_id=int(subject_id))
