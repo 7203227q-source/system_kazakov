@@ -41,9 +41,9 @@ class ExamStructureBoundariesInGeneratorTests(TestCase):
             TaskType.objects.create(exam_format=ef_ege, number=n, name=str(n), max_points=3, is_extended_answer=True)
 
         ef_oge = ExamFormat.objects.create(subject=subj, name="ОГЭ физика", year=2026, is_active=True)
-        for n in range(1, 21):
+        for n in range(1, 17):
             TaskType.objects.create(exam_format=ef_oge, number=n, name=str(n), max_points=1, is_extended_answer=False)
-        for n in range(21, 25):
+        for n in range(17, 23):
             TaskType.objects.create(exam_format=ef_oge, number=n, name=str(n), max_points=2, is_extended_answer=True)
 
         # профиль студента — любой из форматов (важно только что доступен предмет)
@@ -60,6 +60,5 @@ class ExamStructureBoundariesInGeneratorTests(TestCase):
         r2 = self.client.get(reverse("tutor_create_assignment") + f"?student_id={student.id}&exam_format={ef_oge.id}")
         self.assertEqual(r2.status_code, 200)
         html2 = r2.content.decode("utf-8")
-        self.assertIn("Тестовая часть (1-20)", html2)
-        self.assertIn("Развернутая часть (21-24)", html2)
-
+        self.assertIn("Тестовая часть (1-16)", html2)
+        self.assertIn("Развернутая часть (17-22)", html2)

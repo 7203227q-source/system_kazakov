@@ -34,16 +34,16 @@ class TutorCreateAssignmentDynamicExamFormatTests(TestCase):
         self.assertContains(res, f2.name)
         self.assertNotContains(res, f3.name)
 
-        self.assertContains(res, "№99. Тип 99 ЕГЭ")
-        self.assertNotContains(res, "№1. Тип 1 ОГЭ")
+        self.assertContains(res, "№99 — ЕГЭ")
+        self.assertNotContains(res, "№1 — ОГЭ")
 
         res2 = self.client.get(
             reverse("tutor_create_assignment"),
             {"student_id": str(student.id), "exam_format": str(f1.id)},
         )
         self.assertEqual(res2.status_code, 200)
-        self.assertContains(res2, "№1. Тип 1 ОГЭ")
-        self.assertNotContains(res2, "№99. Тип 99 ЕГЭ")
+        self.assertContains(res2, "№1 — ОГЭ")
+        self.assertNotContains(res2, "№99 — ЕГЭ")
 
     def test_student_can_switch_exam_format_and_it_is_available_in_builder(self):
         tutor = User.objects.create_user(username="t", password="pass", role="tutor")

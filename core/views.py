@@ -4091,7 +4091,10 @@ def tutor_create_assignment(request):
             fmt_name = (selected_exam_format.name or "").strip().lower()
 
             suspicious_gap = (guessed_part2_min - guessed_part1_max > 2)
-            suspicious_physics = ("физика" in subj_name) and (guessed_part1_max < 20 or guessed_part2_min < 21 or suspicious_gap)
+            has_part1 = bool(part1_nums)
+            has_part2 = bool(part2_nums)
+            invalid_split = bool(has_part1 and has_part2 and int(guessed_part2_min) <= int(guessed_part1_max))
+            suspicious_physics = ("физика" in subj_name) and (not has_part1 or not has_part2 or invalid_split or suspicious_gap)
             suspicious_math_oge = ("математика" in subj_name and "огэ" in fmt_name) and (guessed_part2_min < 20)
 
             if suspicious_physics or suspicious_math_oge:
