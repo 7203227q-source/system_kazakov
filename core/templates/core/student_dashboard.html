@@ -188,6 +188,50 @@
                 </div>
             </div>
 
+            {% if active_subject_id %}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">Решаемость за неделю</h2>
+                    </div>
+                    <div class="relative h-64 w-full bg-white rounded-lg p-4">
+                        <canvas id="weeklySolvedChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">Сводка</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
+                            <div class="text-sm font-medium text-gray-600">Попыток</div>
+                            <div class="text-sm font-bold text-gray-800">{{ student_total_submissions|default:0 }}</div>
+                        </div>
+                        <div class="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
+                            <div class="text-sm font-medium text-gray-600">Точность</div>
+                            <div class="text-sm font-bold text-gray-800">
+                                {% if student_correct_rate is None %}
+                                    —
+                                {% else %}
+                                    {{ student_correct_rate|floatformat:0 }}%
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                                <div class="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Правильно</div>
+                                <div class="text-lg font-bold text-blue-800">{{ student_correct_submissions|floatformat:0 }}</div>
+                            </div>
+                            <div class="bg-red-50 border border-red-100 rounded-lg px-4 py-3">
+                                <div class="text-xs font-bold text-red-700 uppercase tracking-wider mb-1">Неправильно</div>
+                                <div class="text-lg font-bold text-red-800">{{ student_incorrect_submissions|floatformat:0 }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Content with selected subject -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <!-- Left Col: Today's Plan -->
@@ -554,47 +598,120 @@ function closeSubjectModal() {
 
 document.addEventListener('DOMContentLoaded', function() {
     const chartDataRaw = '{{ chart_data|escapejs }}';
-    if (!chartDataRaw || chartDataRaw === '""' || chartDataRaw === 'null') return;
-    
-    const data = JSON.parse(chartDataRaw);
-    if (!data.dates || data.dates.length === 0) return;
+    if (chartDataRaw && chartDataRaw !== '""' && chartDataRaw !== 'null') {
+        const data = JSON.parse(chartDataRaw);
+        if (data.dates && data.dates.length > 0) {
+            const el = document.getElementById('progressChart');
+            if (el) {
+                const ctx = el.getContext('2d');
+                let predictions = data.predictions;
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.dates,
+                        datasets: [
+                            {
+                                label: 'Фактический балл (Мастерство)',
+                                data: data.mastery,
+                                borderColor: '#4F46E5',
+                                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                                borderWidth: 3,
+                                pointBackgroundColor: '#fff',
+                                pointBorderColor: '#4F46E5',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Прогноз (ИИ)',
+                                data: predictions,
+                                borderColor: '#10B981',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                pointBackgroundColor: '#fff',
+                                pointBorderColor: '#10B981',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                fill: false,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                align: 'end',
+                                labels: {
+                                    usePointStyle: true,
+                                    boxWidth: 8
+                                }
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                titleColor: '#1f2937',
+                                bodyColor: '#4b5563',
+                                borderColor: '#e5e7eb',
+                                borderWidth: 1,
+                                padding: 10,
+                                boxPadding: 4
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                grid: {
+                                    color: '#f3f4f6',
+                                    drawBorder: false,
+                                },
+                                ticks: {
+                                    stepSize: 20,
+                                    color: '#9ca3af'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false,
+                                    drawBorder: false,
+                                },
+                                ticks: {
+                                    color: '#9ca3af',
+                                    maxRotation: 45,
+                                    minRotation: 0
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
+                        }
+                    }
+                });
+            }
+        }
+    }
 
-    const ctx = document.getElementById('progressChart').getContext('2d');
-    
-    // Add current prediction point at the end if it exists to draw the line
-    let predictions = data.predictions;
-    
-    new Chart(ctx, {
-        type: 'line',
+    const weeklyRaw = '{{ weekly_solved_chart_data|default:""|escapejs }}';
+    if (!weeklyRaw || weeklyRaw === '""' || weeklyRaw === 'null') return;
+    const weekly = JSON.parse(weeklyRaw);
+    if (!weekly.labels || weekly.labels.length === 0) return;
+    const wEl = document.getElementById('weeklySolvedChart');
+    if (!wEl) return;
+
+    new Chart(wEl.getContext('2d'), {
+        type: 'bar',
         data: {
-            labels: data.dates,
+            labels: weekly.labels,
             datasets: [
-                {
-                    label: 'Фактический балл (Мастерство)',
-                    data: data.mastery,
-                    borderColor: '#4F46E5', // primary
-                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                    borderWidth: 3,
-                    pointBackgroundColor: '#fff',
-                    pointBorderColor: '#4F46E5',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    fill: true,
-                    tension: 0.4
-                },
-                {
-                    label: 'Прогноз (ИИ)',
-                    data: predictions,
-                    borderColor: '#10B981', // secondary (emerald)
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointBackgroundColor: '#fff',
-                    pointBorderColor: '#10B981',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    fill: false,
-                    tension: 0.4
-                }
+                { label: 'Правильно', data: weekly.correct, backgroundColor: '#2563EB' },
+                { label: 'Неправильно', data: weekly.incorrect, backgroundColor: '#EF4444' }
             ]
         },
         options: {
@@ -602,35 +719,21 @@ document.addEventListener('DOMContentLoaded', function() {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'top',
-                    align: 'end',
+                    position: 'bottom',
                     labels: {
                         usePointStyle: true,
                         boxWidth: 8
                     }
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                    titleColor: '#1f2937',
-                    bodyColor: '#4b5563',
-                    borderColor: '#e5e7eb',
-                    borderWidth: 1,
-                    padding: 10,
-                    boxPadding: 4
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: 100,
                     grid: {
                         color: '#f3f4f6',
                         drawBorder: false,
                     },
                     ticks: {
-                        stepSize: 20,
                         color: '#9ca3af'
                     }
                 },
@@ -640,16 +743,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         drawBorder: false,
                     },
                     ticks: {
-                        color: '#9ca3af',
-                        maxRotation: 45,
-                        minRotation: 0
+                        color: '#9ca3af'
                     }
                 }
-            },
-            interaction: {
-                mode: 'nearest',
-                axis: 'x',
-                intersect: false
             }
         }
     });
