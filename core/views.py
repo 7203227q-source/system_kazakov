@@ -1176,7 +1176,7 @@ def student_dashboard(request):
         'predictions': chart_predictions
     })
 
-    from core.dashboard_analytics import build_submission_summary, build_weekly_solved_chart_data
+    from core.dashboard_analytics import build_submission_summary, build_task_type_rates, build_weekly_solved_chart_data
 
     weekly_solved_chart_data = build_weekly_solved_chart_data(
         request.user,
@@ -1190,6 +1190,12 @@ def student_dashboard(request):
     student_correct_rate = summary["correct_rate"]
     student_correct_submissions = summary["correct"]
     student_incorrect_submissions = summary["incorrect"]
+
+    task_type_rates, active_exam_format_label = build_task_type_rates(
+        request.user,
+        subject_id=int(active_subject_id) if active_subject_id else None,
+        exam_format=getattr(active_profile, "exam_format", None) if active_profile else None,
+    )
 
     due_srs_qs = SpacedRepetition.objects.filter(
         student=request.user,
@@ -1271,6 +1277,8 @@ def student_dashboard(request):
         'student_correct_rate': student_correct_rate,
         'student_correct_submissions': student_correct_submissions,
         'student_incorrect_submissions': student_incorrect_submissions,
+        'task_type_rates': task_type_rates,
+        'active_exam_format_label': active_exam_format_label,
         'due_srs_count': due_srs_count,
         'unread_tutor_replies_total': unread_tutor_replies_total,
         'dashboard_comments': dashboard_comments,
