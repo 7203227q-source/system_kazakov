@@ -42,16 +42,20 @@ class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
         yesterday = today - timedelta(days=1)
         tz = timezone.get_current_timezone()
 
-        Submission.objects.create(
+        s1 = Submission.objects.create(
             student=self.student,
             task=self.task,
             is_correct=False,
+        )
+        Submission.objects.filter(id=s1.id).update(
             created_at=timezone.make_aware(datetime.combine(yesterday, time(10, 0)), tz),
         )
-        Submission.objects.create(
+        s2 = Submission.objects.create(
             student=self.student,
             task=self.task,
             is_correct=True,
+        )
+        Submission.objects.filter(id=s2.id).update(
             created_at=timezone.make_aware(datetime.combine(yesterday, time(20, 0)), tz),
         )
 

@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 
+from django.db.models import Q
 from django.utils import timezone
 
 from core.models import Submission
@@ -14,20 +15,38 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
         today = timezone.localdate()
 
     start = today - timedelta(days=6)
-    rows = (
+    qs = (
         Submission.objects.filter(
             student=student,
-            created_at__date__gte=start,
-            created_at__date__lte=today,
             task__topic__subject_id=int(subject_id),
         )
+        .filter(Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False) | Q(score__isnull=False))
         .order_by("created_at")
-        .values_list("created_at__date", "task_id", "is_correct")
+        .values_list(
+            "created_at",
+            "task_id",
+            "is_correct",
+            "tutor_primary_score",
+            "primary_score",
+            "score",
+            "task__exam_points",
+            "task__task_type__max_points",
+        )
     )
 
-    last_by_day_task: dict[tuple, bool] = {}
-    for d, task_id, is_correct in rows:
-        last_by_day_task[(d, int(task_id))] = bool(is_correct)
+    last_by_day_task: dict[tuple, tuple[float, float]] = {}
+    for created_at, task_id, is_correct, tutor_primary_score, primary_score, score, task_exam_points, task_type_max_points in qs:
+        d = created_at.date()
+        if d < start or d > today:
+            continue
+        mp = float(int(task_exam_points or 0) if int(task_exam_points or 0) > 0 else int(task_type_max_points or 1))
+        if bool(is_correct):
+            earned = mp
+        else:
+            v = tutor_primary_score if tutor_primary_score is not None else primary_score
+            v = v if v is not None else score
+            earned = float(v or 0)
+        last_by_day_task[(d, int(task_id))] = (earned, mp)
 
     labels: list[str] = []
     correct: list[int] = []
@@ -36,17 +55,16 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
     for i in range(7):
         day = start + timedelta(days=i)
         labels.append(day.strftime("%d %b"))
-        c = 0
-        w = 0
-        for (d, _), ok in last_by_day_task.items():
+        c = 0.0
+        w = 0.0
+        for (d, _), v in last_by_day_task.items():
             if d != day:
                 continue
-            if ok:
-                c += 1
-            else:
-                w += 1
-        correct.append(c)
-        incorrect.append(w)
+            earned, mp = v
+            c += float(earned)
+            w += float(mp - earned)
+        correct.append(int(round(c)))
+        incorrect.append(int(round(w)))
 
     return json.dumps({"labels": labels, "correct": correct, "incorrect": incorrect})
 
@@ -55,10 +73,32 @@ def build_submission_summary(student, *, subject_id: int | None) -> dict:
     if not subject_id:
         return {"total": 0, "correct": 0, "incorrect": 0, "correct_rate": None}
 
-    qs = Submission.objects.filter(student=student, task__topic__subject_id=int(subject_id))
-    total = int(qs.count())
-    correct = int(qs.filter(is_correct=True).count())
-    incorrect = int(total - correct)
-    correct_rate = int(round((correct / total) * 100)) if total > 0 else None
-    return {"total": total, "correct": correct, "incorrect": incorrect, "correct_rate": correct_rate}
+    submissions_subject = Submission.objects.filter(student=student, task__topic__subject_id=int(subject_id))
+    total = int(submissions_subject.count())
 
+    scored_submissions = submissions_subject.filter(
+        Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False) | Q(score__isnull=False)
+    ).values_list(
+        "is_correct",
+        "tutor_primary_score",
+        "primary_score",
+        "score",
+        "task__exam_points",
+        "task__task_type__max_points",
+    )
+    max_total = 0.0
+    earned_total = 0.0
+    for is_correct, tutor_primary_score, primary_score, score, task_exam_points, task_type_max_points in scored_submissions:
+        mp = float(int(task_exam_points or 0) if int(task_exam_points or 0) > 0 else int(task_type_max_points or 1))
+        if bool(is_correct):
+            earned = mp
+        else:
+            v = tutor_primary_score if tutor_primary_score is not None else primary_score
+            v = v if v is not None else score
+            earned = float(v or 0)
+        max_total += mp
+        earned_total += earned
+
+    correct_rate = (earned_total / max_total * 100.0) if max_total > 0 else None
+    incorrect_total = max_total - earned_total
+    return {"total": total, "correct": earned_total, "incorrect": incorrect_total, "correct_rate": correct_rate}
