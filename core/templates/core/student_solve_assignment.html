@@ -25,6 +25,11 @@
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     {% include 'core/includes/_ui_theme_css.html' %}
+    <style>
+        /* Отключаем scroll anchoring: при динамических DOM-обновлениях браузер может "соскакивать" по странице */
+        body { overflow-anchor: none; }
+        .task-card { overflow-anchor: none; }
+    </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 h-[100dvh] overflow-y-auto {% if user.role == 'student' %}{% if user.ui_theme == 'dark' %}ui-dark{% elif user.ui_theme == 'dark_classic' %}ui-dark-classic{% endif %}{% endif %}">
 <div class="min-h-[100dvh] bg-gray-50 p-4 sm:p-8 w-full">
@@ -1372,10 +1377,9 @@
                 if (!el) return false;
                 const style = window.getComputedStyle(el);
                 const oy = (style.overflowY || '').toLowerCase();
-                const canScroll = (oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1;
-                return canScroll;
+                return (oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1;
             };
-            // В этом проекте часто скролл-родитель — сам <body> (h-[100dvh] overflow-y-auto).
+            // На наших страницах часто скролл-родитель — сам <body> (h-[100dvh] overflow-y-auto).
             // document.scrollingElement при этом может указывать на <html>, где scrollTop всегда 0.
             if (isScrollable(document.body)) return document.body;
             if (isScrollable(document.documentElement)) return document.documentElement;
@@ -1387,6 +1391,18 @@
         const scroller = getScrollContainer();
         const y = scroller ? scroller.scrollTop : 0;
         const x = scroller ? scroller.scrollLeft : 0;
+
+        // Якорим позицию по текущему элементу вверху viewport, чтобы компенсировать layout-shift'ы
+        let anchorCard = null;
+        let anchorTopBefore = null;
+        try {
+            const els = (document.elementsFromPoint && document.elementsFromPoint(20, 20)) || [];
+            for (const el of els) {
+                const card = el && el.closest ? el.closest('.task-card') : null;
+                if (card) { anchorCard = card; break; }
+            }
+            if (anchorCard) anchorTopBefore = anchorCard.getBoundingClientRect().top;
+        } catch (e) {}
 
         const uploaded = document.getElementById(`upload_state_uploaded_${taskId}`);
         const empty = document.getElementById(`upload_state_empty_${taskId}`);
@@ -1426,8 +1442,17 @@
 
         if (scroller) {
             requestAnimationFrame(() => {
-                if (scroller.scrollTop !== y) scroller.scrollTop = y;
-                if (scroller.scrollLeft !== x) scroller.scrollLeft = x;
+                // 1) Компенсируем layout-shift относительно якоря
+                try {
+                    if (anchorCard && anchorTopBefore != null) {
+                        const anchorTopAfter = anchorCard.getBoundingClientRect().top;
+                        const dy = anchorTopAfter - anchorTopBefore;
+                        if (dy) scroller.scrollTop += dy;
+                    }
+                } catch (e) {}
+                // 2) Фолбэк: держим прежний scrollTop/Left
+                if (Math.abs((scroller.scrollTop || 0) - y) > 2) scroller.scrollTop = y;
+                if (Math.abs((scroller.scrollLeft || 0) - x) > 2) scroller.scrollLeft = x;
             });
         }
     }
@@ -1448,7 +1473,20 @@
         const blocks = Array.from(document.querySelectorAll('[id^="upload_block_"][data-submission-id][data-task-id]'));
         if (!blocks.length) return;
 
+        const scroller = getScrollContainer();
+        let isUserScrolling = false;
+        let scrollTimer = null;
+        const onScroll = () => {
+            isUserScrolling = true;
+            if (scrollTimer) clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(() => { isUserScrolling = false; }, 700);
+        };
+        try {
+            if (scroller) scroller.addEventListener('scroll', onScroll, { passive: true });
+        } catch (e) {}
+
         const tick = async () => {
+            if (isUserScrolling) return;
             await Promise.all(blocks.map(async (el) => {
                 const submissionId = el.getAttribute('data-submission-id');
                 const taskId = el.getAttribute('data-task-id');
