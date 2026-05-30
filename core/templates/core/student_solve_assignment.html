@@ -1147,6 +1147,7 @@
                 const input = el.querySelector('input.answer-input');
                 if (input) input.focus({ preventScroll: true });
             } catch (e) {}
+            try { sessionStorage.removeItem('focus_task_id'); } catch (e) {}
         }, 50);
     }
 
@@ -1184,8 +1185,6 @@
             card.addEventListener('focusin', () => setFocusTask(tid));
         });
         scrollToFocusTask();
-        window.addEventListener('orientationchange', scrollToFocusTask);
-        window.addEventListener('resize', scrollToFocusTask);
     });
 
     async function revealSolution(submissionId, taskId) {
