@@ -1367,6 +1367,19 @@
 {% include "core/image_modal.html" %}
 <script>
     function getScrollContainer() {
+        try {
+            const isScrollable = (el) => {
+                if (!el) return false;
+                const style = window.getComputedStyle(el);
+                const oy = (style.overflowY || '').toLowerCase();
+                const canScroll = (oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1;
+                return canScroll;
+            };
+            // В этом проекте часто скролл-родитель — сам <body> (h-[100dvh] overflow-y-auto).
+            // document.scrollingElement при этом может указывать на <html>, где scrollTop всегда 0.
+            if (isScrollable(document.body)) return document.body;
+            if (isScrollable(document.documentElement)) return document.documentElement;
+        } catch (e) {}
         return document.scrollingElement || document.documentElement || document.body;
     }
 
