@@ -1371,6 +1371,11 @@
 {% include "core/includes/_physics_kim_reference_widget.html" %}
 {% include "core/image_modal.html" %}
 <script>
+    // Во время фокуса на инпутах (особенно на телефоне, когда появляется клавиатура)
+    // браузер сам меняет scrollTop. Любые параллельные DOM-апдейты + "восстановление скролла"
+    // могут давать эффект "соскакивания" вверх. Поэтому в этот момент глушим polling/фиксацию.
+    let uiIsInputFocused = false;
+
     function getScrollContainer() {
         try {
             const isScrollable = (el) => {
@@ -1388,6 +1393,31 @@
     }
 
     function applySubmissionStatusForTask(taskId, data) {
+        if (uiIsInputFocused) {
+            // Не трогаем скролл, пока пользователь вводит ответ/открыта клавиатура
+            // (иначе можно "перебить" автоскролл браузера к активному полю).
+            const uploaded = document.getElementById(`upload_state_uploaded_${taskId}`);
+            const empty = document.getElementById(`upload_state_empty_${taskId}`);
+            const has1 = !!(data && (data.has_image || data.image_url));
+            const has2 = !!(data && (data.has_image_2 || data.image_url_2));
+            const url1 = data && data.image_url ? String(data.image_url) : '';
+            const url2 = data && data.image_url_2 ? String(data.image_url_2) : '';
+
+            if (uploaded && empty) {
+                if (has1) { uploaded.classList.remove('hidden'); empty.classList.add('hidden'); }
+                else { uploaded.classList.add('hidden'); empty.classList.remove('hidden'); }
+            }
+            document.querySelectorAll(`img.js-submission-image[data-task-id="${taskId}"][data-page="1"]`).forEach((img) => {
+                if (has1 && url1) { if ((img.getAttribute('src') || '') !== url1) img.src = url1; img.classList.remove('hidden'); }
+                else { img.removeAttribute('src'); img.classList.add('hidden'); }
+            });
+            document.querySelectorAll(`img.js-submission-image[data-task-id="${taskId}"][data-page="2"]`).forEach((img) => {
+                if (has2 && url2) { if ((img.getAttribute('src') || '') !== url2) img.src = url2; img.classList.remove('hidden'); }
+                else { img.removeAttribute('src'); img.classList.add('hidden'); }
+            });
+            return;
+        }
+
         const scroller = getScrollContainer();
         const y = scroller ? scroller.scrollTop : 0;
         const x = scroller ? scroller.scrollLeft : 0;
@@ -1485,8 +1515,35 @@
             if (scroller) scroller.addEventListener('scroll', onScroll, { passive: true });
         } catch (e) {}
 
+        // Фокус в инпуте: ставим флаг и делаем небольшую задержку после blur,
+        // чтобы не "стрельнуть" polling'ом в момент закрытия/открытия клавиатуры.
+        let focusTimer = null;
+        document.addEventListener('focusin', (e) => {
+            const t = e && e.target;
+            const tag = t && t.tagName ? String(t.tagName).toLowerCase() : '';
+            const isTextInput =
+                tag === 'input' ||
+                tag === 'textarea' ||
+                (t && t.isContentEditable);
+            if (!isTextInput) return;
+            uiIsInputFocused = true;
+            if (focusTimer) clearTimeout(focusTimer);
+        }, true);
+        document.addEventListener('focusout', (e) => {
+            const t = e && e.target;
+            const tag = t && t.tagName ? String(t.tagName).toLowerCase() : '';
+            const isTextInput =
+                tag === 'input' ||
+                tag === 'textarea' ||
+                (t && t.isContentEditable);
+            if (!isTextInput) return;
+            if (focusTimer) clearTimeout(focusTimer);
+            focusTimer = setTimeout(() => { uiIsInputFocused = false; }, 900);
+        }, true);
+
         const tick = async () => {
             if (isUserScrolling) return;
+            if (uiIsInputFocused) return;
             await Promise.all(blocks.map(async (el) => {
                 const submissionId = el.getAttribute('data-submission-id');
                 const taskId = el.getAttribute('data-task-id');
