@@ -1366,7 +1366,15 @@
 {% include "core/includes/_physics_kim_reference_widget.html" %}
 {% include "core/image_modal.html" %}
 <script>
+    function getScrollContainer() {
+        return document.scrollingElement || document.documentElement || document.body;
+    }
+
     function applySubmissionStatusForTask(taskId, data) {
+        const scroller = getScrollContainer();
+        const y = scroller ? scroller.scrollTop : 0;
+        const x = scroller ? scroller.scrollLeft : 0;
+
         const uploaded = document.getElementById(`upload_state_uploaded_${taskId}`);
         const empty = document.getElementById(`upload_state_empty_${taskId}`);
         const has1 = !!(data && (data.has_image || data.image_url));
@@ -1386,7 +1394,7 @@
 
         document.querySelectorAll(`img.js-submission-image[data-task-id="${taskId}"][data-page="1"]`).forEach((img) => {
             if (has1 && url1) {
-                img.src = url1;
+                if ((img.getAttribute('src') || '') !== url1) img.src = url1;
                 img.classList.remove('hidden');
             } else {
                 img.removeAttribute('src');
@@ -1395,13 +1403,20 @@
         });
         document.querySelectorAll(`img.js-submission-image[data-task-id="${taskId}"][data-page="2"]`).forEach((img) => {
             if (has2 && url2) {
-                img.src = url2;
+                if ((img.getAttribute('src') || '') !== url2) img.src = url2;
                 img.classList.remove('hidden');
             } else {
                 img.removeAttribute('src');
                 img.classList.add('hidden');
             }
         });
+
+        if (scroller) {
+            requestAnimationFrame(() => {
+                if (scroller.scrollTop !== y) scroller.scrollTop = y;
+                if (scroller.scrollLeft !== x) scroller.scrollLeft = x;
+            });
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1430,6 +1445,10 @@
                 const hasVisible2 = !!el.querySelector(`#upload_state_uploaded_${taskId}:not(.hidden) img.js-submission-image[data-page="2"]:not(.hidden)`);
                 if (hasVisible1 && hasVisible2) return;
 
+                const rect = el.getBoundingClientRect();
+                const margin = window.innerHeight || 800;
+                if (rect.bottom < -margin || rect.top > (window.innerHeight + margin)) return;
+
                 try {
                     const res = await fetch(`/api/submission/${submissionId}/status/`, { credentials: 'same-origin' });
                     if (!res.ok) return;
@@ -1440,7 +1459,7 @@
         };
 
         tick();
-        setInterval(tick, 3000);
+        setInterval(tick, 4000);
     });
 </script>
 </body>
