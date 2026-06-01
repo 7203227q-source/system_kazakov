@@ -12,13 +12,13 @@
         </button>
     </div>
     <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto min-h-0">
-        <a href="{% url 'tutor_dashboard' %}" class="flex items-center px-4 py-3 {% if active_page == 'dashboard' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
+        <a href="{% url 'tutor_dashboard' %}{% if request.session.tutor_selected_student_id %}?student_id={{ request.session.tutor_selected_student_id }}{% endif %}" class="flex items-center px-4 py-3 {% if active_page == 'dashboard' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
             <i class="fas fa-users w-6"></i> Мои ученики
         </a>
         <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 {% if active_page == 'tasks' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
             <i class="fas fa-database w-6"></i> База заданий
         </a>
-        <a href="{% url 'tutor_create_assignment' %}" class="flex items-center px-4 py-3 {% if active_page == 'create_assignment' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
+        <a href="{% url 'tutor_create_assignment' %}{% if request.session.tutor_selected_student_id %}?student_id={{ request.session.tutor_selected_student_id }}{% endif %}" class="flex items-center px-4 py-3 {% if active_page == 'create_assignment' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition">
             <i class="fas fa-file-alt w-6"></i> Создать вариант
         </a>
         <a href="{% url 'chat_index' %}" class="flex items-center px-4 py-3 {% if active_page == 'chat' %}bg-primary text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %} rounded-lg transition" id="sidebar-chat-link">

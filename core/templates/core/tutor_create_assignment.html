@@ -56,7 +56,7 @@
                             <select id="student-select" name="student_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required onchange="updateBuilderSelection()">
                                 <option value="">-- Выберите ученика --</option>
                                 {% for student in students %}
-                                <option value="{{ student.id }}" {% if saved_form.student_id.0 == student.id|stringformat:"s" or request.GET.student_id == student.id|stringformat:"s" %}selected{% endif %}>{{ student.get_full_name|default:student.username }}</option>
+                                <option value="{{ student.id }}" {% if saved_form.student_id.0 == student.id|stringformat:"s" or request.GET.student_id == student.id|stringformat:"s" or request.session.tutor_selected_student_id == student.id %}selected{% endif %}>{{ student.get_full_name|default:student.username }}</option>
                                 {% endfor %}
                             </select>
                         </div>

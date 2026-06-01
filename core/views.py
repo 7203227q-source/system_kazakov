@@ -2550,7 +2550,15 @@ def tutor_dashboard(request):
             pending_srs_removal_requests=Coalesce(Subquery(pending_srs_removal_qs, output_field=IntegerField()), 0),
         )
     )
-    selected_student_id = request.GET.get('student_id')
+    session_student_key = "tutor_selected_student_id"
+    selected_student_id_raw = (request.GET.get('student_id') or '').strip()
+    selected_student_id = selected_student_id_raw if selected_student_id_raw.isdigit() else None
+    if selected_student_id:
+        request.session[session_student_key] = int(selected_student_id)
+    else:
+        sid = request.session.get(session_student_key)
+        if sid:
+            selected_student_id = str(sid)
     chart_range_raw = (request.GET.get('range') or '30').strip()
     chart_subject_id_raw = (request.GET.get('subject_id') or '').strip()
     selected_student = None
@@ -2668,8 +2676,12 @@ def tutor_dashboard(request):
     
     if selected_student_id:
         selected_student = students.filter(id=selected_student_id).first()
-    elif students.exists():
+    if selected_student is None and students.exists():
         selected_student = students.first()
+    if selected_student:
+        request.session[session_student_key] = int(selected_student.id)
+    else:
+        request.session.pop(session_student_key, None)
         
     if selected_student:
         ensure_parent_invite_code(selected_student)
@@ -3691,6 +3703,13 @@ def tutor_create_assignment(request):
 
     students = request.user.students.all()
     base_exam_formats = ExamFormat.objects.select_related("subject").order_by("subject__name", "-is_active", "-year", "name")
+    sid_raw = (request.GET.get("student_id") or "").strip()
+    if sid_raw.isdigit() and students.filter(id=int(sid_raw)).exists():
+        request.session["tutor_selected_student_id"] = int(sid_raw)
+    else:
+        sid = request.session.get("tutor_selected_student_id")
+        if sid and not students.filter(id=int(sid)).exists():
+            request.session.pop("tutor_selected_student_id", None)
 
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
@@ -3704,6 +3723,8 @@ def tutor_create_assignment(request):
             return redirect('tutor_create_assignment')
 
         student = get_object_or_404(User, id=student_id, role='student')
+        if students.filter(id=int(student.id)).exists():
+            request.session["tutor_selected_student_id"] = int(student.id)
 
         exam_format = None
         if exam_format_id_raw and exam_format_id_raw.isdigit():
@@ -4865,6 +4886,8 @@ def tutor_student_history(request, student_id):
     import json as pyjson
         
     student = get_object_or_404(User, id=student_id, role='student')
+    if request.user.role == "tutor" and request.user.students.filter(id=student.id).exists():
+        request.session["tutor_selected_student_id"] = int(student.id)
 
     profiles = StudentSubjectProfile.objects.filter(student=student).select_related("subject")
     active_subject_id_raw = (request.GET.get("subject_id") or "").strip()
