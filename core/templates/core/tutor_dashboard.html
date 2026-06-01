@@ -86,9 +86,9 @@
                                      {% if student.subject_profiles.exists %}
                                          {% with total=student.subject_profiles.count %}
                                              {% for profile in student.subject_profiles.all|slice:":2" %}
-                                                 <a href="?student_id={{ student.id }}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition {% if selected_student.id == student.id and chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200{% endif %}">
-                                                     {{ profile.subject.name }}
-                                                 </a>
+                                                <a href="?student_id={{ student.id }}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition {% if selected_student.id == student.id and chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200{% endif %}">
+                                                    {{ profile.subject.name }} · {{ profile.xp|default:0 }} XP
+                                                </a>
                                              {% endfor %}
                                              {% if total > 2 %}
                                                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200">+{{ total|add:"-2" }}</span>
@@ -187,6 +187,9 @@
                         </div>
                     </div>
                     <div class="flex space-x-2">
+                        <span class="hidden md:inline-flex items-center bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold">
+                            Всего: {{ selected_student.total_xp|default:0 }} XP
+                        </span>
                         <span class="hidden md:inline-flex items-center bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-2 rounded-lg text-sm font-bold">
                             Сегодня: +{{ selected_student.today_xp|default:0 }} XP
                         </span>
@@ -211,7 +214,7 @@
                         <span class="text-xs font-bold text-gray-500 mr-1">Предмет:</span>
                         {% for profile in selected_student.subject_profiles.all %}
                             <a href="?student_id={{ selected_student.id }}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-3 py-1 rounded-full text-xs font-bold border transition {% if chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200{% endif %}">
-                                {{ profile.subject.name }}
+                                {{ profile.subject.name }} · {{ profile.xp|default:0 }} XP
                             </a>
                         {% endfor %}
 
