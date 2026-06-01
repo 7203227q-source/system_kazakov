@@ -1,4 +1,4 @@
-{% load time_greeting %}
+{% load time_greeting assignment_ui %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -311,6 +311,12 @@
                             <div class="ml-4 flex-1">
                                 <div class="flex items-center space-x-2">
                                     <h4 class="font-bold text-gray-800">{{ assignment.title }}</h4>
+                                    {% with ac=assignment.student_seq|assignment_color %}
+                                    <span class="inline-flex items-center gap-1">
+                                        <span class="w-2 h-2 rounded-full" style="background: {{ ac.fg }};"></span>
+                                        <span class="text-[11px] font-bold" style="color: {{ ac.fg }};">{{ assignment.student_seq|assignment_code }}</span>
+                                    </span>
+                                    {% endwith %}
                                     {% if assignment.is_verified %}
                                     <span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-red-200">
                                         Контрольная
@@ -831,6 +837,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            const palette = [
+                { bg: '#EEF2FF', fg: '#4F46E5' },
+                { bg: '#ECFDF5', fg: '#10B981' },
+                { bg: '#FFF7ED', fg: '#F97316' },
+                { bg: '#FDF2F8', fg: '#DB2777' },
+                { bg: '#EFF6FF', fg: '#2563EB' },
+                { bg: '#F5F3FF', fg: '#7C3AED' },
+                { bg: '#FFFBEB', fg: '#D97706' },
+                { bg: '#F0FDFA', fg: '#0D9488' },
+            ];
+            const assignmentColor = (studentSeq) => {
+                const n = parseInt(studentSeq || 0, 10) || 0;
+                if (n <= 0) return { bg: '#E5E7EB', fg: '#6B7280' };
+                return palette[n % palette.length];
+            };
+            const assignmentCode = (studentSeq) => {
+                const n = parseInt(studentSeq || 0, 10) || 0;
+                if (n <= 0) return '';
+                return `#${String(n).padStart(3, '0')}`;
+            };
+
             assignments.forEach((a, idx) => {
                 const isVerified = !!a.is_verified;
                 const due = fmtDate(a.due_date);
@@ -849,6 +876,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = document.createElement('div');
                 row.className = 'p-5 border-b border-gray-100 flex items-center hover:bg-gray-50 transition';
                 row.setAttribute('data-assignment-id', String(a.id));
+                const code = assignmentCode(a.student_seq);
+                const color = assignmentColor(a.student_seq);
                 row.innerHTML = `
                     <div class="w-12 h-12 ${isVerified ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'} rounded-full flex items-center justify-center text-xl shrink-0 relative">
                         <i class="fas fa-file-alt"></i>
@@ -861,6 +890,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="ml-4 flex-1">
                         <div class="flex items-center space-x-2">
                             <h4 class="font-bold text-gray-800">${a.title || ''}</h4>
+                            ${code ? `<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background: ${color.fg};"></span><span class="text-[11px] font-bold" style="color: ${color.fg};">${code}</span></span>` : ''}
                             ${isVerified ? `<span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-red-200">Контрольная</span>` : ''}
                             ${dueBadge}
                             ${replies ? `<a href="/student/history/" class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">Ответы: ${replies}</a>` : ''}
@@ -894,7 +924,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const changed = idsNow.length !== idsNew.length || idsNow.some((id, i) => id !== idsNew[i]);
                 if (changed) render(assignments);
             } catch (e) {
-                // silent
             } finally {
                 inFlight = false;
             }
