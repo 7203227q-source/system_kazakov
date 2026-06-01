@@ -51,6 +51,34 @@ def _mark_tutor_questions_seen(tutor, submissions_qs):
         submission__assignment__tutor=tutor,
     ).update(seen_by_tutor_at=now)
 
+
+def _ensure_student_assignment_seqs(student):
+    from django.db import transaction
+
+    with transaction.atomic():
+        max_seq = (
+            Assignment.objects.select_for_update()
+            .filter(student=student, student_seq__isnull=False)
+            .aggregate(m=models.Max("student_seq"))
+            .get("m")
+            or 0
+        )
+
+        to_update = list(
+            Assignment.objects.select_for_update()
+            .filter(student=student, student_seq__isnull=True, is_deleted=False)
+            .order_by("created_at", "id")
+        )
+        if not to_update:
+            return
+
+        seq = int(max_seq) + 1
+        for a in to_update:
+            a.student_seq = seq
+            seq += 1
+
+        Assignment.objects.bulk_update(to_update, ["student_seq"])
+
 @login_required
 def admin_system_status(request):
     """Страница мониторинга системы и API ключей для Администратора"""
@@ -1029,6 +1057,8 @@ def student_dashboard(request):
     """Дашборд Ученика"""
     if request.user.role != 'student':
         return redirect('login')
+
+    _ensure_student_assignment_seqs(request.user)
         
     if request.method == 'POST' and 'invite_code' in request.POST:
         code = request.POST.get('invite_code').strip().upper()
@@ -1620,6 +1650,9 @@ def student_solve_assignment(request, assignment_id):
         return redirect('student_dashboard')
         
     assignment = get_object_or_404(Assignment, id=assignment_id, student=request.user, is_deleted=False)
+    if assignment.student_seq is None:
+        _ensure_student_assignment_seqs(request.user)
+        assignment.refresh_from_db()
 
     auto_expire_assignment_if_needed(assignment)
 
@@ -3978,7 +4011,7 @@ def tutor_create_assignment(request):
             request.session['saved_assignment_form'] = dict(request.POST)
             return redirect('tutor_create_assignment')
 
-        # Определяем student_seq для автосгенерированного названия (если пользователь не указал title вручную)
+        # Определяем student_seq для нового варианта
         max_seq = Assignment.objects.filter(student=student).aggregate(m=models.Max('student_seq'))['m'] or 0
         seq_num = (max_seq or 0) + 1
 
@@ -3987,7 +4020,7 @@ def tutor_create_assignment(request):
             student=student,
             title=_title_for_seq(seq_num, 1),
             kind=kind,
-            student_seq=(seq_num if not title_input else None),
+            student_seq=seq_num,
             is_draft=True,
             exam_format=exam_format,
         )
@@ -5523,6 +5556,9 @@ from django.views.decorators.csrf import csrf_exempt
 @csrf_exempt
 def mobile_upload_draft(request, token):
     submission = get_object_or_404(Submission, upload_token=token)
+    if submission.assignment_id and submission.assignment.student_seq is None:
+        _ensure_student_assignment_seqs(submission.assignment.student)
+        submission.assignment.refresh_from_db()
     if request.method == 'POST':
         image = request.FILES.get('image')
         image2 = request.FILES.get('image2')
@@ -7208,6 +7244,8 @@ def api_student_pending_assignments(request):
     if request.user.role != "student":
         return JsonResponse({"error": "forbidden"}, status=403)
 
+    _ensure_student_assignment_seqs(request.user)
+
     qs = Assignment.objects.filter(student=request.user, is_draft=False, is_completed=False, is_deleted=False)
     subject_id_raw = (request.GET.get("subject_id") or "").strip()
     if subject_id_raw.isdigit():
@@ -7254,6 +7292,7 @@ def api_student_pending_assignments(request):
             due_status = "urgent"
         items.append({
             "id": a.id,
+            "student_seq": a.student_seq,
             "title": a.title,
             "due_date": a.due_date.isoformat() if a.due_date else None,
             "due_status": due_status,

@@ -1,4 +1,4 @@
-{% load ui_datetime json_extras %}
+{% load ui_datetime json_extras assignment_ui %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -36,7 +36,15 @@
     <div class="max-w-4xl mx-auto">
         <div class="flex justify-between items-center mb-8">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800">{{ assignment.title }}</h1>
+                <h1 class="text-2xl font-bold text-gray-800">
+                    <span>{{ assignment.title }}</span>
+                    {% with ac=assignment.student_seq|assignment_color %}
+                    <span class="inline-flex items-center gap-1 ml-2 align-middle">
+                        <span class="w-2 h-2 rounded-full" style="background: {{ ac.fg }};"></span>
+                        <span class="text-[11px] font-bold" style="color: {{ ac.fg }};">{{ assignment.student_seq|assignment_code }}</span>
+                    </span>
+                    {% endwith %}
+                </h1>
                 <p class="text-sm text-gray-500">От репетитора: {{ assignment.tutor.get_full_name|default:assignment.tutor.username }}</p>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     {% if assignment.due_date %}
