@@ -604,16 +604,14 @@ def login_view(request):
     Авторизация.
     """
     if request.method == 'POST':
-        username = request.POST.get('username', '')
-        password = request.POST.get('password', '')
-        
-        # Для простоты тестов, если пароль не передан, попробуем '1'
-        if not password:
-            password = '1'
+        username = (request.POST.get('username') or '').strip()
+        password = request.POST.get('password') or ''
+        remember_me = (request.POST.get("remember_me") or "").strip().lower() in {"1", "true", "on", "yes"}
             
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
+            request.session.set_expiry(settings.SESSION_COOKIE_AGE if remember_me else 0)
             if user.role == 'tutor':
                 return redirect('tutor_dashboard')
             elif user.role == 'parent':
