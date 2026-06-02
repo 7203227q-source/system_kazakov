@@ -4341,7 +4341,10 @@ def admin_task_regen_preview(request, task_id):
         from .openrouter_client import generate_task_regeneration
         result = generate_task_regeneration(task=task, mode=mode, model=model, prompt_template=prompt_template_effective)
         from .answer_format import normalize_regen_correct_answer
-        result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
+        try:
+            result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
+        except Exception:
+            pass
         preview_log = TaskGenerationLog.objects.create(
             task=task,
             user=request.user,
@@ -4461,7 +4464,10 @@ def admin_task_regen_apply(request, task_id):
                 prompt_template=prompt_template_effective,
             )
         from .answer_format import normalize_regen_correct_answer
-        result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
+        try:
+            result["correct_answer"] = normalize_regen_correct_answer(notes=result.get("notes") or "")
+        except Exception:
+            pass
     except Exception as e:
         TaskGenerationLog.objects.create(
             task=task,
@@ -6470,18 +6476,14 @@ def api_verify_with_ai(request, submission_id):
                 recognition_confidence is not None and recognition_confidence < 0.35
             )
             if gate_fail:
-                ai = {
-                    "primary_score": 0,
-                    "is_correct": False,
-                    "feedback": "",
-                    "recognized_solution": recognized_solution,
-                    "mistakes": [],
-                    "verdict": [],
-                    "photo_valid": photo_valid,
-                    "photo_valid_reason": photo_valid_reason,
-                    "recognition_confidence": recognition_confidence,
-                    "score_breakdown": [],
-                }
+                parsed_1 = dict(parsed_1 or {})
+                parsed_1["recognized_solution"] = recognized_solution
+                parsed_1["photo_valid"] = photo_valid
+                parsed_1["photo_valid_reason"] = photo_valid_reason
+                parsed_1["recognition_confidence"] = recognition_confidence
+                parsed_1.setdefault("primary_score", 0)
+                parsed_1.setdefault("is_correct", False)
+                ai = parse_ai_photo_verdict(parsed_1, max_points, confidence_threshold=0.35)
             else:
                 grade_model = model
                 try:

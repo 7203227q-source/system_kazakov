@@ -45,5 +45,5 @@ class EGEPhysicsStructureTests(TestCase):
             data={"action": "finish", f"answer_{self.task_test2.id}": "1"},
             follow=False,
         )
-        self.assertIn(res.status_code, (302, 303))
-
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Завершить всё равно", res.content.decode("utf-8"))

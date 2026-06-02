@@ -33,8 +33,8 @@ class MobileUploadSecondPageTests(TestCase):
         img = SimpleUploadedFile("a.png", b"\x89PNG\r\n\x1a\n", content_type="image/png")
         sub = Submission.objects.create(student=student, task=task, image_url=img)
 
+        self.client.force_login(student)
         r = self.client.get(reverse("api_submission_status", args=[sub.id]))
         self.assertEqual(r.status_code, 200)
         data = r.json()
         self.assertIn("image_url_2", data)
-
