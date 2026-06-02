@@ -88,7 +88,15 @@
                             <div class="flex justify-between items-center bg-gray-50 p-2 rounded">
                                 <span class="font-bold text-gray-700 text-sm">{{ profile.subject.name }}</span>
                                 <div class="flex items-center space-x-2">
-                                    <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold" title="Текущий прогноз ИИ">Прогноз: {{ profile.latest_snapshot.predicted_exam_score|default:"-" }}</span>
+                                    {% if profile.exam_display %}
+                                        <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold" title="Текущий прогноз ИИ">
+                                            Прогноз: {{ profile.exam_display.pred_primary }}/{{ profile.exam_display.max_primary }} ({{ profile.latest_snapshot.predicted_exam_score|default:"-" }}/100)
+                                        </span>
+                                    {% else %}
+                                        <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold" title="Текущий прогноз ИИ">
+                                            Прогноз: {{ profile.latest_snapshot.predicted_exam_score|default:"-" }}
+                                        </span>
+                                    {% endif %}
                                     <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-bold" title="Целевой балл">Цель: {{ profile.target_score }}</span>
                                 </div>
                             </div>

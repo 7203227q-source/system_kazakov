@@ -5210,11 +5210,62 @@ def parent_dashboard(request):
             messages.error(request, "Ученик с таким кодом не найден.")
         return redirect('parent_dashboard')
         
-    children = request.user.children.all().prefetch_related('subject_profiles', 'subject_profiles__subject')
-    
+    children = request.user.children.all().prefetch_related(
+        "subject_profiles__subject",
+        "subject_profiles__exam_format",
+    )
+
+    subject_ids_need_format = set()
     for child in children:
         for profile in child.subject_profiles.all():
-            profile.latest_snapshot = DailySnapshot.objects.filter(student=child, subject=profile.subject).order_by('-date').first()
+            if not getattr(profile, "exam_format_id", None):
+                subject_ids_need_format.add(int(profile.subject_id))
+
+    active_exam_format_by_subject = {}
+    fallback_exam_format_by_subject = {}
+    if subject_ids_need_format:
+        for ef in (
+            ExamFormat.objects.filter(subject_id__in=list(subject_ids_need_format), is_active=True)
+            .order_by("subject_id", "-year", "name")
+            .only("id", "subject_id", "is_active", "year", "name")
+        ):
+            sid = int(ef.subject_id)
+            if sid not in active_exam_format_by_subject:
+                active_exam_format_by_subject[sid] = ef
+        for ef in (
+            ExamFormat.objects.filter(subject_id__in=list(subject_ids_need_format))
+            .order_by("subject_id", "-is_active", "-year", "name")
+            .only("id", "subject_id", "is_active", "year", "name")
+        ):
+            sid = int(ef.subject_id)
+            if sid not in fallback_exam_format_by_subject:
+                fallback_exam_format_by_subject[sid] = ef
+
+    for child in children:
+        for profile in child.subject_profiles.all():
+            profile.latest_snapshot = DailySnapshot.objects.filter(student=child, subject=profile.subject).order_by("-date").first()
+            profile.exam_display = None
+            try:
+                from core.exam_scoring import primary_from_percent
+
+                snap = getattr(profile, "latest_snapshot", None)
+                if not snap:
+                    continue
+
+                ef = getattr(profile, "exam_format", None) or active_exam_format_by_subject.get(int(profile.subject_id)) or fallback_exam_format_by_subject.get(int(profile.subject_id))
+                scale = getattr(ef, "score_scale", None) if ef else None
+                if not scale:
+                    continue
+                max_primary = int(getattr(scale, "max_primary_score", 0) or 0)
+                if max_primary <= 0:
+                    continue
+
+                profile.exam_display = {
+                    "max_primary": max_primary,
+                    "pred_primary": primary_from_percent(snap.predicted_exam_score, max_primary),
+                }
+            except Exception:
+                profile.exam_display = None
             
     selected_child_id = request.GET.get('child_id')
     selected_child = None

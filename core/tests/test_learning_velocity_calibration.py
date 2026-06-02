@@ -84,8 +84,8 @@ class LearningVelocityCalibrationTests(TestCase):
         self.assertIn(res.status_code, (302, 303))
 
         self.profile.refresh_from_db()
-        # err=+50, k=0.25 => 0.125, clamp => 0.10, warmup(0) => *0.3 => 0.03
-        self.assertAlmostEqual(float(self.profile.learning_velocity), 1.03, places=3)
+        # err=+50, k=0.15 => 0.075, clamp => 0.06, warmup(0) => *0.3 => 0.018
+        self.assertAlmostEqual(float(self.profile.learning_velocity), 1.018, places=3)
 
         a.refresh_from_db()
         self.assertIsNotNone(getattr(a, "learning_velocity_calibrated_at", None))
@@ -113,5 +113,5 @@ class LearningVelocityCalibrationTests(TestCase):
         self.assertTrue(calibrate_learning_velocity_for_assignment(a))
 
         self.profile.refresh_from_db()
-        # 0.03 * deadline_weight(0.2) => 0.006
-        self.assertAlmostEqual(float(self.profile.learning_velocity), 1.006, places=3)
+        # 0.018 * deadline_weight(0.2) => 0.0036
+        self.assertAlmostEqual(float(self.profile.learning_velocity), 1.0036, places=4)
