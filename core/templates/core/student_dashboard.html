@@ -134,6 +134,9 @@
                                     {{ exam_display.pred_primary }}/{{ exam_display.max_primary }}
                                     <span class="text-base text-gray-500">(оценка {{ exam_display.pred_grade }})</span>
                                 </h3>
+                                <div class="text-sm text-gray-500 mt-1">
+                                    ≈ {{ latest_snapshot.predicted_exam_score|default:"-" }}/100
+                                </div>
                             {% else %}
                                 <h3 class="text-3xl font-bold text-primary">{{ latest_snapshot.predicted_exam_score|default:"-" }}<span class="text-lg text-gray-400">/100</span></h3>
                             {% endif %}

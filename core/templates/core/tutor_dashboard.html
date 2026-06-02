@@ -380,7 +380,7 @@
                                     <span class="font-bold text-gray-700 text-sm">{{ profile.subject.name }}</span>
                                     {% if profile.exam_display %}
                                         <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">
-                                            Прогноз: {{ profile.exam_display.pred_primary }}/{{ profile.exam_display.max_primary }} (оценка {{ profile.exam_display.pred_grade }})
+                                            Прогноз: {{ profile.exam_display.pred_primary }}/{{ profile.exam_display.max_primary }} ({{ profile.latest_snapshot.predicted_exam_score|default:"-" }}/100, оценка {{ profile.exam_display.pred_grade }})
                                         </span>
                                     {% else %}
                                         <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-bold">Прогноз: {{ profile.latest_snapshot.predicted_exam_score|default:"-" }}</span>

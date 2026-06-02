@@ -6,6 +6,33 @@ import random
 
 ALPHA = 0.25  # Коэффициент экспоненциального сглаживания (EMA)
 
+RECENT_SHRINK_K = 10.0
+TREND_HORIZON_DAYS = 30
+TREND_MAX_DELTA = 20.0
+PRED_SMOOTH_BETA = 0.35
+PRED_MAX_STEP_UP = 6.0
+PRED_MAX_STEP_DOWN = 8.0
+
+
+def _clamp(x: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, float(x)))
+
+
+def _shrink_recent_perf(*, current_mastery: float, recent_perf: float, recent_weight: float) -> float:
+    rm = float(current_mastery or 0.0)
+    rp = float(recent_perf or 0.0)
+    rw = max(0.0, float(recent_weight or 0.0))
+    w = rw / (rw + float(RECENT_SHRINK_K))
+    return rm + w * (rp - rm)
+
+
+def _smooth_prediction(*, prev_pred: float, raw_pred: float) -> float:
+    prev = float(prev_pred or 0.0)
+    raw = float(raw_pred or 0.0)
+    pred = (float(PRED_SMOOTH_BETA) * raw) + ((1.0 - float(PRED_SMOOTH_BETA)) * prev)
+    return _clamp(pred, prev - float(PRED_MAX_STEP_DOWN), prev + float(PRED_MAX_STEP_UP))
+
+
 def touch_subject_streak(student, subject, *, today=None):
     """
     Обновляет стрик по предмету (StudentSubjectProfile) 1 раз в день.
@@ -176,16 +203,20 @@ def update_student_analytics(student, subject):
             total_w += w
         recent_perf = (total / total_w) if total_w > 0 else None
 
-    blended_mastery = float(current_mastery)
+    current_mastery_f = float(current_mastery or 0.0)
+    blended_mastery = float(current_mastery_f)
     perf_delta = 0.0
     if recent_perf is not None:
-        blended_mastery = 0.7 * float(current_mastery) + 0.3 * float(recent_perf)
-        perf_delta = float(recent_perf) - float(current_mastery)
+        recent_weight = float(total_w)
+        recent_adj = _shrink_recent_perf(
+            current_mastery=float(current_mastery_f),
+            recent_perf=float(recent_perf),
+            recent_weight=float(recent_weight),
+        )
+        blended_mastery = 0.7 * float(current_mastery_f) + 0.3 * float(recent_adj)
+        perf_delta = float(recent_perf) - float(current_mastery_f)
 
     predicted_score = blended_mastery * float(profile.learning_velocity or 1.0)
-
-    def _clamp(x: float, lo: float, hi: float) -> float:
-        return max(lo, min(hi, x))
 
     exam_date = getattr(profile, "exam_date", None)
     if exam_date and exam_date >= today:
@@ -204,8 +235,22 @@ def update_student_analytics(student, subject):
                 slope = (float(m1 or 0.0) - float(m0 or 0.0)) / float(span)
                 # Если текущий перформанс выше/ниже мастерства — усиливаем/ослабляем тренд.
                 slope *= (1.0 + _clamp(perf_delta / 50.0, -0.5, 0.5))
-                projected_mastery = float(blended_mastery) + slope * float(days_left)
+                h = min(int(days_left), int(TREND_HORIZON_DAYS))
+                trend_delta = _clamp(slope * float(h), -float(TREND_MAX_DELTA), float(TREND_MAX_DELTA))
+                projected_mastery = float(blended_mastery) + float(trend_delta)
                 predicted_score = projected_mastery * float(profile.learning_velocity or 1.0)
+
+    prev = (
+        DailySnapshot.objects.filter(student=student, subject=subject, date__lt=today)
+        .order_by("-date")
+        .values_list("predicted_exam_score", flat=True)
+        .first()
+    )
+    raw_pred = float(predicted_score)
+    if prev is not None and float(prev) >= 20.0:
+        predicted_score = _smooth_prediction(prev_pred=float(prev), raw_pred=raw_pred)
+    else:
+        predicted_score = raw_pred
 
     predicted_score = _clamp(float(predicted_score), 0.0, 100.0)
     
@@ -349,11 +394,11 @@ def calibrate_learning_velocity_for_assignment(assignment: Assignment) -> bool:
     base_weight = 1.0 if assignment.is_verified else (0.5 * float(getattr(profile, "trust_factor", 0.6) or 0.6))
 
     # Базовый коэффициент (насколько быстро адаптируемся к err).
-    k = 0.25
+    k = 0.15
     delta = (k * err) / 100.0
 
     # Ограничение шага за один пересчёт.
-    delta = max(-0.10, min(0.10, float(delta)))
+    delta = max(-0.06, min(0.06, float(delta)))
 
     # Прогрев (warm-up): первые калибровки — заметно мягче.
     n = Assignment.objects.filter(
@@ -380,7 +425,7 @@ def calibrate_learning_velocity_for_assignment(assignment: Assignment) -> bool:
 
     old_lv = float(getattr(profile, "learning_velocity", 1.0) or 1.0)
     new_lv = old_lv + float(delta)
-    new_lv = max(0.5, min(1.5, float(new_lv)))
+    new_lv = max(0.7, min(1.3, float(new_lv)))
 
     profile.learning_velocity = float(new_lv)
     profile.save(update_fields=["learning_velocity"])
