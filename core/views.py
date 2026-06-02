@@ -1191,8 +1191,10 @@ def student_dashboard(request):
     chart_predictions = []
     
     if active_profile:
-        snapshots = DailySnapshot.objects.filter(student=request.user, subject=active_profile.subject).order_by('date')[:30]
-        for s in snapshots:
+        snapshots = list(
+            DailySnapshot.objects.filter(student=request.user, subject=active_profile.subject).order_by("-date")[:30]
+        )
+        for s in reversed(snapshots):
             chart_dates.append(s.date.strftime('%d %b'))
             chart_mastery.append(s.current_mastery)
             chart_predictions.append(s.predicted_exam_score)

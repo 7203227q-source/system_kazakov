@@ -123,7 +123,7 @@ def update_student_analytics(student, subject):
         is_anomaly=False
     ).order_by('created_at')
     
-    current_mastery = 0.0
+    current_mastery = None
     
     for log in recent_logs:
         # Нормализуем score задачи к 100-балльной шкале (условно, 1 балл = 100% успеха для задачи в 1 балл)
@@ -136,10 +136,10 @@ def update_student_analytics(student, subject):
         
         effective_score = task_success_rate * weight
         
-        if current_mastery == 0.0:
+        if current_mastery is None:
             current_mastery = effective_score
         else:
-            current_mastery = (effective_score * ALPHA) + (current_mastery * (1 - ALPHA))
+            current_mastery = (effective_score * ALPHA) + (float(current_mastery) * (1 - ALPHA))
             
     # 2. Обновление Daily Snapshot
     today = timezone.now().date()
@@ -209,7 +209,7 @@ def update_student_analytics(student, subject):
 
     predicted_score = _clamp(float(predicted_score), 0.0, 100.0)
     
-    snapshot.current_mastery = round(current_mastery, 2)
+    snapshot.current_mastery = round(float(current_mastery or 0.0), 2)
     snapshot.predicted_exam_score = round(predicted_score, 2)
     
     # 4. Анализ разрыва (Gap Analysis)
