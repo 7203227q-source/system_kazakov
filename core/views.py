@@ -631,6 +631,16 @@ def login_view(request):
     """
     Авторизация.
     """
+    social_google_enabled = False
+    try:
+        from allauth.socialaccount.models import SocialApp
+        from django.contrib.sites.shortcuts import get_current_site
+
+        site = get_current_site(request)
+        social_google_enabled = SocialApp.objects.filter(provider="google", sites=site).exists()
+    except Exception:
+        social_google_enabled = False
+
     if request.method == 'POST':
         username = (request.POST.get('username') or '').strip()
         password = request.POST.get('password') or ''
@@ -649,9 +659,13 @@ def login_view(request):
             else:
                 return redirect('student_dashboard')
         else:
-            return render(request, 'core/login.html', {'error': 'Неверный логин или пароль'})
+            return render(
+                request,
+                'core/login.html',
+                {'error': 'Неверный логин или пароль', 'social_google_enabled': social_google_enabled},
+            )
             
-    return render(request, 'core/login.html')
+    return render(request, 'core/login.html', {'social_google_enabled': social_google_enabled})
 
 
 def _physics_kim_ref_flags(*, subject_name: str, exam_format_name: str):
