@@ -26,6 +26,8 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
         .order_by("created_at")
         .values_list(
             "created_at",
+            "tutor_scored_at",
+            "ai_last_verify_at",
             "task_id",
             "is_correct",
             "tutor_primary_score",
@@ -37,8 +39,9 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
     )
 
     last_by_day_task: dict[tuple, tuple[float, float]] = {}
-    for created_at, task_id, is_correct, tutor_primary_score, primary_score, score, task_exam_points, task_type_max_points in qs:
-        d = created_at.date()
+    for created_at, tutor_scored_at, ai_last_verify_at, task_id, is_correct, tutor_primary_score, primary_score, score, task_exam_points, task_type_max_points in qs:
+        dt = tutor_scored_at or ai_last_verify_at or created_at
+        d = dt.date()
         if d < start or d > today:
             continue
         mp = float(int(task_exam_points or 0) if int(task_exam_points or 0) > 0 else int(task_type_max_points or 1))

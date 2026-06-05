@@ -74,6 +74,30 @@ class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
         self.assertEqual(int(data["correct"][idx]), 1)
         self.assertEqual(int(data["incorrect"][idx]), 0)
 
+    def test_weekly_chart_uses_scoring_timestamp_for_extended_submissions(self):
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        old_day = today - timedelta(days=10)
+        tz = timezone.get_current_timezone()
+
+        sub = Submission.objects.create(
+            student=self.student,
+            task=self.task,
+            is_correct=True,
+        )
+        Submission.objects.filter(id=sub.id).update(
+            created_at=timezone.make_aware(datetime.combine(old_day, time(10, 0)), tz),
+            ai_last_verify_at=timezone.make_aware(datetime.combine(yesterday, time(20, 0)), tz),
+        )
+
+        res = self.client.get(reverse("student_dashboard"), {"subject_id": self.subject.id})
+        self.assertEqual(res.status_code, 200)
+
+        data = json.loads(res.context["weekly_solved_chart_data"])
+        idx = data["labels"].index(yesterday.strftime("%d %b"))
+        self.assertEqual(int(data["correct"][idx]), 1)
+        self.assertEqual(int(data["incorrect"][idx]), 0)
+
     def test_dashboard_provides_submission_summary_for_active_subject(self):
         Submission.objects.create(student=self.student, task=self.task, is_correct=False)
         Submission.objects.create(student=self.student, task=self.task, is_correct=True)
