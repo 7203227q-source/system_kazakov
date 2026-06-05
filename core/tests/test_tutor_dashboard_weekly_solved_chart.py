@@ -52,3 +52,37 @@ class TutorDashboardWeeklySolvedChartTests(TestCase):
         self.assertEqual(data["incorrect"][idx_d2], 0)
         self.assertEqual(data["correct"][idx_d1], 0)
         self.assertEqual(data["incorrect"][idx_d1], 1)
+
+    def test_weekly_chart_counts_extended_score_on_scored_at_day(self):
+        tutor = User.objects.create_user(username="t", password="pass", role="tutor")
+        student = User.objects.create_user(username="s", password="pass", role="student")
+        tutor.students.add(student)
+
+        subj = Subject.objects.create(name="Физика")
+        ef = ExamFormat.objects.create(subject=subj, name="ЕГЭ", year=2026, is_active=True)
+        StudentSubjectProfile.objects.create(student=student, subject=subj, exam_format=ef)
+
+        topic = Topic.objects.create(subject=subj, name="T")
+        tt = TaskType.objects.create(exam_format=ef, number=30, name="30", max_points=3, is_extended_answer=True)
+        task = Task.objects.create(topic=topic, task_type=tt, correct_answer="x", difficulty=10, exam_points=3)
+
+        today = timezone.localdate()
+        yesterday = today - timezone.timedelta(days=1)
+        old_day = today - timezone.timedelta(days=10)
+        tz = timezone.get_current_timezone()
+
+        sub = Submission.objects.create(student=student, task=task, is_correct=None, score=2)
+        Submission.objects.filter(id=sub.id).update(
+            created_at=timezone.make_aware(datetime.combine(old_day, time(10, 0)), tz),
+            tutor_scored_at=timezone.make_aware(datetime.combine(yesterday, time(18, 0)), tz),
+        )
+
+        self.client.login(username="t", password="pass")
+        res = self.client.get(reverse("tutor_dashboard"), {"student_id": student.id, "subject_id": subj.id})
+        self.assertEqual(res.status_code, 200)
+
+        data = json.loads(res.context["weekly_solved_chart_data"])
+        labels = data["labels"]
+        idx = next(i for i, x in enumerate(labels) if x.endswith(yesterday.strftime("%d.%m")))
+        self.assertEqual(int(data["correct"][idx]), 2)
+        self.assertEqual(int(data["incorrect"][idx]), 1)

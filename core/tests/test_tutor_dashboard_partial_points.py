@@ -61,3 +61,30 @@ class TutorDashboardPartialPointsTests(TestCase):
         self.assertEqual(int(weekly["correct"][-1]), 1)
         self.assertEqual(int(weekly["incorrect"][-1]), 2)
 
+    def test_score_field_is_counted_for_extended_partial_points(self):
+        now = timezone.now()
+
+        sub = Submission.objects.create(
+            student=self.student,
+            task=self.task,
+            is_correct=None,
+            score=1,
+        )
+        Submission.objects.filter(id=sub.id).update(created_at=now, tutor_scored_at=now)
+
+        self.client.login(username="t", password="pass")
+        res = self.client.get(reverse("tutor_dashboard"), {"student_id": self.student.id, "subject_id": self.subject.id})
+        self.assertEqual(res.status_code, 200)
+
+        tiles = list(res.context["task_type_rates"])
+        tile = next(t for t in tiles if int(t["number"]) == 1)
+
+        self.assertEqual(int(tile["total"]), 3)
+        self.assertEqual(int(tile["correct"]), 1)
+        self.assertEqual(int(round(float(tile["rate"] or 0.0))), 33)
+
+        self.assertEqual(int(round(float(res.context["student_correct_rate"] or 0.0))), 33)
+
+        weekly = json.loads(res.context["weekly_solved_chart_data"])
+        self.assertEqual(int(weekly["correct"][-1]), 1)
+        self.assertEqual(int(weekly["incorrect"][-1]), 2)

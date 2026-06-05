@@ -2900,7 +2900,7 @@ def tutor_dashboard(request):
                 ensure_ascii=False,
             )
 
-        def _earned_max_fraction(*, is_correct, tutor_primary_score, primary_score, task_exam_points, task_type_max_points):
+        def _earned_max_fraction(*, is_correct, tutor_primary_score, primary_score, score, task_exam_points, task_type_max_points):
             mp = int(task_exam_points or 0) if int(task_exam_points or 0) > 0 else int(task_type_max_points or 0)
             if mp <= 0:
                 mp = 1
@@ -2908,12 +2908,9 @@ def tutor_dashboard(request):
             if is_correct is True:
                 earned = float(mp)
             else:
-                if tutor_primary_score is not None:
-                    earned = float(tutor_primary_score)
-                elif primary_score is not None:
-                    earned = float(primary_score)
-                else:
-                    earned = 0.0
+                v = tutor_primary_score if tutor_primary_score is not None else primary_score
+                v = v if v is not None else score
+                earned = float(v or 0.0)
 
             if earned < 0.0:
                 earned = 0.0
@@ -2938,33 +2935,39 @@ def tutor_dashboard(request):
             qs = (
                 Submission.objects.filter(
                     student=selected_student,
-                    created_at__date__gte=start_week,
-                    created_at__date__lte=today,
                 )
                 .filter(task__topic__subject_id=chart_subject_id)
-                .filter(Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False))
+                .filter(Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False) | Q(score__isnull=False))
                 .order_by("created_at")
                 .values_list(
                     "created_at",
+                    "tutor_scored_at",
+                    "ai_last_verify_at",
                     "task_id",
                     "is_correct",
                     "tutor_primary_score",
                     "primary_score",
+                    "score",
                     "task__exam_points",
                     "task__task_type__max_points",
                 )
             )
 
             last_by_day_task: dict[tuple, tuple[float, int]] = {}
-            for created_at, task_id, is_correct, tutor_primary_score, primary_score, task_exam_points, task_type_max_points in qs:
+            for created_at, tutor_scored_at, ai_last_verify_at, task_id, is_correct, tutor_primary_score, primary_score, score, task_exam_points, task_type_max_points in qs:
+                dt = tutor_scored_at or ai_last_verify_at or created_at
+                d = dt.date()
+                if d < start_week or d > today:
+                    continue
                 earned, mp, _ = _earned_max_fraction(
                     is_correct=is_correct,
                     tutor_primary_score=tutor_primary_score,
                     primary_score=primary_score,
+                    score=score,
                     task_exam_points=task_exam_points,
                     task_type_max_points=task_type_max_points,
                 )
-                last_by_day_task[(created_at.date(), int(task_id))] = (float(earned), int(mp))
+                last_by_day_task[(d, int(task_id))] = (float(earned), int(mp))
 
             by_day: dict = {}
             for (d, _tid), v in last_by_day_task.items():
@@ -3055,7 +3058,9 @@ def tutor_dashboard(request):
         if active_exam_format:
             submissions_base = submissions_base.filter(task__task_type__exam_format=active_exam_format)
         submissions_base = submissions_base.exclude(task__task_type__number__isnull=True)
-        submissions_base = submissions_base.filter(Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False))
+        submissions_base = submissions_base.filter(
+            Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False) | Q(score__isnull=False)
+        )
 
         last_sub = submissions_base.filter(task_id=OuterRef("task_id")).order_by("-created_at")
         latest_rows = (
@@ -3068,9 +3073,12 @@ def tutor_dashboard(request):
             .distinct()
             .annotate(
                 last_created_at=Subquery(last_sub.values("created_at")[:1]),
+                last_tutor_scored_at=Subquery(last_sub.values("tutor_scored_at")[:1]),
+                last_ai_last_verify_at=Subquery(last_sub.values("ai_last_verify_at")[:1]),
                 last_is_correct=Subquery(last_sub.values("is_correct")[:1]),
                 last_tutor_primary_score=Subquery(last_sub.values("tutor_primary_score")[:1]),
                 last_primary_score=Subquery(last_sub.values("primary_score")[:1]),
+                last_score=Subquery(last_sub.values("score")[:1]),
             )
         )
 
@@ -3080,7 +3088,7 @@ def tutor_dashboard(request):
             n_raw = r.get("task__task_type__number")
             if n_raw is None:
                 continue
-            dt = r.get("last_created_at")
+            dt = r.get("last_tutor_scored_at") or r.get("last_ai_last_verify_at") or r.get("last_created_at")
             if not dt:
                 continue
             age_days = (today - dt.date()).days
@@ -3092,6 +3100,7 @@ def tutor_dashboard(request):
                 is_correct=r.get("last_is_correct"),
                 tutor_primary_score=r.get("last_tutor_primary_score"),
                 primary_score=r.get("last_primary_score"),
+                score=r.get("last_score"),
                 task_exam_points=r.get("task__exam_points"),
                 task_type_max_points=r.get("task__task_type__max_points"),
             )
@@ -3107,7 +3116,7 @@ def tutor_dashboard(request):
         from django.db.models.functions import Cast, Coalesce
 
         scored_submissions = submissions_subject.filter(
-            Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False)
+            Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False) | Q(score__isnull=False)
         )
 
         max_points_expr = Case(
@@ -3118,7 +3127,7 @@ def tutor_dashboard(request):
 
         earned_expr = Case(
             When(is_correct=True, then=Cast(max_points_expr, FloatField())),
-            default=Coalesce("tutor_primary_score", "primary_score", Value(0)),
+            default=Coalesce("tutor_primary_score", "primary_score", "score", Value(0)),
             output_field=FloatField(),
         )
 
