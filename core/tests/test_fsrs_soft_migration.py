@@ -1,8 +1,11 @@
+from datetime import timedelta
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.utils import timezone
 
 from core.models import ExamFormat, SpacedRepetition, Subject, Task, TaskType, Topic, User
-from core.services import process_task_submission
+from core.services import process_srs_review, process_task_submission
 
 
 class FSRSSoftMigrationTests(TestCase):
@@ -56,3 +59,20 @@ class FSRSSoftMigrationTests(TestCase):
         self.assertEqual(rec.srs_algorithm, "fsrs")
         self.assertIsInstance(rec.fsrs_state, dict)
         self.assertTrue(rec.fsrs_state)
+
+    def test_process_srs_review_falls_back_safely_when_fsrs_review_fails(self):
+        rec = SpacedRepetition.objects.create(
+            student=self.student,
+            task=self.task,
+            next_review_date=timezone.localdate(),
+        )
+        before = timezone.now()
+
+        with patch("core.services.review_card", side_effect=RuntimeError("boom")):
+            process_srs_review(rec, grade=1, active_time_seconds=75, attempt_count=2)
+
+        rec.refresh_from_db()
+        self.assertEqual(rec.last_grade, 1)
+        self.assertIsNotNone(rec.last_reviewed_at)
+        self.assertGreaterEqual(rec.last_reviewed_at, before)
+        self.assertEqual(rec.next_review_date, timezone.localdate() + timedelta(days=1))

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db import models
 from django.utils import timezone
@@ -90,9 +90,23 @@ def determine_fsrs_signal(*, is_correct, active_time_seconds, attempt_count, exp
 
 
 def process_srs_review(srs_record, grade, *, active_time_seconds=None, attempt_count=1):
-    """
-    Обновляет запись интервального повторения через FSRS-обертку.
-    """
+    """Обновляет запись интервального повторения через FSRS-обертку."""
+    try:
+        return _process_fsrs_review(
+            srs_record,
+            grade=grade,
+            active_time_seconds=active_time_seconds,
+            attempt_count=attempt_count,
+        )
+    except Exception:
+        srs_record.last_grade = int(grade)
+        srs_record.last_reviewed_at = timezone.now()
+        srs_record.next_review_date = timezone.localdate() + timedelta(days=1)
+        srs_record.save(update_fields=["last_grade", "last_reviewed_at", "next_review_date"])
+        return srs_record
+
+
+def _process_fsrs_review(srs_record, *, grade, active_time_seconds=None, attempt_count=1):
     is_correct = int(grade) >= 3
     expected_time_seconds = get_expected_time_seconds(srs_record.student)
     normalized_time = normalize_active_time_seconds(active_time_seconds)

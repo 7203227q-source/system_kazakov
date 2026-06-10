@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from unittest.mock import patch
 
 from core.models import (
     ExamFormat,
@@ -80,4 +81,25 @@ class StudentPracticeSrsActiveTimeTests(TestCase):
         self.assertEqual(
             TaskLog.objects.filter(student=self.student, task=self.task).latest("id").time_spent,
             60,
+        )
+
+    def test_practice_submit_srs_passes_default_review_context(self):
+        self.client.force_login(self.student)
+
+        with patch("core.views.process_task_submission") as process_task_submission:
+            res = self.client.post(
+                reverse("student_practice_submit", args=[self.task.id]),
+                {
+                    "answer": "7",
+                    "mode": "srs",
+                },
+            )
+
+        self.assertEqual(res.status_code, 302)
+        process_task_submission.assert_called_once_with(
+            self.student,
+            self.task,
+            5,
+            active_time_seconds=60,
+            attempt_count=1,
         )

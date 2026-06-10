@@ -2182,7 +2182,13 @@ def student_practice_submit(request, task_id):
 
     if mode == 'srs':
         try:
-            process_task_submission(request.user, task, grade)
+            process_task_submission(
+                request.user,
+                task,
+                grade,
+                active_time_seconds=60,
+                attempt_count=1,
+            )
         except Exception:
             pass
 
@@ -6678,7 +6684,13 @@ def api_verify_with_ai(request, submission_id):
             srs_exists = SpacedRepetition.objects.filter(student=request.user, task=task).exists()
             if srs_exists or int(points_earned or 0) < int(max_points_effective or 0):
                 grade = 5 if int(points_earned or 0) >= int(max_points_effective or 0) else 1
-                process_task_submission(request.user, task, grade)
+                process_task_submission(
+                    request.user,
+                    task,
+                    grade,
+                    active_time_seconds=60,
+                    attempt_count=1,
+                )
         except Exception:
             pass
 
@@ -7248,7 +7260,13 @@ def api_tutor_verify_with_ai(request, submission_id):
             srs_exists = SpacedRepetition.objects.filter(student=student, task=task).exists()
             if srs_exists or int(points_earned or 0) < int(max_points_effective or 0):
                 grade = 5 if int(points_earned or 0) >= int(max_points_effective or 0) else 1
-                process_task_submission(student, task, grade)
+                process_task_submission(
+                    student,
+                    task,
+                    grade,
+                    active_time_seconds=60,
+                    attempt_count=1,
+                )
         except Exception:
             pass
 

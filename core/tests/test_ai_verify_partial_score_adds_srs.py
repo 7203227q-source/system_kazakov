@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -34,7 +35,6 @@ class AIVerifyPartialScoreAddsSrsTests(TestCase):
             "choices": [{"message": {"content": json.dumps({"primary_score": 2, "is_correct": False, "feedback": "ok"})}}]
         }
 
-        from unittest.mock import patch
         with patch("core.views.requests.post") as post:
             post.return_value.status_code = 200
             post.return_value.json.return_value = dummy_response
@@ -45,3 +45,24 @@ class AIVerifyPartialScoreAddsSrsTests(TestCase):
         self.assertEqual(res.status_code, 200, res.content)
         self.assertTrue(SpacedRepetition.objects.filter(student=self.student, task=self.task).exists())
 
+    def test_ai_verify_passes_review_context_to_srs_processing(self):
+        os.environ["OPENROUTER_API_KEY"] = "test"
+        dummy_response = {
+            "choices": [{"message": {"content": json.dumps({"primary_score": 2, "is_correct": False, "feedback": "ok"})}}]
+        }
+
+        with patch("core.views.requests.post") as post, patch("core.views.process_task_submission") as process_task_submission:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = dummy_response
+
+            self.client.force_login(self.student)
+            res = self.client.post(reverse("api_verify_with_ai", args=[self.submission.id]))
+
+        self.assertEqual(res.status_code, 200, res.content)
+        process_task_submission.assert_called_once_with(
+            self.student,
+            self.task,
+            1,
+            active_time_seconds=60,
+            attempt_count=1,
+        )
