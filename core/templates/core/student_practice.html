@@ -187,6 +187,8 @@
                                         <input type="hidden" name="task_id" value="{{ task.id }}">
                                         <input type="hidden" name="mode" value="{{ mode|default:'' }}">
                                         <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                                        <input type="hidden" name="active_time_seconds" value="0" data-active-time-seconds>
+                                        <input type="hidden" name="attempt_count" value="1" data-attempt-count>
                                         {% if active_subject_id %}
                                         <input type="hidden" name="subject_id" value="{{ active_subject_id }}">
                                         {% endif %}
@@ -241,6 +243,8 @@
                                     <input type="hidden" name="task_id" value="{{ task.id }}">
                                     <input type="hidden" name="mode" value="{{ mode|default:'' }}">
                                     <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                                    <input type="hidden" name="active_time_seconds" value="0" data-active-time-seconds>
+                                    <input type="hidden" name="attempt_count" value="1" data-attempt-count>
                                     {% if active_subject_id %}
                                     <input type="hidden" name="subject_id" value="{{ active_subject_id }}">
                                     {% endif %}
@@ -427,6 +431,8 @@
                                 <input type="hidden" name="task_id" value="{{ task.id }}">
                                 <input type="hidden" name="mode" value="{{ mode|default:'' }}">
                                 <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                                <input type="hidden" name="active_time_seconds" value="0" data-active-time-seconds>
+                                <input type="hidden" name="attempt_count" value="1" data-attempt-count>
                                 {% if active_subject_id %}
                                 <input type="hidden" name="subject_id" value="{{ active_subject_id }}">
                                 {% endif %}
@@ -441,6 +447,8 @@
                             <input type="hidden" name="task_id" value="{{ task.id }}">
                             <input type="hidden" name="mode" value="{{ mode|default:'' }}">
                             <input type="hidden" name="attempt_token" value="{{ attempt_token|default:'' }}">
+                            <input type="hidden" name="active_time_seconds" value="0" data-active-time-seconds>
+                            <input type="hidden" name="attempt_count" value="1" data-attempt-count>
                             {% if active_subject_id %}
                             <input type="hidden" name="subject_id" value="{{ active_subject_id }}">
                             {% endif %}
@@ -479,6 +487,45 @@
     </main>
 
 {% include "core/includes/_physics_kim_reference_widget.html" %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const activeInputs = Array.from(document.querySelectorAll('[data-active-time-seconds]'));
+    const attemptInputs = Array.from(document.querySelectorAll('[data-attempt-count]'));
+    if (!activeInputs.length) return;
+
+    let activeSeconds = 0;
+    let visibleAt = document.hidden ? null : Date.now();
+    const startedAt = Date.now();
+
+    function flushActiveTime() {
+        if (visibleAt === null) return;
+        const delta = Math.max(0, Math.floor((Date.now() - visibleAt) / 1000));
+        activeSeconds += delta;
+        visibleAt = Date.now();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            flushActiveTime();
+            visibleAt = null;
+        } else {
+            visibleAt = Date.now();
+        }
+    });
+
+    window.addEventListener('beforeunload', flushActiveTime);
+
+    document.querySelectorAll('form[action="{% url "student_practice" %}"]').forEach((form) => {
+        form.addEventListener('submit', () => {
+            flushActiveTime();
+            const fallback = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
+            const finalSeconds = Math.max(activeSeconds, fallback);
+            activeInputs.forEach((input) => { input.value = String(finalSeconds); });
+            attemptInputs.forEach((input) => { input.value = input.value || '1'; });
+        });
+    });
+});
+</script>
 {% include "core/image_modal.html" %}
 </body>
 </html>
