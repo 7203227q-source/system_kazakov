@@ -39,3 +39,4 @@ urllib3==2.6.3
 whitenoise==6.12.0
 qrcode==7.4.2
 Pillow==10.4.0
+fsrs==6.3.1
