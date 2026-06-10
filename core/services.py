@@ -1,9 +1,12 @@
 from datetime import datetime
+
+from django.db import models
 from django.utils import timezone
-from .models import SpacedRepetition, TaskType, ExamFormat
-from .fsrs_engine import review_card
 import random
 import time
+
+from .fsrs_engine import review_card
+from .models import ExamFormat, SpacedRepetition, TaskLog, TaskType
 
 def ai_classify_task(task_content, subject):
     """
@@ -48,17 +51,59 @@ def ai_classify_task(task_content, subject):
     
     return task_type
 
-def _fsrs_label_from_grade(grade):
-    return "good" if int(grade) >= 3 else "again"
+def normalize_active_time_seconds(value):
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        return None
+    if seconds < 0:
+        return None
+    return min(seconds, 60 * 60)
+
+
+def get_expected_time_seconds(student):
+    avg = (
+        TaskLog.objects.filter(student=student, is_anomaly=False, time_spent__gt=0)
+        .aggregate(a=models.Avg("time_spent"))
+        .get("a")
+    )
+    if not avg:
+        avg = (
+            TaskLog.objects.filter(is_anomaly=False, time_spent__gt=0)
+            .aggregate(a=models.Avg("time_spent"))
+            .get("a")
+        )
+    return int(avg or 60)
+
+
+def determine_fsrs_signal(*, is_correct, active_time_seconds, attempt_count, expected_time_seconds):
+    if not is_correct:
+        return "again"
+    if int(attempt_count or 1) > 1:
+        return "hard"
+    if active_time_seconds is None:
+        return "good"
+    relative_time = float(active_time_seconds) / float(max(expected_time_seconds, 1))
+    if relative_time >= 1.75:
+        return "hard"
+    return "good"
 
 
 def process_srs_review(srs_record, grade, *, active_time_seconds=None, attempt_count=1):
     """
     Обновляет запись интервального повторения через FSRS-обертку.
     """
-    del active_time_seconds, attempt_count
+    is_correct = int(grade) >= 3
+    expected_time_seconds = get_expected_time_seconds(srs_record.student)
+    normalized_time = normalize_active_time_seconds(active_time_seconds)
+    signal = determine_fsrs_signal(
+        is_correct=is_correct,
+        active_time_seconds=normalized_time,
+        attempt_count=attempt_count,
+        expected_time_seconds=expected_time_seconds,
+    )
 
-    next_state = review_card(srs_record.fsrs_state, _fsrs_label_from_grade(grade))
+    next_state = review_card(srs_record.fsrs_state, signal)
     due_dt = datetime.fromisoformat(next_state["due"])
 
     srs_record.srs_algorithm = "fsrs"
