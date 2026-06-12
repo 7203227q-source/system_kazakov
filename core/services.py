@@ -1,8 +1,12 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+
+from django.db import models
 from django.utils import timezone
-from .models import SpacedRepetition, TaskType, ExamFormat
 import random
 import time
+
+from .fsrs_engine import review_card
+from .models import ExamFormat, SpacedRepetition, TaskLog, TaskType
 
 def ai_classify_task(task_content, subject):
     """
@@ -47,47 +51,93 @@ def ai_classify_task(task_content, subject):
     
     return task_type
 
-def process_srs_review(srs_record, grade):
-    """
-    Алгоритм SuperMemo-2 (SM-2) для интервального повторения.
-    
-    Параметры:
-    - srs_record: объект SpacedRepetition
-    - grade: оценка от 0 до 5
-        0 - полная отключка (не вспомнил вообще)
-        1 - неправильный ответ, но вспомнился при подсказке
-        2 - неправильный ответ, где правильный казался легким
-        3 - правильный ответ, но вспомнил с большим трудом
-        4 - правильный ответ после раздумий
-        5 - идеальный ответ, без задержек
-    """
-    if grade >= 3:
-        if srs_record.repetitions == 0:
-            srs_record.interval = 1
-        elif srs_record.repetitions == 1:
-            srs_record.interval = 6
-        else:
-            srs_record.interval = round(srs_record.interval * srs_record.easiness_factor)
-        srs_record.repetitions += 1
-    else:
-        srs_record.repetitions = 0
-        srs_record.interval = 1
+def normalize_active_time_seconds(value):
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        return None
+    if seconds < 0:
+        return None
+    return min(seconds, 60 * 60)
 
-    # Формула обновления E-Factor:
-    # EF':= EF + (0.1 - (5-q)*(0.08 + (5-q)*0.02))
-    srs_record.easiness_factor += (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02))
-    if srs_record.easiness_factor < 1.3:
-        srs_record.easiness_factor = 1.3
 
-    srs_record.last_grade = grade
+def get_expected_time_seconds(student):
+    avg = (
+        TaskLog.objects.filter(student=student, is_anomaly=False, time_spent__gt=0)
+        .aggregate(a=models.Avg("time_spent"))
+        .get("a")
+    )
+    if not avg:
+        avg = (
+            TaskLog.objects.filter(is_anomaly=False, time_spent__gt=0)
+            .aggregate(a=models.Avg("time_spent"))
+            .get("a")
+        )
+    return int(avg or 60)
+
+
+def determine_fsrs_signal(*, is_correct, active_time_seconds, attempt_count, expected_time_seconds):
+    if not is_correct:
+        return "again"
+    if int(attempt_count or 1) > 1:
+        return "hard"
+    if active_time_seconds is None:
+        return "good"
+    relative_time = float(active_time_seconds) / float(max(expected_time_seconds, 1))
+    if relative_time >= 1.75:
+        return "hard"
+    return "good"
+
+
+def process_srs_review(srs_record, grade, *, active_time_seconds=None, attempt_count=1):
+    """Обновляет запись интервального повторения через FSRS-обертку."""
+    try:
+        return _process_fsrs_review(
+            srs_record,
+            grade=grade,
+            active_time_seconds=active_time_seconds,
+            attempt_count=attempt_count,
+        )
+    except Exception:
+        srs_record.last_grade = int(grade)
+        srs_record.last_reviewed_at = timezone.now()
+        srs_record.next_review_date = timezone.localdate() + timedelta(days=1)
+        srs_record.save(update_fields=["last_grade", "last_reviewed_at", "next_review_date"])
+        return srs_record
+
+
+def _process_fsrs_review(srs_record, *, grade, active_time_seconds=None, attempt_count=1):
+    is_correct = int(grade) >= 3
+    expected_time_seconds = get_expected_time_seconds(srs_record.student)
+    normalized_time = normalize_active_time_seconds(active_time_seconds)
+    signal = determine_fsrs_signal(
+        is_correct=is_correct,
+        active_time_seconds=normalized_time,
+        attempt_count=attempt_count,
+        expected_time_seconds=expected_time_seconds,
+    )
+
+    next_state = review_card(srs_record.fsrs_state, signal)
+    due_dt = datetime.fromisoformat(next_state["due"])
+
+    srs_record.srs_algorithm = "fsrs"
+    srs_record.fsrs_state = next_state
+    srs_record.last_grade = int(grade)
     srs_record.last_reviewed_at = timezone.now()
-    # Дата следующего повторения
-    srs_record.next_review_date = timezone.now().date() + timedelta(days=srs_record.interval)
-    srs_record.save()
-    
+    srs_record.next_review_date = due_dt.date()
+    srs_record.save(
+        update_fields=[
+            "srs_algorithm",
+            "fsrs_state",
+            "last_grade",
+            "last_reviewed_at",
+            "next_review_date",
+        ]
+    )
+
     return srs_record
 
-def process_task_submission(student, task, grade):
+def process_task_submission(student, task, grade, *, active_time_seconds=None, attempt_count=1):
     """
     Обрабатывает ответ ученика на задание: создает или обновляет
     запись интервального повторения.
@@ -100,10 +150,17 @@ def process_task_submission(student, task, grade):
             'interval': 0,
             'repetitions': 0,
             'next_review_date': timezone.now().date(),
+            'srs_algorithm': 'fsrs',
+            'fsrs_state': {},
         }
     )
-    
-    return process_srs_review(srs_record, grade)
+
+    return process_srs_review(
+        srs_record,
+        grade,
+        active_time_seconds=active_time_seconds,
+        attempt_count=attempt_count,
+    )
 
 def get_due_tasks_for_student(student, *, subject_id: int | None = None):
     """Возвращает записи интервального повторения, которые нужно повторить сегодня или ранее.

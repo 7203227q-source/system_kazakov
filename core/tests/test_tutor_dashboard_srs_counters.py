@@ -19,7 +19,7 @@ class TutorDashboardSrsCountersTests(TestCase):
         self.task1 = Task.objects.create(topic=topic, task_type=tt, correct_answer="1", difficulty=10, exam_points=1)
         self.task2 = Task.objects.create(topic=topic, task_type=tt, correct_answer="1", difficulty=10, exam_points=1)
 
-    def test_process_srs_review_sets_last_reviewed_at(self):
+    def test_process_srs_review_sets_last_reviewed_at_and_fsrs_algorithm(self):
         rec = SpacedRepetition.objects.create(
             student=self.student,
             task=self.task1,
@@ -32,6 +32,7 @@ class TutorDashboardSrsCountersTests(TestCase):
         rec.refresh_from_db()
         self.assertIsNotNone(rec.last_reviewed_at)
         self.assertGreaterEqual(rec.last_reviewed_at, before)
+        self.assertEqual(rec.srs_algorithm, "fsrs")
 
     def test_tutor_dashboard_shows_srs_due_and_reviewed_today(self):
         today = timezone.localdate()

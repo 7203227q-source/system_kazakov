@@ -15,7 +15,7 @@ from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submiss
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
-from .services import process_task_submission, get_due_tasks_for_student
+from .services import get_due_tasks_for_student, normalize_active_time_seconds, process_task_submission
 from .system_info import get_system_metrics, check_openrouter_api
 import os
 
@@ -718,6 +718,14 @@ def student_practice(request):
         user_answer = request.POST.get('answer', '').strip()
         give_up = (request.POST.get("give_up") or "").strip()
         attempt_token = (request.POST.get("attempt_token") or "").strip()
+        active_time_seconds = request.POST.get("active_time_seconds")
+        attempt_count_raw = request.POST.get("attempt_count")
+        try:
+            attempt_count = max(1, int(attempt_count_raw or "1"))
+        except ValueError:
+            attempt_count = 1
+        normalized_time = normalize_active_time_seconds(active_time_seconds)
+        time_spent = normalized_time if normalized_time is not None else 60
         task = get_object_or_404(Task, id=task_id)
         if mode == "srs":
             try:
@@ -789,11 +797,17 @@ def student_practice(request):
                 submission.primary_score = 0
                 submission.save(update_fields=["user_answer", "is_correct", "score", "primary_score"])
 
-            record_task_log(request.user, task, submission, None, 60)
+            record_task_log(request.user, task, submission, None, time_spent)
 
             if mode == 'srs':
                 try:
-                    process_task_submission(request.user, task, grade)
+                    process_task_submission(
+                        request.user,
+                        task,
+                        grade,
+                        active_time_seconds=time_spent,
+                        attempt_count=attempt_count,
+                    )
                 except Exception:
                     pass
 
@@ -818,13 +832,17 @@ def student_practice(request):
                 score=int(points_earned or 0),
             )
 
-            # Время решения в тренажере не замеряем строго, ставим заглушку 60с для избежания аномалии
-            record_task_log(request.user, task, submission, None, 60)
+            record_task_log(request.user, task, submission, None, time_spent)
 
-            # Если это SRS-режим, обновляем интервалы (SM-2)
             if mode == 'srs':
                 try:
-                    process_task_submission(request.user, task, grade)
+                    process_task_submission(
+                        request.user,
+                        task,
+                        grade,
+                        active_time_seconds=time_spent,
+                        attempt_count=attempt_count,
+                    )
                 except Exception:
                     pass
 
@@ -2164,7 +2182,13 @@ def student_practice_submit(request, task_id):
 
     if mode == 'srs':
         try:
-            process_task_submission(request.user, task, grade)
+            process_task_submission(
+                request.user,
+                task,
+                grade,
+                active_time_seconds=60,
+                attempt_count=1,
+            )
         except Exception:
             pass
 
@@ -6660,7 +6684,13 @@ def api_verify_with_ai(request, submission_id):
             srs_exists = SpacedRepetition.objects.filter(student=request.user, task=task).exists()
             if srs_exists or int(points_earned or 0) < int(max_points_effective or 0):
                 grade = 5 if int(points_earned or 0) >= int(max_points_effective or 0) else 1
-                process_task_submission(request.user, task, grade)
+                process_task_submission(
+                    request.user,
+                    task,
+                    grade,
+                    active_time_seconds=60,
+                    attempt_count=1,
+                )
         except Exception:
             pass
 
@@ -7230,7 +7260,13 @@ def api_tutor_verify_with_ai(request, submission_id):
             srs_exists = SpacedRepetition.objects.filter(student=student, task=task).exists()
             if srs_exists or int(points_earned or 0) < int(max_points_effective or 0):
                 grade = 5 if int(points_earned or 0) >= int(max_points_effective or 0) else 1
-                process_task_submission(student, task, grade)
+                process_task_submission(
+                    student,
+                    task,
+                    grade,
+                    active_time_seconds=60,
+                    attempt_count=1,
+                )
         except Exception:
             pass
 

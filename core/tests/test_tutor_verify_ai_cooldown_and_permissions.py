@@ -1,5 +1,6 @@
 import json
 import os
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -51,8 +52,6 @@ class TutorVerifyAiCooldownTests(TestCase):
         self.client.login(username="t", password="pass")
         url = reverse("api_tutor_verify_with_ai", args=[self.sub.id])
 
-        from unittest.mock import patch
-
         dummy_response = {
             "choices": [
                 {"message": {"content": json.dumps({"primary_score": 1, "is_correct": False, "feedback": "ok"})}}
@@ -91,8 +90,6 @@ class TutorVerifyAiCooldownTests(TestCase):
         dummy_response_1 = {"choices": [{"message": {"content": json.dumps(recognition, ensure_ascii=False)}}]}
         dummy_response_2 = {"choices": [{"message": {"content": json.dumps(grading, ensure_ascii=False)}}]}
 
-        from unittest.mock import patch
-
         with patch("core.views.requests.post") as post:
             class R:
                 def __init__(self, payload):
@@ -116,3 +113,28 @@ class TutorVerifyAiCooldownTests(TestCase):
         )
         self.assertEqual(data.get("model"), "check-model")
         self.assertEqual(post.call_count, 2)
+
+    def test_tutor_verify_ai_passes_review_context_to_srs_processing(self):
+        self.client.login(username="t", password="pass")
+        url = reverse("api_tutor_verify_with_ai", args=[self.sub.id])
+
+        dummy_response = {
+            "choices": [
+                {"message": {"content": json.dumps({"primary_score": 1, "is_correct": False, "feedback": "ok"})}}
+            ]
+        }
+
+        with patch("core.views.requests.post") as post, patch("core.views.process_task_submission") as process_task_submission:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = dummy_response
+
+            response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200, response.content)
+        process_task_submission.assert_called_once_with(
+            self.student,
+            self.task,
+            1,
+            active_time_seconds=60,
+            attempt_count=1,
+        )

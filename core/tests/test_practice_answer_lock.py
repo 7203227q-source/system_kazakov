@@ -25,13 +25,31 @@ class PracticeAnswerLockTests(TestCase):
         session.save()
 
         url = reverse("student_practice")
-        res1 = self.client.post(url, {"task_id": self.task.id, "answer": "1", "attempt_token": token})
+        res1 = self.client.post(
+            url,
+            {
+                "task_id": self.task.id,
+                "answer": "1",
+                "attempt_token": token,
+                "active_time_seconds": "44",
+                "attempt_count": "1",
+            },
+        )
         self.assertEqual(res1.status_code, 200)
         self.assertContains(res1, "Неправильно")
         self.assertEqual(Submission.objects.filter(student=self.student, task=self.task).count(), 1)
 
         # Second submit (should be ignored/locked and return the same result)
-        res2 = self.client.post(url, {"task_id": self.task.id, "answer": "2", "attempt_token": token})
+        res2 = self.client.post(
+            url,
+            {
+                "task_id": self.task.id,
+                "answer": "2",
+                "attempt_token": token,
+                "active_time_seconds": "48",
+                "attempt_count": "2",
+            },
+        )
         self.assertEqual(res2.status_code, 200)
         self.assertContains(res2, "Неправильно")
         self.assertEqual(Submission.objects.filter(student=self.student, task=self.task).count(), 1)
@@ -46,12 +64,32 @@ class PracticeAnswerLockTests(TestCase):
         session.save()
 
         url = reverse("student_practice")
-        res1 = self.client.post(url, {"task_id": self.task.id, "answer": "1", "attempt_token": token, "mode": "srs"})
+        res1 = self.client.post(
+            url,
+            {
+                "task_id": self.task.id,
+                "answer": "1",
+                "attempt_token": token,
+                "mode": "srs",
+                "active_time_seconds": "44",
+                "attempt_count": "1",
+            },
+        )
         self.assertEqual(res1.status_code, 200)
         self.assertContains(res1, "Неправильно")
         self.assertEqual(Submission.objects.filter(student=self.student, task=self.task).count(), 1)
 
-        res2 = self.client.post(url, {"task_id": self.task.id, "answer": "2", "attempt_token": token, "mode": "srs"})
+        res2 = self.client.post(
+            url,
+            {
+                "task_id": self.task.id,
+                "answer": "2",
+                "attempt_token": token,
+                "mode": "srs",
+                "active_time_seconds": "48",
+                "attempt_count": "2",
+            },
+        )
         self.assertEqual(res2.status_code, 200)
         self.assertContains(res2, "Неправильно")
         self.assertEqual(Submission.objects.filter(student=self.student, task=self.task).count(), 1)

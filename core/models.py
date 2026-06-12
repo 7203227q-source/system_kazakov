@@ -4,7 +4,6 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
-from datetime import timedelta
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -295,6 +294,11 @@ class SpacedRepetition(models.Model):
     """
     Таблица для алгоритма интервального повторения (SuperMemo-2 style)
     """
+    SRS_ALGORITHM_CHOICES = [
+        ("sm2", "SM-2"),
+        ("fsrs", "FSRS"),
+    ]
+
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='srs_progress', limit_choices_to={'role': 'student'})
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
     
@@ -303,6 +307,14 @@ class SpacedRepetition(models.Model):
     interval = models.IntegerField(default=0, verbose_name="Интервал (в днях)")
     repetitions = models.IntegerField(default=0, verbose_name="Успешных повторений подряд")
     next_review_date = models.DateField(default=timezone.now, verbose_name="Дата следующего повторения")
+    srs_algorithm = models.CharField(
+        max_length=10,
+        choices=SRS_ALGORITHM_CHOICES,
+        default="sm2",
+        db_index=True,
+        verbose_name="Алгоритм интервального повторения",
+    )
+    fsrs_state = models.JSONField(default=dict, blank=True, verbose_name="FSRS state")
     
     last_grade = models.IntegerField(null=True, blank=True, verbose_name="Последняя оценка (0-5)")
     last_reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
