@@ -220,6 +220,19 @@
                                         {% endwith %}
                                     </div>
 
+                                    <button
+                                        type="button"
+                                        class="js-task-error-btn not-prose mt-3 bg-white border border-red-200 text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg text-xs font-bold transition {% if sub.error_reported %}opacity-70 cursor-not-allowed{% endif %}"
+                                        data-task-id="{{ sub.task.id }}"
+                                        data-error-source="tutor_history"
+                                        data-submission-id="{{ sub.id }}"
+                                        data-assignment-id="{{ sub.assignment_id|default:'' }}"
+                                        data-error-reported="{% if sub.error_reported %}1{% else %}0{% endif %}"
+                                        {% if sub.error_reported %}disabled{% endif %}
+                                    >
+                                        {% if sub.error_reported %}Ошибка отмечена{% else %}Ошибка{% endif %}
+                                    </button>
+
                                     <div class="not-prose mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
                                         <div class="text-sm font-bold text-gray-800 mb-3">Вопросы по задаче</div>
                                         {% if sub.comments.count %}
@@ -383,6 +396,19 @@
                                         </div>
                                         {% endwith %}
                                     </div>
+
+                                    <button
+                                        type="button"
+                                        class="js-task-error-btn not-prose mt-3 bg-white border border-red-200 text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg text-xs font-bold transition {% if sub.error_reported %}opacity-70 cursor-not-allowed{% endif %}"
+                                        data-task-id="{{ sub.task.id }}"
+                                        data-error-source="tutor_history"
+                                        data-submission-id="{{ sub.id }}"
+                                        data-assignment-id="{{ sub.assignment_id|default:'' }}"
+                                        data-error-reported="{% if sub.error_reported %}1{% else %}0{% endif %}"
+                                        {% if sub.error_reported %}disabled{% endif %}
+                                    >
+                                        {% if sub.error_reported %}Ошибка отмечена{% else %}Ошибка{% endif %}
+                                    </button>
 
                                     <form method="POST" action="{% url 'tutor_student_srs_remove' student.id sub.task.id %}" class="not-prose mt-3" onsubmit="return confirm('Убрать задачу из повторения?');">
                                         {% csrf_token %}
@@ -575,6 +601,46 @@
             el.classList.toggle('hidden');
         }
     }
+
+    function setTaskErrorReported(btn) {
+        if (!btn) return;
+        btn.dataset.errorReported = '1';
+        btn.disabled = true;
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+        const label = btn.querySelector('span') || btn;
+        label.textContent = 'Ошибка отмечена';
+    }
+
+    async function reportTaskError(btn) {
+        if (!btn || btn.dataset.errorReported === '1') return;
+        const taskId = btn.dataset.taskId;
+        if (!taskId) return;
+
+        const formData = new FormData();
+        formData.append('source', btn.dataset.errorSource || '');
+        if (btn.dataset.assignmentId) formData.append('assignment_id', btn.dataset.assignmentId);
+        if (btn.dataset.submissionId) formData.append('submission_id', btn.dataset.submissionId);
+
+        try {
+            const res = await fetch(`/api/tasks/${taskId}/report-error/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: formData,
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error('report-failed');
+            setTaskErrorReported(btn);
+        } catch (e) {
+            alert('Не удалось отметить ошибку');
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.js-task-error-btn');
+        if (!btn) return;
+        e.preventDefault();
+        reportTaskError(btn);
+    });
 
     async function tutorPostComment(submissionId) {
         const input = document.getElementById(`tutor_comment_text_${submissionId}`);

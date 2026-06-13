@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/submission/<int:submission_id>/reveal-solution/', views.api_submission_reveal_solution, name='api_submission_reveal_solution'),
     path('api/submission/<int:submission_id>/clear-images/', views.api_submission_clear_images, name='api_submission_clear_images'),
     path('api/submission/<int:submission_id>/verify/', views.api_verify_with_ai, name='api_verify_with_ai'),
+    path('api/tasks/<int:task_id>/report-error/', views.report_task_error, name='report_task_error'),
     path('api/tutor/submission/<int:submission_id>/override-score/', views.api_tutor_override_score, name='api_tutor_override_score'),
     path('api/tutor/submission/<int:submission_id>/verify-ai/', views.api_tutor_verify_with_ai, name='api_tutor_verify_with_ai'),
     path('student/assignment/<int:assignment_id>/', views.student_solve_assignment, name='student_solve_assignment'),
@@ -91,6 +92,9 @@ urlpatterns = [
 
     path('parent/', views.parent_dashboard, name='parent_dashboard'),
     path('platform-admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('platform-admin/errors/', views.admin_task_error_reports, name='admin_task_error_reports'),
+    path('platform-admin/errors/<int:report_id>/', views.admin_task_error_report_detail, name='admin_task_error_report_detail'),
+    path('platform-admin/errors/<int:report_id>/update/', views.admin_task_error_report_update, name='admin_task_error_report_update'),
     path('platform-admin/exam-structure/', views.admin_exam_structure, name='admin_exam_structure'),
     path('platform-admin/users/<int:user_id>/delete/', views.admin_delete_user, name='admin_delete_user'),
     path('platform-admin/reshuege-import/', views.admin_reshuege_import, name='admin_reshuege_import'),

@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import timedelta, date
 import uuid
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, SpacedRepetitionRemovalRequest, TaskLog
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, SpacedRepetitionRemovalRequest, TaskLog, TaskErrorReport
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
@@ -477,6 +477,83 @@ def admin_reshuege_import_step(request):
         return JsonResponse(item)
     except Exception as e:
         return JsonResponse({'task_id': task_id_raw, 'status': 'error', 'detail': str(e)[:200]}, status=200)
+
+
+@login_required
+@require_POST
+def report_task_error(request, task_id):
+    if request.user.role not in {"student", "tutor"}:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    task = get_object_or_404(Task, id=task_id)
+    source = (request.POST.get("source") or "").strip()
+    if source not in {"practice", "srs", "variant", "student_history", "tutor_history"}:
+        return JsonResponse({"error": "invalid_source"}, status=400)
+
+    submission = None
+    submission_id = (request.POST.get("submission_id") or "").strip()
+    if submission_id.isdigit():
+        submission = Submission.objects.filter(id=int(submission_id), task=task).first()
+
+    assignment = None
+    assignment_id = (request.POST.get("assignment_id") or "").strip()
+    if assignment_id.isdigit():
+        assignment = Assignment.objects.filter(id=int(assignment_id)).first()
+
+    try:
+        report, created = TaskErrorReport.objects.get_or_create(
+            task=task,
+            reported_by=request.user,
+            reporter_role=request.user.role,
+            source=source,
+            submission=submission,
+            assignment=assignment,
+            defaults={"status": "new"},
+        )
+    except IntegrityError:
+        report = TaskErrorReport.objects.get(
+            task=task,
+            reported_by=request.user,
+            reporter_role=request.user.role,
+            source=source,
+            submission=submission,
+            assignment=assignment,
+        )
+        created = False
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "created": created,
+            "already_reported": not created,
+            "report_id": report.id,
+        }
+    )
+
+
+def _reported_task_ids_for_user(*, user, source, task_ids, assignment_id=None):
+    qs = TaskErrorReport.objects.filter(
+        reported_by=user,
+        reporter_role=user.role,
+        source=source,
+        task_id__in=list(task_ids),
+    )
+    if assignment_id is None:
+        qs = qs.filter(assignment__isnull=True)
+    else:
+        qs = qs.filter(assignment_id=assignment_id)
+    return set(qs.values_list("task_id", flat=True))
+
+
+def _reported_submission_ids_for_user(*, user, source, submission_ids):
+    return set(
+        TaskErrorReport.objects.filter(
+            reported_by=user,
+            reporter_role=user.role,
+            source=source,
+            submission_id__in=list(submission_ids),
+        ).values_list("submission_id", flat=True)
+    )
 
 
 def proxy_image(request):
@@ -948,6 +1025,7 @@ def student_practice(request):
 
     is_extended = bool(task and is_extended_answer_task(task))
     practice_submission = None
+    practice_error_reported = False
     if task is not None and mode == 'srs' and is_extended:
         # Для развёрнутой части в режиме SRS нам нужен Submission, чтобы загрузить фото и проверить ИИ.
         current = request.session.get("practice_current") or {}
@@ -979,6 +1057,15 @@ def student_practice(request):
             current["submission_id"] = int(practice_submission.id)
             request.session["practice_current"] = current
             request.session.modified = True
+
+    if task is not None:
+        practice_error_reported = TaskErrorReport.objects.filter(
+            task=task,
+            reported_by=request.user,
+            reporter_role=request.user.role,
+            source="srs" if mode == "srs" else "practice",
+            assignment__isnull=True,
+        ).exists()
 
     srs_remove_request_pending = False
     if mode == "srs" and task is not None:
@@ -1012,6 +1099,7 @@ def student_practice(request):
         'attempt_token': attempt_token,
         'is_extended': is_extended,
         'practice_submission': practice_submission,
+        'practice_error_reported': bool(practice_error_reported),
         'profiles': profiles,
         'active_subject_id': active_subject_id,
         'srs_due_total': srs_due_total,
@@ -1724,11 +1812,18 @@ def student_solve_assignment(request, assignment_id):
         ).count()
 
         tasks_list = list(tasks)
+        variant_reported_ids = _reported_task_ids_for_user(
+            user=request.user,
+            source="variant",
+            task_ids=[t.id for t in tasks_list],
+            assignment_id=assignment.id,
+        )
         domain = request.build_absolute_uri('/')[:-1]
         import json as pyjson
 
         for task in tasks_list:
             task.saved_submission = saved_submissions.get(task.id)
+            task.error_reported = task.id in variant_reported_ids
             if task.saved_submission and getattr(task.saved_submission, "ai_feedback", None):
                 try:
                     task.saved_submission.ai_feedback_display = normalize_tex_in_feedback(task.saved_submission.ai_feedback)
@@ -2246,6 +2341,11 @@ def student_history(request):
     page_number = (request.GET.get("page") or "1").strip()
     page_obj = Paginator(submissions_qs, per_page).get_page(page_number)
     submissions = list(page_obj.object_list)
+    reported_submission_ids = _reported_submission_ids_for_user(
+        user=request.user,
+        source="student_history",
+        submission_ids=[sub.id for sub in submissions],
+    )
 
     _mark_student_replies_seen(request.user, submissions)
     unread_tutor_replies_total = SubmissionComment.objects.filter(
@@ -2258,6 +2358,7 @@ def student_history(request):
 
     # Подготавливаем поля для шаблона (JSON-массивы -> списки)
     for sub in submissions:
+        sub.error_reported = sub.id in reported_submission_ids
         try:
             sub.ai_mistakes = pyjson.loads(sub.ai_mistakes_json) if sub.ai_mistakes_json else []
         except Exception:
@@ -5034,12 +5135,18 @@ def tutor_student_history(request, student_id):
         .filter(day__in=page_days)
         .order_by("-created_at")
     )
+    reported_submission_ids = _reported_submission_ids_for_user(
+        user=request.user,
+        source="tutor_history",
+        submission_ids=list(submissions.values_list("id", flat=True)),
+    )
     if request.user.role == 'tutor':
         _mark_tutor_questions_seen(request.user, submissions.filter(assignment__tutor=request.user))
 
     days_data = {}
 
     for sub in submissions:
+        sub.error_reported = sub.id in reported_submission_ids
         # Подготавливаем поля для шаблона (JSON-массивы -> списки)
         try:
             sub.ai_mistakes = pyjson.loads(sub.ai_mistakes_json) if sub.ai_mistakes_json else []
@@ -5415,6 +5522,99 @@ def admin_dashboard(request):
     }
     
     return render(request, 'core/admin_dashboard.html', context)
+
+
+@login_required
+def admin_task_error_reports(request):
+    if request.user.role != "admin":
+        return redirect("login")
+
+    reports = TaskErrorReport.objects.select_related(
+        "task",
+        "reported_by",
+        "submission",
+        "assignment",
+    ).order_by("-created_at")
+
+    status_filter = (request.GET.get("status") or "").strip()
+    source_filter = (request.GET.get("source") or "").strip()
+    role_filter = (request.GET.get("role") or "").strip()
+    search_query = (request.GET.get("q") or "").strip()
+
+    if status_filter:
+        reports = reports.filter(status=status_filter)
+    if source_filter:
+        reports = reports.filter(source=source_filter)
+    if role_filter:
+        reports = reports.filter(reporter_role=role_filter)
+    if search_query:
+        search_filters = (
+            Q(reported_by__username__icontains=search_query)
+            | Q(reported_by__first_name__icontains=search_query)
+            | Q(reported_by__last_name__icontains=search_query)
+        )
+        if search_query.isdigit():
+            search_filters |= Q(task_id=int(search_query))
+        reports = reports.filter(search_filters)
+
+    base_query = request.GET.copy()
+    base_query.pop("page", None)
+    base_query_prefix = f"&{base_query.urlencode()}" if base_query else ""
+    base_query_items = list(base_query.items())
+
+    page_obj = Paginator(reports, 25).get_page(request.GET.get("page", 1))
+    return render(
+        request,
+        "core/admin_task_error_reports.html",
+        {
+            "reports": list(page_obj.object_list),
+            "page_obj": page_obj,
+            "base_query_prefix": base_query_prefix,
+            "base_query_items": base_query_items,
+            "status_filter": status_filter,
+            "source_filter": source_filter,
+            "role_filter": role_filter,
+            "search_query": search_query,
+            "status_choices": TaskErrorReport.STATUS_CHOICES,
+            "source_choices": TaskErrorReport.SOURCE_CHOICES,
+            "role_choices": TaskErrorReport.REPORTER_ROLE_CHOICES,
+        },
+    )
+
+
+@login_required
+def admin_task_error_report_detail(request, report_id):
+    if request.user.role != "admin":
+        return redirect("login")
+
+    report = get_object_or_404(
+        TaskErrorReport.objects.select_related(
+            "task",
+            "reported_by",
+            "submission",
+            "assignment",
+        ),
+        id=report_id,
+    )
+    return render(request, "core/admin_task_error_report_detail.html", {"report": report})
+
+
+@login_required
+@require_POST
+def admin_task_error_report_update(request, report_id):
+    if request.user.role != "admin":
+        return HttpResponseForbidden()
+
+    report = get_object_or_404(TaskErrorReport, id=report_id)
+    status = (request.POST.get("status") or "").strip()
+    allowed_statuses = {choice[0] for choice in TaskErrorReport.STATUS_CHOICES}
+    if status in allowed_statuses:
+        report.status = status
+        report.save(update_fields=["status", "updated_at"])
+        messages.success(request, "Статус обновлён.")
+    else:
+        messages.error(request, "Некорректный статус.")
+    return redirect("admin_task_error_report_detail", report_id=report.id)
 
 
 @login_required

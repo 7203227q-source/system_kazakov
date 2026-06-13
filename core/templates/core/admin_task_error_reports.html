@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ошибки - Система Казакова</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                        admin: '#1F2937'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 h-[100dvh] flex overflow-hidden">
+    <div id="mobile-sidebar-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
+
+    <aside id="admin-sidebar" class="w-64 bg-admin text-white flex flex-col shrink-0 h-full overflow-hidden fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+        <div class="h-16 flex items-center justify-between px-6 border-b border-gray-700 bg-gray-900">
+            <div class="flex items-center">
+                <i class="fas fa-shield-alt text-indigo-400 text-2xl mr-2"></i>
+                <span class="text-xl font-bold">Система <span class="text-xs text-gray-400 font-normal">Admin</span></span>
+            </div>
+            <button class="md:hidden text-gray-400 hover:text-white" onclick="toggleSidebar()">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="{% url 'admin_dashboard' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-users-cog w-6 text-gray-400"></i> Пользователи
+            </a>
+            <a href="{% url 'tutor_task_bank' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-database w-6 text-gray-400"></i> База заданий
+            </a>
+            <a href="{% url 'admin_exam_structure' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-list-ol w-6 text-gray-400"></i> Структура экзамена
+            </a>
+            <a href="{% url 'admin_reshuege_import' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-cloud-download-alt w-6 text-gray-400"></i> Импорт с РешуЕГЭ
+            </a>
+            <a href="{% url 'admin_task_error_reports' %}" class="flex items-center px-4 py-3 bg-gray-800 text-white rounded-lg">
+                <i class="fas fa-exclamation-triangle w-6 text-indigo-400"></i> Ошибки
+            </a>
+            <a href="{% url 'admin_system' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-server w-6 text-gray-400"></i> Система и Интеграции
+            </a>
+            <a href="{% url 'admin_openrouter_balance' %}" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-wallet w-6 text-gray-400"></i> OpenRouter: баланс
+            </a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-[100dvh] overflow-hidden bg-gray-50">
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm z-10">
+            <div class="flex items-center">
+                <button class="md:hidden text-gray-500 hover:text-gray-700 mr-4" onclick="toggleSidebar()">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">Ошибки</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="{% url 'logout' %}" class="text-red-500 hover:text-red-700 flex items-center font-medium transition" title="Выйти">
+                    <i class="fas fa-sign-out-alt md:mr-2 text-xl md:text-base"></i> <span class="hidden md:inline">Выйти</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-6">
+                {% if messages %}
+                <div class="space-y-2">
+                    {% for message in messages %}
+                    <div class="p-4 rounded-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="GET" class="bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Статус</label>
+                        <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <option value="">Все</option>
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Источник</label>
+                        <select name="source" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <option value="">Все</option>
+                            {% for value, label in source_choices %}
+                            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Кто сообщил</label>
+                        <select name="role" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <option value="">Все</option>
+                            {% for value, label in role_choices %}
+                            <option value="{{ value }}" {% if role_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-gray-600 mb-1">Поиск</label>
+                        <div class="flex gap-3">
+                            <input type="text" name="q" value="{{ search_query }}" placeholder="ID задачи, username, имя..." class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition">Найти</button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-base font-bold text-gray-800">Список отчётов</h2>
+                            {% if page_obj %}
+                            <p class="text-sm text-gray-500 mt-1">Показано {{ page_obj.start_index }}-{{ page_obj.end_index }} из {{ page_obj.paginator.count }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500">
+                                    <th class="px-6 py-3 font-bold">ID</th>
+                                    <th class="px-6 py-3 font-bold">Создан</th>
+                                    <th class="px-6 py-3 font-bold">Задача</th>
+                                    <th class="px-6 py-3 font-bold">Пользователь</th>
+                                    <th class="px-6 py-3 font-bold">Роль</th>
+                                    <th class="px-6 py-3 font-bold">Источник</th>
+                                    <th class="px-6 py-3 font-bold">Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-sm">
+                                {% for report in reports %}
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="px-6 py-4">
+                                        <a href="{% url 'admin_task_error_report_detail' report.id %}" class="text-primary font-bold hover:underline">#{{ report.id }}</a>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-600">{{ report.created_at|date:"d.m.Y H:i" }}</td>
+                                    <td class="px-6 py-4 text-gray-800">Task {{ report.task_id }}</td>
+                                    <td class="px-6 py-4 text-gray-800">{{ report.reported_by.get_full_name|default:report.reported_by.username }}</td>
+                                    <td class="px-6 py-4 text-gray-600">{{ report.get_reporter_role_display }}</td>
+                                    <td class="px-6 py-4 text-gray-600">{{ report.get_source_display }}</td>
+                                    <td class="px-6 py-4 text-gray-600">{{ report.get_status_display }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">Отчёты не найдены.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if page_obj and page_obj.paginator.num_pages > 1 %}
+                    <div class="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <span class="text-sm text-gray-500">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                        <div class="inline-flex items-center bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            {% if page_obj.has_previous %}
+                            <a href="?page={{ page_obj.previous_page_number }}{{ base_query_prefix }}" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center">
+                                <i class="fas fa-chevron-left mr-2 text-xs"></i> Назад
+                            </a>
+                            {% else %}
+                            <span class="px-4 py-2 text-sm font-medium text-gray-300 flex items-center">
+                                <i class="fas fa-chevron-left mr-2 text-xs"></i> Назад
+                            </span>
+                            {% endif %}
+
+                            <div class="px-4 py-2 text-sm font-bold text-gray-700 border-x border-gray-200 bg-gray-50">
+                                {{ page_obj.number }}
+                            </div>
+
+                            {% if page_obj.has_next %}
+                            <a href="?page={{ page_obj.next_page_number }}{{ base_query_prefix }}" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center">
+                                Вперёд <i class="fas fa-chevron-right ml-2 text-xs"></i>
+                            </a>
+                            {% else %}
+                            <span class="px-4 py-2 text-sm font-medium text-gray-300 flex items-center">
+                                Вперёд <i class="fas fa-chevron-right ml-2 text-xs"></i>
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </main>
+
+<script>
+function syncSidebarLayout() {
+    const sidebar = document.getElementById('admin-sidebar');
+    const overlay = document.getElementById('mobile-sidebar-overlay');
+    if (!sidebar || !overlay) return;
+
+    if (window.matchMedia('(min-width: 768px)').matches) {
+        overlay.classList.add('hidden');
+        sidebar.classList.remove('-translate-x-full');
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+    }
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('admin-sidebar');
+    const overlay = document.getElementById('mobile-sidebar-overlay');
+    if (!sidebar || !overlay) return;
+
+    if (window.matchMedia('(min-width: 768px)').matches) {
+        overlay.classList.add('hidden');
+        sidebar.classList.remove('-translate-x-full');
+        return;
+    }
+
+    if (sidebar.classList.contains('-translate-x-full')) {
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', syncSidebarLayout);
+window.addEventListener('resize', syncSidebarLayout);
+</script>
+</body>
+</html>

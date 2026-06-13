@@ -493,6 +493,57 @@ class SubmissionComment(models.Model):
             models.Index(fields=["submission", "created_at"]),
         ]
 
+
+class TaskErrorReport(models.Model):
+    REPORTER_ROLE_CHOICES = [
+        ("student", "Ученик"),
+        ("tutor", "Репетитор"),
+    ]
+    SOURCE_CHOICES = [
+        ("practice", "Тренажер"),
+        ("srs", "Интервальные повторения"),
+        ("variant", "Вариант"),
+        ("student_history", "Журнал ученика"),
+        ("tutor_history", "Журнал репетитора"),
+    ]
+    STATUS_CHOICES = [
+        ("new", "Новая"),
+        ("reviewed", "Просмотрена"),
+        ("resolved", "Решена"),
+    ]
+
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="error_reports")
+    reported_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="task_error_reports")
+    reporter_role = models.CharField(max_length=20, choices=REPORTER_ROLE_CHOICES)
+    source = models.CharField(max_length=32, choices=SOURCE_CHOICES)
+    submission = models.ForeignKey(
+        Submission,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="task_error_reports",
+    )
+    assignment = models.ForeignKey(
+        Assignment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="task_error_reports",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="new")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task", "reported_by", "reporter_role", "source", "submission", "assignment"],
+                name="uniq_task_error_report_context",
+            )
+        ]
+
+
 class DailySnapshot(models.Model):
     """Ежедневный срез аналитики ученика по предмету"""
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_snapshots')

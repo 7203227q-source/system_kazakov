@@ -126,6 +126,18 @@
                             {% if task.task_type %}{{ task.task_type.label }}{% else %}Задача №{{ forloop.counter }}{% endif %}
                         </span>
                         <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                class="js-task-error-btn bg-white border border-red-200 text-red-700 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-bold transition {% if task.error_reported %}opacity-70 cursor-not-allowed{% endif %}"
+                                data-task-id="{{ task.id }}"
+                                data-error-source="variant"
+                                data-assignment-id="{{ assignment.id }}"
+                                data-submission-id="{{ task.saved_submission.id|default:'' }}"
+                                data-error-reported="{% if task.error_reported %}1{% else %}0{% endif %}"
+                                {% if task.error_reported %}disabled{% endif %}
+                            >
+                                {% if task.error_reported %}Ошибка отмечена{% else %}Ошибка{% endif %}
+                            </button>
                             <button type="button" onclick="openBoard({{ assignment.id }}, {{ task.id }})" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-1 rounded-lg text-xs font-bold transition">
                                 Доска
                             </button>
@@ -648,6 +660,49 @@
 </div>
 
 <script>
+    function markTaskErrorButtonReported(btn) {
+        if (!btn) return;
+        btn.dataset.errorReported = '1';
+        btn.disabled = true;
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+        const label = btn.querySelector('span') || btn;
+        label.textContent = 'Ошибка отмечена';
+    }
+
+    async function reportTaskError(btn) {
+        if (!btn || btn.dataset.errorReported === '1') return;
+        const taskId = btn.dataset.taskId;
+        if (!taskId) return;
+
+        const formData = new FormData();
+        formData.append('source', btn.dataset.errorSource || '');
+        if (btn.dataset.assignmentId) formData.append('assignment_id', btn.dataset.assignmentId);
+        if (btn.dataset.submissionId) formData.append('submission_id', btn.dataset.submissionId);
+
+        try {
+            const res = await fetch(`/api/tasks/${taskId}/report-error/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: formData,
+                credentials: 'same-origin',
+            });
+            if (!res.ok) {
+                alert('Не удалось отметить ошибку');
+                return;
+            }
+            markTaskErrorButtonReported(btn);
+        } catch (e) {
+            alert('Не удалось отметить ошибку');
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.js-task-error-btn');
+        if (!btn) return;
+        e.preventDefault();
+        reportTaskError(btn);
+    });
+
     function submitAssignment(actionValue) {
         const form = document.getElementById('assignment-form');
         const actionEl = document.getElementById('assignment_action');

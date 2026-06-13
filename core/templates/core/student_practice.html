@@ -77,7 +77,20 @@
                             <i class="fas fa-bookmark mr-2"></i> Добавить в интервальное повторение
                         </button>
                     </form>
-                    {% endif %}
+            {% endif %}
+            {% if task %}
+                <button
+                    type="button"
+                    class="js-task-error-btn text-red-600 hover:text-red-700 transition flex items-center text-sm font-bold bg-white border border-red-200 px-3 py-2 rounded-lg {% if practice_error_reported %}opacity-70 cursor-not-allowed{% endif %}"
+                    data-task-id="{{ task.id }}"
+                    data-error-source="{% if mode == 'srs' %}srs{% else %}practice{% endif %}"
+                    data-error-reported="{% if practice_error_reported %}1{% else %}0{% endif %}"
+                    {% if practice_error_reported %}disabled{% endif %}
+                >
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>{% if practice_error_reported %}Ошибка отмечена{% else %}Ошибка{% endif %}</span>
+                </button>
+            {% endif %}
                     <a href="{% url 'student_practice' %}{% if mode == 'srs' %}?mode=srs{% if active_subject_id %}&subject_id={{ active_subject_id }}{% endif %}{% endif %}" class="text-gray-500 hover:text-primary transition flex items-center">
                     <i class="fas fa-sync-alt mr-2"></i> Пропустить
                     </a>
@@ -488,6 +501,48 @@
 
 {% include "core/includes/_physics_kim_reference_widget.html" %}
 <script>
+function markTaskErrorButtonReported(btn) {
+    if (!btn) return;
+    btn.dataset.errorReported = '1';
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-not-allowed');
+    const label = btn.querySelector('span') || btn;
+    label.textContent = 'Ошибка отмечена';
+}
+
+async function reportTaskError(btn) {
+    if (!btn || btn.dataset.errorReported === '1') return;
+    const taskId = btn.dataset.taskId;
+    if (!taskId) return;
+    const formData = new FormData();
+    formData.append('source', btn.dataset.errorSource || '');
+    if (btn.dataset.assignmentId) formData.append('assignment_id', btn.dataset.assignmentId);
+    if (btn.dataset.submissionId) formData.append('submission_id', btn.dataset.submissionId);
+
+    try {
+        const res = await fetch(`/api/tasks/${taskId}/report-error/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData,
+            credentials: 'same-origin',
+        });
+        if (!res.ok) {
+            alert('Не удалось отметить ошибку');
+            return;
+        }
+        markTaskErrorButtonReported(btn);
+    } catch (e) {
+        alert('Не удалось отметить ошибку');
+    }
+}
+
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.js-task-error-btn');
+    if (!btn) return;
+    e.preventDefault();
+    reportTaskError(btn);
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     const activeInputs = Array.from(document.querySelectorAll('[data-active-time-seconds]'));
     const attemptInputs = Array.from(document.querySelectorAll('[data-attempt-count]'));

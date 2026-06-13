@@ -125,6 +125,18 @@
                         </div>
 
                         <div class="mt-4">
+                            <button
+                                type="button"
+                                class="js-task-error-btn mb-3 text-xs font-bold bg-white border border-red-200 text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition {% if sub.error_reported %}opacity-70 cursor-not-allowed{% endif %}"
+                                data-task-id="{{ sub.task.id }}"
+                                data-error-source="student_history"
+                                data-submission-id="{{ sub.id }}"
+                                data-assignment-id="{{ sub.assignment_id|default:'' }}"
+                                data-error-reported="{% if sub.error_reported %}1{% else %}0{% endif %}"
+                                {% if sub.error_reported %}disabled{% endif %}
+                            >
+                                {% if sub.error_reported %}Ошибка отмечена{% else %}Ошибка{% endif %}
+                            </button>
                             <button type="button" onclick="toggleSolution('solution_sub_{{ sub.id }}'); event.stopPropagation();" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
                                 Показать решение
                             </button>
@@ -267,9 +279,48 @@
 
     function toggleTaskDetail(id) {
         const el = document.getElementById(id);
-        if (el) {
-            el.classList.toggle('hidden');
+        if (el) el.classList.toggle('hidden');
+    }
+
+    function setTaskErrorReported(btn) {
+        if (!btn) return;
+        btn.dataset.errorReported = '1';
+        btn.disabled = true;
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+        const label = btn.querySelector('span') || btn;
+        label.textContent = 'Ошибка отмечена';
+    }
+
+    async function reportTaskError(btn) {
+        if (!btn || btn.dataset.errorReported === '1') return;
+        const taskId = btn.dataset.taskId;
+        if (!taskId) return;
+
+        const formData = new FormData();
+        formData.append('source', btn.dataset.errorSource || '');
+        if (btn.dataset.assignmentId) formData.append('assignment_id', btn.dataset.assignmentId);
+        if (btn.dataset.submissionId) formData.append('submission_id', btn.dataset.submissionId);
+
+        try {
+            const res = await fetch(`/api/tasks/${taskId}/report-error/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: formData,
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error('report-failed');
+            setTaskErrorReported(btn);
+        } catch (e) {
+            alert('Не удалось отметить ошибку');
         }
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.js-task-error-btn');
+        if (!btn) return;
+        e.preventDefault();
+        reportTaskError(btn);
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
         const params = new URLSearchParams(window.location.search);
@@ -286,7 +337,6 @@
             setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-400', 'ring-offset-2'), 2500);
         }
     });
-    }
 </script>
 
 {% include "core/image_modal.html" %}
