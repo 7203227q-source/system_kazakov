@@ -1262,6 +1262,7 @@ def student_dashboard(request):
     due_srs_qs = SpacedRepetition.objects.filter(
         student=request.user,
         next_review_date__lte=timezone.now().date(),
+        is_suspended=False,
     )
     if active_subject_id:
         due_srs_qs = due_srs_qs.filter(task__topic__subject_id=int(active_subject_id))

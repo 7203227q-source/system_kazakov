@@ -54,3 +54,11 @@ class SrsFilteredByActiveSubjectTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(int(res.context.get("due_srs_count") or 0), 1)
 
+    def test_student_dashboard_due_srs_count_ignores_suspended_cards(self):
+        SpacedRepetition.objects.filter(student=self.student, task=self.task_m).update(is_suspended=True)
+
+        self.client.force_login(self.student)
+        url = reverse("student_dashboard") + f"?subject_id={self.math.id}"
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(int(res.context.get("due_srs_count") or 0), 0)
