@@ -94,6 +94,7 @@ urlpatterns = [
 
     path('parent/', views.parent_dashboard, name='parent_dashboard'),
     path('platform-admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('platform-admin/school-program/', views.admin_school_program, name='admin_school_program'),
     path('platform-admin/errors/', views.admin_task_error_reports, name='admin_task_error_reports'),
     path('platform-admin/errors/<int:report_id>/', views.admin_task_error_report_detail, name='admin_task_error_report_detail'),
     path('platform-admin/errors/<int:report_id>/update/', views.admin_task_error_report_update, name='admin_task_error_report_update'),

@@ -5727,6 +5727,77 @@ def admin_dashboard(request):
 
 
 @login_required
+def admin_school_program(request):
+    if request.user.role != "admin":
+        return redirect("login")
+
+    sections = [
+        {
+            "title": "Курсы",
+            "subtitle": "LearningTrack",
+            "description": "Курсы школьного контура, например «Математика, 7 класс».",
+            "list_url": "/admin/core/learningtrack/",
+            "add_url": "/admin/core/learningtrack/add/",
+        },
+        {
+            "title": "Разделы",
+            "subtitle": "CurriculumUnit",
+            "description": "Крупные разделы программы внутри курса.",
+            "list_url": "/admin/core/curriculumunit/",
+            "add_url": "/admin/core/curriculumunit/add/",
+        },
+        {
+            "title": "Темы",
+            "subtitle": "CurriculumTopic",
+            "description": "Конкретные темы, которые проходят ученики.",
+            "list_url": "/admin/core/curriculumtopic/",
+            "add_url": "/admin/core/curriculumtopic/add/",
+        },
+        {
+            "title": "Типы заданий",
+            "subtitle": "LearningTaskType",
+            "description": "Учебные типы задач для школьного курса.",
+            "list_url": "/admin/core/learningtasktype/",
+            "add_url": "/admin/core/learningtasktype/add/",
+        },
+        {
+            "title": "Связка заданий",
+            "subtitle": "SchoolTaskMeta",
+            "description": "Привязка задач к теме, курсу и учебному типу.",
+            "list_url": "/admin/core/schooltaskmeta/",
+            "add_url": "/admin/core/schooltaskmeta/add/",
+        },
+        {
+            "title": "Индивидуальные планы",
+            "subtitle": "StudentLearningPlan",
+            "description": "Персональные программы учеников.",
+            "list_url": "/admin/core/studentlearningplan/",
+            "add_url": "/admin/core/studentlearningplan/add/",
+        },
+        {
+            "title": "Шаги плана",
+            "subtitle": "PlanItem",
+            "description": "Отдельные шаги внутри индивидуального плана.",
+            "list_url": "/admin/core/planitem/",
+            "add_url": "/admin/core/planitem/add/",
+        },
+    ]
+    quick_start_steps = [
+        "Открыть курс «Математика, 7 класс»",
+        "Создать или проверить разделы",
+        "Добавить темы программы",
+        "Добавить типы заданий",
+        "Привязать задачи через SchoolTaskMeta",
+        "Создать индивидуальный план",
+    ]
+    return render(
+        request,
+        "core/admin_school_program.html",
+        {"sections": sections, "quick_start_steps": quick_start_steps},
+    )
+
+
+@login_required
 def admin_task_error_reports(request):
     if request.user.role != "admin":
         return redirect("login")
