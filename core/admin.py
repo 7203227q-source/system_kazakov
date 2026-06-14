@@ -8,10 +8,17 @@ from django.template.response import TemplateResponse
 from django.urls import path, reverse
 
 from .models import (
+    CurriculumTopic,
+    CurriculumUnit,
     ExamFormat,
     ExamScoreScale,
+    LearningTaskType,
+    LearningTrack,
+    PlanItem,
     Payment,
+    SchoolTaskMeta,
     SpacedRepetition,
+    StudentLearningPlan,
     Subject,
     Submission,
     SystemConfig,
@@ -257,3 +264,67 @@ class TaskTypeAdmin(admin.ModelAdmin):
     list_display = ("exam_format", "number", "name", "max_points", "is_geometry")
     list_filter = ("exam_format", "exam_format__subject", "is_geometry")
     search_fields = ("name",)
+
+
+@admin.register(LearningTrack)
+class LearningTrackAdmin(admin.ModelAdmin):
+    list_display = ("title", "subject", "mode", "grade", "is_active")
+    list_filter = ("mode", "grade", "is_active", "subject")
+    search_fields = ("title", "subject__name")
+
+
+@admin.register(CurriculumUnit)
+class CurriculumUnitAdmin(admin.ModelAdmin):
+    list_display = ("title", "learning_track", "position")
+    list_filter = ("learning_track",)
+    search_fields = ("title", "learning_track__title")
+
+
+@admin.register(CurriculumTopic)
+class CurriculumTopicAdmin(admin.ModelAdmin):
+    list_display = ("title", "unit", "position", "is_required", "legacy_topic")
+    list_filter = ("unit__learning_track", "is_required")
+    search_fields = ("title", "unit__title", "legacy_topic__name")
+
+
+@admin.register(LearningTaskType)
+class LearningTaskTypeAdmin(admin.ModelAdmin):
+    list_display = ("name", "learning_track", "code", "default_max_points", "is_extended_answer")
+    list_filter = ("learning_track", "is_extended_answer")
+    search_fields = ("name", "code", "learning_track__title")
+
+
+@admin.register(SchoolTaskMeta)
+class SchoolTaskMetaAdmin(admin.ModelAdmin):
+    list_display = (
+        "task",
+        "learning_track",
+        "curriculum_topic",
+        "learning_task_type",
+        "difficulty_level",
+        "status",
+        "generated_by_ai",
+        "generated_by",
+    )
+    list_filter = ("learning_track", "curriculum_topic", "learning_task_type", "status", "generated_by_ai")
+    search_fields = ("task__id", "learning_track__title", "curriculum_topic__title", "learning_task_type__name")
+    readonly_fields = ("generated_by_ai", "generated_by", "generation_notes")
+    actions = ["publish_drafts"]
+
+    @admin.action(description="Опубликовать черновики school-задач")
+    def publish_drafts(self, request, queryset):
+        queryset.filter(status="draft").update(status="published")
+
+
+@admin.register(StudentLearningPlan)
+class StudentLearningPlanAdmin(admin.ModelAdmin):
+    list_display = ("student", "learning_track", "goal_type", "status", "diagnostic_completed_at", "updated_at")
+    list_filter = ("status", "goal_type", "learning_track")
+    search_fields = ("student__username", "learning_track__title")
+
+
+@admin.register(PlanItem)
+class PlanItemAdmin(admin.ModelAdmin):
+    list_display = ("plan", "curriculum_topic", "priority", "recommended_task_count", "status", "next_review_at")
+    list_filter = ("status", "plan__learning_track")
+    search_fields = ("plan__student__username", "curriculum_topic__title", "plan__learning_track__title")

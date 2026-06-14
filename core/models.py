@@ -1,5 +1,6 @@
 import uuid
 import re
+from decimal import Decimal
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models import Q
@@ -179,6 +180,110 @@ class Topic(models.Model):
         return f"{self.subject.name} - {self.name}"
 
 
+class LearningTrack(models.Model):
+    MODE_CHOICES = [
+        ("school", "Школьная программа"),
+    ]
+
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="learning_tracks")
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES)
+    grade = models.PositiveSmallIntegerField()
+    title = models.CharField(max_length=200)
+    academic_year = models.CharField(max_length=32, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("subject", "mode", "grade", "title"),
+                name="uniq_learning_track_subject_mode_grade_title",
+            )
+        ]
+        ordering = ["grade", "title", "id"]
+
+    def __str__(self):
+        return self.title
+
+
+class CurriculumUnit(models.Model):
+    learning_track = models.ForeignKey(
+        LearningTrack,
+        on_delete=models.CASCADE,
+        related_name="units",
+    )
+    title = models.CharField(max_length=200)
+    position = models.PositiveIntegerField()
+    description = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("learning_track", "position"),
+                name="uniq_curriculum_unit_learning_track_position",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.learning_track.title} — {self.title}"
+
+
+class CurriculumTopic(models.Model):
+    unit = models.ForeignKey(
+        CurriculumUnit,
+        on_delete=models.CASCADE,
+        related_name="topics",
+    )
+    legacy_topic = models.ForeignKey(
+        Topic,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="curriculum_topics",
+    )
+    title = models.CharField(max_length=200)
+    position = models.PositiveIntegerField()
+    difficulty_baseline = models.PositiveSmallIntegerField(default=1)
+    is_required = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("unit", "position"),
+                name="uniq_curriculum_topic_unit_position",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.unit.title} — {self.title}"
+
+
+class LearningTaskType(models.Model):
+    learning_track = models.ForeignKey(
+        LearningTrack,
+        on_delete=models.CASCADE,
+        related_name="learning_task_types",
+    )
+    code = models.SlugField(max_length=64)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    default_max_points = models.PositiveSmallIntegerField(default=1)
+    is_extended_answer = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["name", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("learning_track", "code"),
+                name="uniq_learning_task_type_learning_track_code",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.learning_track.title} — {self.name}"
+
+
 class Task(models.Model):
     fipi_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="ID задания ФИПИ")
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='tasks')
@@ -258,6 +363,120 @@ class Task(models.Model):
     def __str__(self):
         fipi_str = f" ({self.fipi_id})" if self.fipi_id else ""
         return f"Task {self.id}{fipi_str} ({self.topic.name})"
+
+
+class SchoolTaskMeta(models.Model):
+    STATUS_CHOICES = [
+        ("draft", "Черновик"),
+        ("published", "Опубликовано"),
+    ]
+
+    task = models.OneToOneField(Task, on_delete=models.CASCADE, related_name="school_meta")
+    learning_track = models.ForeignKey(
+        LearningTrack,
+        on_delete=models.CASCADE,
+        related_name="school_task_meta",
+    )
+    curriculum_topic = models.ForeignKey(
+        CurriculumTopic,
+        on_delete=models.CASCADE,
+        related_name="school_task_meta",
+    )
+    learning_task_type = models.ForeignKey(
+        LearningTaskType,
+        on_delete=models.CASCADE,
+        related_name="school_task_meta",
+    )
+    difficulty_level = models.PositiveSmallIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    generated_by_ai = models.BooleanField(default=False)
+    generated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="generated_school_tasks",
+    )
+    generation_notes = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["learning_track", "curriculum_topic", "learning_task_type", "task_id"]
+
+    def __str__(self):
+        return f"{self.learning_track.title} — Task {self.task_id}"
+
+
+class StudentLearningPlan(models.Model):
+    GOAL_CHOICES = [
+        ("подтянуть базу", "Подтянуть базу"),
+        ("идти по школьной программе", "Идти по школьной программе"),
+        ("ускоренный проход", "Ускоренный проход"),
+    ]
+    STATUS_CHOICES = [
+        ("draft", "Черновик"),
+        ("active", "Активный"),
+        ("completed", "Завершён"),
+    ]
+
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="learning_plans",
+        limit_choices_to={"role": "student"},
+    )
+    learning_track = models.ForeignKey(
+        LearningTrack,
+        on_delete=models.CASCADE,
+        related_name="learning_plans",
+    )
+    goal_type = models.CharField(max_length=64, choices=GOAL_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
+    diagnostic_completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_learning_plans",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+
+    def __str__(self):
+        return f"{self.student.username} — {self.learning_track.title}"
+
+
+class PlanItem(models.Model):
+    STATUS_CHOICES = [
+        ("assigned", "Назначено"),
+        ("in_progress", "В работе"),
+        ("repeat", "Повторить"),
+        ("mastered", "Освоено"),
+    ]
+
+    plan = models.ForeignKey(
+        StudentLearningPlan,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    curriculum_topic = models.ForeignKey(
+        CurriculumTopic,
+        on_delete=models.CASCADE,
+        related_name="plan_items",
+    )
+    priority = models.PositiveSmallIntegerField(default=1)
+    target_mastery = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.80"))
+    recommended_task_count = models.PositiveSmallIntegerField(default=5)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="assigned")
+    next_review_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-priority", "id"]
+
+    def __str__(self):
+        return f"{self.plan} — {self.curriculum_topic.title}"
 
 class TaskVariant(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='variants')
@@ -385,6 +604,37 @@ class Assignment(models.Model):
         verbose_name="Когда калибровали learning_velocity по этому варианту",
     )
     exam_format = models.ForeignKey(ExamFormat, on_delete=models.SET_NULL, null=True, blank=True, related_name="assignments")
+    ASSIGNMENT_MODE_CHOICES = [
+        ("exam", "Экзамен"),
+        ("school", "Школьная программа"),
+    ]
+    assignment_mode = models.CharField(
+        max_length=20,
+        choices=ASSIGNMENT_MODE_CHOICES,
+        default="exam",
+        verbose_name="Режим варианта",
+    )
+    learning_track = models.ForeignKey(
+        LearningTrack,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assignments",
+    )
+    curriculum_topic = models.ForeignKey(
+        CurriculumTopic,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assignments",
+    )
+    learning_task_type = models.ForeignKey(
+        LearningTaskType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assignments",
+    )
     is_deleted = models.BooleanField(default=False, verbose_name="Удалено (скрыто у ученика)")
     deleted_at = models.DateTimeField(null=True, blank=True, verbose_name="Когда удалено")
     deleted_by = models.ForeignKey(

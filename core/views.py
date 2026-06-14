@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.contrib import messages
 from django.db import models, IntegrityError
 from django.core.paginator import Paginator
@@ -11,11 +11,12 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import timedelta, date
 import uuid
-from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, SpacedRepetitionRemovalRequest, TaskLog, TaskErrorReport
+from .models import User, Payment, Task, TaskGenerationLog, TaskVariant, Submission, SubmissionComment, ExamFormat, Assignment, StudentSubjectProfile, Subject, DailySnapshot, WhiteboardSession, WhiteboardEvent, AssignmentExtensionRequest, SpacedRepetition, SpacedRepetitionRemovalRequest, TaskLog, TaskErrorReport, LearningTrack, CurriculumTopic, LearningTaskType
 import time
 import json
 from .analytics import record_task_log, get_adaptive_task_for_student
 from .services import get_due_tasks_for_student, normalize_active_time_seconds, process_task_submission
+from .services_school_plan import collect_diagnostic_scores_for_track, create_initial_learning_plan
 from .system_info import get_system_metrics, check_openrouter_api
 import os
 
@@ -2652,6 +2653,35 @@ def tutor_update_student_contacts(request, student_id):
     messages.success(request, "Контакты и заметки успешно сохранены.")
     return redirect(f"{reverse('tutor_dashboard')}?student_id={student.id}")
 
+
+@login_required
+def tutor_start_school_plan(request, student_id):
+    if request.user.role != "tutor":
+        return HttpResponseForbidden("Only tutors can start school plans.")
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST required.")
+
+    student = get_object_or_404(User, id=student_id, role="student")
+    if not request.user.students.filter(id=student.id).exists():
+        return HttpResponseForbidden("Student is not linked to this tutor.")
+
+    track_id = (request.POST.get("learning_track") or "").strip()
+    if not track_id.isdigit():
+        return HttpResponseBadRequest("learning_track is required.")
+
+    track = get_object_or_404(LearningTrack, id=int(track_id), mode="school")
+    diagnostic_scores = collect_diagnostic_scores_for_track(track=track, data=request.POST)
+    goal_type = (request.POST.get("goal_type") or "идти по школьной программе").strip() or "идти по школьной программе"
+
+    create_initial_learning_plan(
+        student=student,
+        track=track,
+        diagnostic_scores=diagnostic_scores,
+        goal_type=goal_type,
+        created_by=request.user,
+    )
+    return redirect("tutor_student_history", student_id=student.id)
+
 @login_required
 def tutor_dashboard(request):
     """Дашборд Репетитора"""
@@ -3884,6 +3914,7 @@ def tutor_create_assignment(request):
         return redirect('login')
 
     students = request.user.students.all()
+    mode = ((request.GET.get("mode") or request.POST.get("mode") or "").strip() or "exam").lower()
     base_exam_formats = ExamFormat.objects.select_related("subject").order_by("subject__name", "-is_active", "-year", "name")
     sid_raw = (request.GET.get("student_id") or "").strip()
     if sid_raw.isdigit() and students.filter(id=int(sid_raw)).exists():
@@ -3895,6 +3926,7 @@ def tutor_create_assignment(request):
 
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
+        mode = ((request.POST.get("mode") or mode).strip() or "exam").lower()
         exam_format_id_raw = (request.POST.get('exam_format') or '').strip()
         kind = request.POST.get('kind', 'homework')
         submit_action = (request.POST.get('submit_action') or 'preview').strip()
@@ -3907,6 +3939,90 @@ def tutor_create_assignment(request):
         student = get_object_or_404(User, id=student_id, role='student')
         if students.filter(id=int(student.id)).exists():
             request.session["tutor_selected_student_id"] = int(student.id)
+
+        if mode == "school":
+            track_id_raw = (request.POST.get("learning_track") or "").strip()
+            topic_id_raw = (request.POST.get("curriculum_topic") or "").strip()
+            learning_task_type_id_raw = (request.POST.get("learning_task_type") or "").strip()
+            tasks_per_type_raw = (request.POST.get("tasks_per_type") or "1").strip()
+
+            selected_track = None
+            if track_id_raw.isdigit():
+                selected_track = LearningTrack.objects.filter(
+                    id=int(track_id_raw),
+                    mode="school",
+                    is_active=True,
+                ).select_related("subject").first()
+            if selected_track is None:
+                messages.error(request, "Выберите трек обучения.")
+                request.session['saved_assignment_form'] = dict(request.POST)
+                return redirect(f"{reverse('tutor_create_assignment')}?mode=school")
+
+            selected_curriculum_topic = None
+            if topic_id_raw.isdigit():
+                selected_curriculum_topic = CurriculumTopic.objects.filter(
+                    id=int(topic_id_raw),
+                    unit__learning_track=selected_track,
+                ).select_related("unit").first()
+            if selected_curriculum_topic is None:
+                messages.error(request, "Выберите тему программы.")
+                request.session['saved_assignment_form'] = dict(request.POST)
+                return redirect(
+                    f"{reverse('tutor_create_assignment')}?mode=school&student_id={student.id}&learning_track={selected_track.id}"
+                )
+
+            selected_learning_task_type = None
+            if learning_task_type_id_raw.isdigit():
+                selected_learning_task_type = LearningTaskType.objects.filter(
+                    id=int(learning_task_type_id_raw),
+                    learning_track=selected_track,
+                ).first()
+            if selected_learning_task_type is None:
+                messages.error(request, "Выберите тип учебной задачи.")
+                request.session['saved_assignment_form'] = dict(request.POST)
+                return redirect(
+                    f"{reverse('tutor_create_assignment')}?mode=school&student_id={student.id}&learning_track={selected_track.id}"
+                )
+
+            tasks_per_type = int(tasks_per_type_raw) if tasks_per_type_raw.isdigit() else 1
+            tasks_per_type = max(1, min(20, tasks_per_type))
+            unique_tasks = list(
+                Task.objects.filter(
+                    school_meta__learning_track=selected_track,
+                    school_meta__curriculum_topic=selected_curriculum_topic,
+                    school_meta__learning_task_type=selected_learning_task_type,
+                    school_meta__status="published",
+                )
+                .distinct()
+                .order_by("difficulty", "id")[:tasks_per_type]
+            )
+            if not unique_tasks:
+                messages.error(request, "Для выбранных фильтров нет опубликованных school-задач.")
+                request.session['saved_assignment_form'] = dict(request.POST)
+                return redirect(
+                    f"{reverse('tutor_create_assignment')}?mode=school&student_id={student.id}&learning_track={selected_track.id}"
+                )
+
+            if 'saved_assignment_form' in request.session:
+                del request.session['saved_assignment_form']
+
+            title_input = (request.POST.get('title') or '').strip()
+            max_seq = Assignment.objects.filter(student=student).aggregate(m=models.Max('student_seq'))['m'] or 0
+            seq_num = (max_seq or 0) + 1
+            assignment = Assignment.objects.create(
+                tutor=request.user,
+                student=student,
+                title=title_input or f"{selected_track.title} — {selected_curriculum_topic.title}",
+                kind=kind,
+                student_seq=seq_num,
+                is_draft=True,
+                assignment_mode="school",
+                learning_track=selected_track,
+                curriculum_topic=selected_curriculum_topic,
+                learning_task_type=selected_learning_task_type,
+            )
+            assignment.tasks.add(*unique_tasks)
+            return redirect('tutor_preview_assignment', assignment_id=assignment.id)
 
         exam_format = None
         if exam_format_id_raw and exam_format_id_raw.isdigit():
@@ -4187,6 +4303,56 @@ def tutor_create_assignment(request):
     if selected_student_id and str(selected_student_id).isdigit():
         selected_student = students.filter(id=int(selected_student_id)).first()
 
+    school_tracks = LearningTrack.objects.filter(mode="school", is_active=True).select_related("subject").order_by("grade", "title", "id")
+    selected_learning_track = None
+    selected_curriculum_topic = None
+    selected_learning_task_type = None
+    available_topics = CurriculumTopic.objects.none()
+    available_learning_types = LearningTaskType.objects.none()
+
+    selected_learning_track_id = (request.GET.get("learning_track") or "").strip()
+    if not selected_learning_track_id and saved_form:
+        selected_learning_track_id = (saved_form.get("learning_track") or [""])[0]
+    if selected_learning_track_id.isdigit():
+        selected_learning_track = school_tracks.filter(id=int(selected_learning_track_id)).first()
+    elif mode == "school":
+        selected_learning_track = (
+            school_tracks.filter(units__topics__isnull=False, learning_task_types__isnull=False)
+            .distinct()
+            .order_by("-id")
+            .first()
+            or school_tracks.order_by("-id").first()
+        )
+
+    if selected_learning_track is not None:
+        available_topics = CurriculumTopic.objects.filter(unit__learning_track=selected_learning_track).select_related("unit").order_by("unit__position", "position", "id")
+        available_learning_types = LearningTaskType.objects.filter(learning_track=selected_learning_track).order_by("name", "id")
+
+    selected_curriculum_topic_id = (request.GET.get("curriculum_topic") or "").strip()
+    if not selected_curriculum_topic_id and saved_form:
+        selected_curriculum_topic_id = (saved_form.get("curriculum_topic") or [""])[0]
+    if selected_curriculum_topic_id.isdigit():
+        selected_curriculum_topic = available_topics.filter(id=int(selected_curriculum_topic_id)).first()
+
+    selected_learning_task_type_id = (request.GET.get("learning_task_type") or "").strip()
+    if not selected_learning_task_type_id and saved_form:
+        selected_learning_task_type_id = (saved_form.get("learning_task_type") or [""])[0]
+    if selected_learning_task_type_id.isdigit():
+        selected_learning_task_type = available_learning_types.filter(id=int(selected_learning_task_type_id)).first()
+
+    if mode == "school":
+        return render(request, 'core/tutor_create_assignment.html', {
+            'students': students,
+            'saved_form': saved_form,
+            'mode': mode,
+            'school_tracks': school_tracks,
+            'selected_learning_track': selected_learning_track,
+            'available_topics': available_topics,
+            'selected_curriculum_topic': selected_curriculum_topic,
+            'available_learning_types': available_learning_types,
+            'selected_learning_task_type': selected_learning_task_type,
+        })
+
     if selected_student:
         subject_ids = list(
             StudentSubjectProfile.objects.filter(student=selected_student).values_list("subject_id", flat=True).distinct()
@@ -4339,6 +4505,7 @@ def tutor_create_assignment(request):
 
     return render(request, 'core/tutor_create_assignment.html', {
         'students': students,
+        'mode': mode,
         'exam_formats': exam_formats,
         'selected_exam_format': selected_exam_format,
         'grouped_data': grouped_data,
@@ -4360,7 +4527,7 @@ def tutor_preview_assignment(request, assignment_id):
     from django.db.models import OuterRef, Subquery
     link_sq = through.objects.filter(assignment_id=assignment.id, task_id=OuterRef('pk')).values('id')[:1]
     tasks_qs = (
-        assignment.tasks.select_related('task_type')
+        assignment.tasks.select_related('task_type', 'school_meta__learning_task_type')
         .annotate(_link_id=Subquery(link_sq))
         .order_by('task_type__number', '_link_id')
     )

@@ -45,11 +45,87 @@
 
                 <h1 class="text-xl md:text-2xl font-bold text-gray-800 mb-2">Генератор вариантов</h1>
                 <p class="text-sm text-gray-500 mb-6 md:mb-8">Соберите вариант из случайных задач по нужным типам.</p>
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <a href="{% url 'tutor_create_assignment' %}{% if request.GET.student_id %}?student_id={{ request.GET.student_id }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium border {% if mode == 'school' %}bg-white text-gray-600 border-gray-300 hover:bg-gray-50{% else %}bg-primary text-white border-primary{% endif %}">
+                        Экзамен
+                    </a>
+                    <a href="{% url 'tutor_create_school_assignment' %}?mode=school{% if request.GET.student_id %}&student_id={{ request.GET.student_id }}{% endif %}" class="px-4 py-2 rounded-lg text-sm font-medium border {% if mode == 'school' %}bg-primary text-white border-primary{% else %}bg-white text-gray-600 border-gray-300 hover:bg-gray-50{% endif %}">
+                        Школьная программа
+                    </a>
+                </div>
 
                 <form method="POST" action="{% url 'tutor_create_assignment' %}" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {% csrf_token %}
+                <input type="hidden" name="mode" value="{{ mode|default:'exam' }}">
                 
                 <div class="p-6 border-b border-gray-100 space-y-6">
+                    {% if mode == 'school' %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Кому назначить <span class="text-red-500">*</span></label>
+                            <select id="student-select" name="student_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required onchange="updateBuilderSelection()">
+                                <option value="">-- Выберите ученика --</option>
+                                {% for student in students %}
+                                <option value="{{ student.id }}" {% if saved_form.student_id.0 == student.id|stringformat:"s" or request.GET.student_id == student.id|stringformat:"s" or request.session.tutor_selected_student_id == student.id %}selected{% endif %}>{{ student.get_full_name|default:student.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Трек обучения <span class="text-red-500">*</span></label>
+                            <select id="learning-track-select" name="learning_track" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required onchange="updateBuilderSelection()">
+                                <option value="">-- Выберите трек --</option>
+                                {% for track in school_tracks %}
+                                <option value="{{ track.id }}" {% if selected_learning_track and selected_learning_track.id == track.id %}selected{% endif %}>{{ track.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Тема программы <span class="text-red-500">*</span></label>
+                            <select id="curriculum-topic-select" name="curriculum_topic" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required>
+                                <option value="">-- Выберите тему --</option>
+                                {% for topic in available_topics %}
+                                <option value="{{ topic.id }}" {% if selected_curriculum_topic and selected_curriculum_topic.id == topic.id %}selected{% endif %}>{{ topic.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Тип учебной задачи <span class="text-red-500">*</span></label>
+                            <select id="learning-task-type-select" name="learning_task_type" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary" required>
+                                <option value="">-- Выберите тип задачи --</option>
+                                {% for item in available_learning_types %}
+                                <option value="{{ item.id }}" {% if selected_learning_task_type and selected_learning_task_type.id == item.id %}selected{% endif %}>{{ item.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Сколько задач взять</label>
+                            <input type="number" name="tasks_per_type" min="1" max="20" value="{{ saved_form.tasks_per_type.0|default:'1' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                            <p class="text-xs text-gray-500 mt-1">Из опубликованных задач выбранной school-ветки.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Название варианта</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="title-input" name="title" value="{{ saved_form.title.0|default:'' }}" placeholder="Оставьте пустым для автогенерации" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                <button type="button" onclick="generateTitle()" class="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg font-medium transition text-sm flex items-center border border-gray-300" title="Сгенерировать название">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Если пусто, будет использован трек и тема программы.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Тип варианта</label>
+                            <select id="kind-select" name="kind" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="homework" {% if saved_form.kind.0 == 'homework' %}selected{% endif %}>Домашняя работа</option>
+                                <option value="test" {% if saved_form.kind.0 == 'test' %}selected{% endif %}>Тест</option>
+                                <option value="control_test" {% if saved_form.kind.0 == 'control_test' %}selected{% endif %}>Контрольный тест</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% else %}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Кому назначить <span class="text-red-500">*</span></label>
@@ -118,9 +194,17 @@
                             <p class="text-xs text-gray-500 mt-1">Если 0 — у всех вариантов будет одинаковая дата.</p>
                         </div>
                     </div>
+                    {% endif %}
                     </div>
                 </div>
 
+                {% if mode == 'school' %}
+                <div class="p-6 bg-gray-50">
+                    <div class="bg-white rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
+                        Подбор идёт по school-метаданным задачи: трек, тема программы и тип учебной задачи.
+                    </div>
+                </div>
+                {% else %}
                 <div class="p-6 bg-gray-50">
                     <div class="flex justify-between items-center mb-6">
                         <div>
@@ -200,14 +284,21 @@
                         {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="p-6 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3">
+                    {% if mode == 'school' %}
+                    <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center shadow-sm justify-center">
+                        <i class="fas fa-magic mr-2"></i> Создать предпросмотр
+                    </button>
+                    {% else %}
                     <button type="submit" name="submit_action" value="preview" class="bg-primary text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center shadow-sm justify-center">
                         <i class="fas fa-magic mr-2"></i> Сгенерировать предпросмотр
                     </button>
                     <button type="submit" name="submit_action" value="publish_bulk" class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center shadow-sm justify-center">
                         <i class="fas fa-bolt mr-2"></i> Сгенерировать и назначить
                     </button>
+                    {% endif %}
                 </div>
             </form>
         </div>
@@ -366,11 +457,23 @@
     function updateBuilderSelection() {
         const student = document.getElementById("student-select");
         const examFormat = document.getElementById("exam-format-select");
+        const learningTrack = document.getElementById("learning-track-select");
+        const mode = "{{ mode|default:'exam' }}";
         const url = new URL(window.location.href);
         const params = url.searchParams;
         params.delete("page");
+        if (mode === "school") {
+            params.set("mode", "school");
+        } else {
+            params.delete("mode");
+        }
         params.set("student_id", student && student.value ? student.value : "");
-        if (examFormat && examFormat.value) {
+        if (mode === "school" && learningTrack && learningTrack.value) {
+            params.set("learning_track", learningTrack.value);
+        } else {
+            params.delete("learning_track");
+        }
+        if (mode !== "school" && examFormat && examFormat.value) {
             params.set("exam_format", examFormat.value);
         } else {
             params.delete("exam_format");
@@ -385,19 +488,33 @@
     function generateTitle() {
         const studentSelect = document.getElementById("student-select");
         const formatSelect = document.getElementById("exam-format-select");
+        const learningTrackSelect = document.getElementById("learning-track-select");
+        const curriculumTopicSelect = document.getElementById("curriculum-topic-select");
         const kindSelect = document.getElementById("kind-select");
         const titleInput = document.getElementById("title-input");
+        const mode = "{{ mode|default:'exam' }}";
         
+        const studentName = studentSelect.options[studentSelect.selectedIndex].text;
+        const kindText = kindSelect.options[kindSelect.selectedIndex].text;
+
+        if (mode === "school") {
+            if (!studentSelect.value || !learningTrackSelect.value || !curriculumTopicSelect.value) {
+                alert("Сначала выберите ученика, трек и тему программы.");
+                return;
+            }
+            const trackText = learningTrackSelect.options[learningTrackSelect.selectedIndex].text;
+            const topicText = curriculumTopicSelect.options[curriculumTopicSelect.selectedIndex].text;
+            titleInput.value = `${trackText} — ${topicText} — ${studentName} — ${kindText}`;
+            return;
+        }
+
         if (!studentSelect.value || !formatSelect.value) {
             alert("Сначала выберите ученика и формат экзамена.");
             return;
         }
-        
-        const studentName = studentSelect.options[studentSelect.selectedIndex].text;
+
         const formatText = formatSelect.options[formatSelect.selectedIndex].text.split(' · ')[1] || formatSelect.options[formatSelect.selectedIndex].text;
         const cleanFormatText = formatText.replace(' (не активен)', '');
-        const kindText = kindSelect.options[kindSelect.selectedIndex].text;
-        
         titleInput.value = `${cleanFormatText} — ${studentName} — ${kindText}`;
     }
 </script>

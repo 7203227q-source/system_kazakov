@@ -44,6 +44,7 @@ urlpatterns = [
     
     path('tutor/', views.tutor_dashboard, name='tutor_dashboard'),
     path('tutor/student/<int:student_id>/contacts/', views.tutor_update_student_contacts, name='tutor_update_student_contacts'),
+    path('tutor/student/<int:student_id>/school-plan/start/', views.tutor_start_school_plan, name='tutor_start_school_plan'),
     path('tutor/student/<int:student_id>/exam-settings/', views.tutor_update_student_exam_settings, name='tutor_update_student_exam_settings'),
     path('tutor/student/<int:student_id>/add-subject/', views.tutor_add_student_subject, name='tutor_add_student_subject'),
     path('tutor/student/<int:student_id>/history/', views.tutor_student_history, name='tutor_student_history'),
@@ -78,6 +79,7 @@ urlpatterns = [
     path('tutor/tasks/<int:task_id>/regen/preview/', views.admin_task_regen_preview, name='admin_task_regen_preview'),
     path('tutor/tasks/<int:task_id>/regen/apply/', views.admin_task_regen_apply, name='admin_task_regen_apply'),
     path('tutor/create-assignment/', views.tutor_create_assignment, name='tutor_create_assignment'),
+    path('tutor/create-assignment/school/', views.tutor_create_assignment, name='tutor_create_school_assignment'),
     path('tutor/assignment/<int:assignment_id>/preview/', views.tutor_preview_assignment, name='tutor_preview_assignment'),
     path('tutor/assignment/<int:assignment_id>/summary/', views.tutor_assignment_summary, name='tutor_assignment_summary'),
     path('tutor/assignment/<int:assignment_id>/view/', views.tutor_assignment_view, name='tutor_assignment_view'),

@@ -32,6 +32,11 @@
             <div>
                 <h1 class="text-xl md:text-2xl font-bold text-gray-800">Предпросмотр: {{ assignment.title }}</h1>
                 <p class="text-sm text-gray-500 mt-1">Ученик: {{ assignment.student.get_full_name|default:assignment.student.username }}</p>
+                {% if assignment.assignment_mode == 'school' and assignment.learning_track %}
+                <p class="text-sm text-gray-500 mt-1">
+                    {{ assignment.learning_track.title }}{% if assignment.curriculum_topic %} · {{ assignment.curriculum_topic.title }}{% endif %}{% if assignment.learning_task_type %} · {{ assignment.learning_task_type.name }}{% endif %}
+                </p>
+                {% endif %}
             </div>
             <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                 <form method="POST" action="{% url 'tutor_publish_assignment' assignment.id %}" class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -70,7 +75,7 @@
                 <div class="bg-gray-50 px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-bold text-gray-800 mr-2">
-                            {% if task.task_type %}№{{ task.task_type.number }}. {{ task.task_type.name }}{% else %}Задача №{{ forloop.counter }}{% endif %}
+                            {% if task.task_type %}№{{ task.task_type.number }}. {{ task.task_type.name }}{% elif task.school_meta_id %}{{ task.school_meta.learning_task_type.name }}{% else %}Задача №{{ forloop.counter }}{% endif %}
                         </span>
                         {% if task.subtype_tag %}
                         <span class="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full">
@@ -81,12 +86,14 @@
                             Сложность: {{ task.difficulty }}
                         </span>
                     </div>
+                    {% if assignment.assignment_mode != 'school' %}
                     <form method="POST" action="{% url 'tutor_regenerate_task' assignment.id task.id %}" class="w-full sm:w-auto">
                         {% csrf_token %}
                         <button type="submit" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center transition bg-indigo-50 sm:bg-transparent px-3 py-2 sm:p-0 rounded-lg w-full sm:w-auto justify-center" title="Заменить на случайную такого же типа">
                             <i class="fas fa-sync-alt mr-2 sm:mr-1"></i> Заменить задачу
                         </button>
                     </form>
+                    {% endif %}
                 </div>
                 
                 <div class="px-4 sm:px-6 py-3 bg-indigo-50/30 border-b border-gray-100 flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm">
