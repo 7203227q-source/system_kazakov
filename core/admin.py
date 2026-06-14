@@ -23,6 +23,8 @@ from .models import (
     Submission,
     SystemConfig,
     Task,
+    TaskAudioAsset,
+    TaskContextGroup,
     TaskVariant,
     TaskType,
     Topic,
@@ -235,6 +237,21 @@ class SubmissionAdmin(admin.ModelAdmin):
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ('parent', 'student', 'tutor', 'amount', 'lessons_credited', 'status')
     list_filter = ('status', 'created_at')
+
+
+@admin.register(TaskAudioAsset)
+class TaskAudioAssetAdmin(admin.ModelAdmin):
+    list_display = ("id", "source", "original_url", "sha256", "size_bytes", "created_at")
+    search_fields = ("original_url", "sha256")
+    list_filter = ("source",)
+
+
+@admin.register(TaskContextGroup)
+class TaskContextGroupAdmin(admin.ModelAdmin):
+    list_display = ("id", "source", "group_key", "audio_asset", "subject", "exam_format", "created_at")
+    search_fields = ("group_key", "title", "position_hint")
+    list_filter = ("source", "subject", "exam_format")
+
 
 @admin.register(SystemConfig)
 class SystemConfigAdmin(admin.ModelAdmin):

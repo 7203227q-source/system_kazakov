@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlparse
 
+from . import services_reshuege_audio as reshuege_audio
 from .models import ExamFormat, Task, TaskType, TaskVariant, Topic
 from .task_html import normalize_task_html
 from .utils import download_and_replace_images
@@ -387,6 +388,7 @@ def import_one_task_from_sdamgia(
     exclude_larin: bool,
     theme: str = "classic",
     allow_bundle: bool = True,
+    resolved_context_group=None,
 ) -> dict:
     from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html, replace_svg_images_with_latex
 
@@ -403,6 +405,7 @@ def import_one_task_from_sdamgia(
             return {"task_id": task_id, "status": "skipped", "detail": "already exists"}
 
     html = fetch_task_page_html(base_url, task_id)
+    context_group = resolved_context_group
 
     bundle_code = None
     bundle_map: dict[int, str] = {}
@@ -418,6 +421,21 @@ def import_one_task_from_sdamgia(
 
     if skip_prototype and has_prototype_marker(html):
         return {"task_id": task_id, "status": "skipped", "detail": "prototype solution"}
+
+    if context_group is None:
+        audio_url = reshuege_audio.extract_audio_url(html, base_url=base_url)
+        if audio_url:
+            audio_asset = reshuege_audio.get_or_create_audio_asset(
+                source="reshuege",
+                original_url=audio_url,
+            )
+            context_group = reshuege_audio.get_or_create_context_group(
+                source="reshuege",
+                group_key=reshuege_audio.build_group_key(audio_url=audio_url),
+                subject=exam_format.subject,
+                exam_format=exam_format,
+                audio_asset=audio_asset,
+            )
 
     content_html, answer, solution_html = parse_task_page(html, task_id=task_id)
     content_html = normalize_task_html(normalize_sdamgia_html(content_html))
@@ -448,6 +466,7 @@ def import_one_task_from_sdamgia(
             "task_type": task_type,
             "subtype_tag": "",
             "bundle_code": bundle_code,
+            "context_group": context_group,
             "difficulty": 50,
             "correct_answer": answer,
             "exam_points": task_type.max_points,
@@ -476,6 +495,7 @@ def import_one_task_from_sdamgia(
                 exclude_larin=exclude_larin,
                 theme=theme,
                 allow_bundle=False,
+                resolved_context_group=context_group,
             )
         Task.objects.filter(fipi_id__in=list(bundle_map.values())).update(bundle_code=bundle_code)
 

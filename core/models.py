@@ -284,12 +284,71 @@ class LearningTaskType(models.Model):
         return f"{self.learning_track.title} — {self.name}"
 
 
+class TaskAudioAsset(models.Model):
+    SOURCE_CHOICES = [
+        ("reshuege", "РешуОГЭ/ЕГЭ"),
+    ]
+
+    source = models.CharField(max_length=32, choices=SOURCE_CHOICES)
+    original_url = models.URLField(max_length=1000)
+    file = models.FileField(upload_to="tasks/audio/")
+    sha256 = models.CharField(max_length=64)
+    mime_type = models.CharField(max_length=128, blank=True, default="")
+    size_bytes = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("source", "original_url"), name="uniq_task_audio_asset_source_url"),
+            models.UniqueConstraint(fields=("source", "sha256"), name="uniq_task_audio_asset_source_sha256"),
+        ]
+
+
+class TaskContextGroup(models.Model):
+    SOURCE_CHOICES = [
+        ("reshuege", "РешуОГЭ/ЕГЭ"),
+    ]
+
+    source = models.CharField(max_length=32, choices=SOURCE_CHOICES)
+    group_key = models.CharField(max_length=1000)
+    audio_asset = models.ForeignKey(
+        TaskAudioAsset,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="context_groups",
+    )
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="task_context_groups")
+    exam_format = models.ForeignKey(
+        ExamFormat,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="task_context_groups",
+    )
+    title = models.CharField(max_length=255, blank=True, default="")
+    position_hint = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("source", "group_key"), name="uniq_task_context_group_source_key"),
+        ]
+
+
 class Task(models.Model):
     fipi_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="ID задания ФИПИ")
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='tasks')
     task_type = models.ForeignKey(TaskType, on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks', verbose_name="Тип задания (КИМ)")
     subtype_tag = models.CharField(max_length=200, null=True, blank=True, verbose_name="Подтип/Тег математической логики")
     bundle_code = models.CharField(max_length=200, null=True, blank=True, db_index=True, verbose_name="Код связки (групповой блок)")
+    context_group = models.ForeignKey(
+        "TaskContextGroup",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasks",
+    )
 
     correct_answer = models.TextField(verbose_name="Правильный ответ/решение")
     difficulty = models.IntegerField(default=50, verbose_name="Сложность (1-100)")

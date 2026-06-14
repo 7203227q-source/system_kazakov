@@ -4156,6 +4156,48 @@ def tutor_create_assignment(request):
                     )
                     selected_tasks.extend(tasks_of_subtype)
 
+        def _expand_grouped_tasks(tasks: list[Task]) -> list[Task]:
+            if not tasks:
+                return []
+
+            context_group_ids = {task.context_group_id for task in tasks if task.context_group_id}
+            grouped_tasks_by_group_id: dict[int, list[Task]] = {}
+            if context_group_ids:
+                for grouped_task in (
+                    Task.objects.filter(context_group_id__in=context_group_ids)
+                    .select_related("task_type")
+                    .order_by("task_type__number", "id")
+                ):
+                    grouped_tasks_by_group_id.setdefault(grouped_task.context_group_id, []).append(grouped_task)
+
+            expanded: list[Task] = []
+            seen_task_ids: set[int] = set()
+            expanded_group_ids: set[int] = set()
+
+            for task in tasks:
+                if task.context_group_id and task.context_group_id in grouped_tasks_by_group_id:
+                    if task.context_group_id in expanded_group_ids:
+                        continue
+                    expanded_group_ids.add(task.context_group_id)
+                    ordered_group = [task] + [
+                        grouped_task
+                        for grouped_task in grouped_tasks_by_group_id[task.context_group_id]
+                        if grouped_task.id != task.id
+                    ]
+                    for grouped_task in ordered_group:
+                        if grouped_task.id in seen_task_ids:
+                            continue
+                        seen_task_ids.add(grouped_task.id)
+                        expanded.append(grouped_task)
+                    continue
+
+                if task.id in seen_task_ids:
+                    continue
+                seen_task_ids.add(task.id)
+                expanded.append(task)
+
+            return expanded
+
         def _build_unique_tasks() -> list[Task]:
             """
             Собирает список уникальных задач под один вариант.
@@ -4213,14 +4255,7 @@ def tutor_create_assignment(request):
 
             if not selected:
                 return []
-
-            unique: list[Task] = []
-            seen_ids: set[int] = set()
-            for t in selected:
-                if t.id not in seen_ids:
-                    seen_ids.add(t.id)
-                    unique.append(t)
-            return unique
+            return _expand_grouped_tasks(selected)
 
         if 'saved_assignment_form' in request.session:
             del request.session['saved_assignment_form']
