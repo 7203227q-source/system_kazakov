@@ -365,13 +365,25 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def get_content_for_theme(self, theme='classic'):
+        def _apply_audio_asset(html):
+            from core.services_reshuege_audio import rewrite_audio_sources
+
+            audio_asset = getattr(getattr(self, "context_group", None), "audio_asset", None)
+            audio_url = ""
+            if audio_asset and getattr(audio_asset, "file", None):
+                try:
+                    audio_url = audio_asset.file.url
+                except ValueError:
+                    audio_url = ""
+            return rewrite_audio_sources(html, audio_url=audio_url)
+
         variant = self.variants.filter(theme=theme).first()
         if variant:
             from core.tex_replace import fix_latex_tokens_in_html, fix_math_words_in_html
 
             fixed, _ = fix_latex_tokens_in_html(variant.content)
             fixed2, _ = fix_math_words_in_html(fixed)
-            return fixed2
+            return _apply_audio_asset(fixed2)
         # Fallback to classic if preferred theme not found
         classic = self.variants.filter(theme='classic').first()
         if classic:
@@ -379,7 +391,7 @@ class Task(models.Model):
 
             fixed, _ = fix_latex_tokens_in_html(classic.content)
             fixed2, _ = fix_math_words_in_html(fixed)
-            return fixed2
+            return _apply_audio_asset(fixed2)
         # Try to get the first available variant if neither theme nor classic is found
         any_variant = self.variants.first()
         if any_variant:
@@ -387,7 +399,7 @@ class Task(models.Model):
 
             fixed, _ = fix_latex_tokens_in_html(any_variant.content)
             fixed2, _ = fix_math_words_in_html(fixed)
-            return fixed2
+            return _apply_audio_asset(fixed2)
         # Ultimate fallback (should not happen if db is consistent)
         return "Условие задачи отсутствует."
 

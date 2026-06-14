@@ -2,7 +2,7 @@ from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from unittest.mock import patch
 
-from core.models import ExamFormat, Subject, Task, TaskAudioAsset, TaskContextGroup, TaskType, Topic
+from core.models import ExamFormat, Subject, Task, TaskAudioAsset, TaskContextGroup, TaskType, TaskVariant, Topic
 
 
 class ReshuegeAudioModelTests(TestCase):
@@ -249,3 +249,48 @@ class ReshuegeAudioImportTests(TestCase):
 
         self.assertEqual(mocked_audio.call_count, 1)
         self.assertEqual(mocked_group_get_or_create.call_count, 1)
+
+
+@override_settings(MEDIA_URL="/media/")
+class ReshuegeAudioRenderTests(TestCase):
+    def test_get_content_for_theme_uses_local_audio_asset_url(self):
+        subject = Subject.objects.create(name="Английский язык")
+        exam_format = ExamFormat.objects.create(
+            subject=subject,
+            name="ОГЭ английский",
+            year=2026,
+            is_active=True,
+        )
+        topic = Topic.objects.create(subject=subject, name="Аудирование")
+        asset = TaskAudioAsset.objects.create(
+            source="reshuege",
+            original_url="https://en-oge.sdamgia.ru/files/audio123.mp3",
+            file="tasks/audio/audio123.mp3",
+            sha256="hash123",
+            mime_type="audio/mpeg",
+            size_bytes=10,
+        )
+        group = TaskContextGroup.objects.create(
+            source="reshuege",
+            group_key="audio:https://en-oge.sdamgia.ru/files/audio123.mp3",
+            audio_asset=asset,
+            subject=subject,
+            exam_format=exam_format,
+        )
+        task = Task.objects.create(
+            topic=topic,
+            correct_answer="1",
+            difficulty=10,
+            exam_points=1,
+            context_group=group,
+        )
+        TaskVariant.objects.create(
+            task=task,
+            theme="classic",
+            content='<p>Прослушайте аудио.</p><audio controls src="/files/audio123.mp3"></audio>',
+        )
+
+        html = task.get_content_for_theme("classic")
+
+        self.assertIn('/media/tasks/audio/audio123.mp3', html)
+        self.assertNotIn('src="/files/audio123.mp3"', html)

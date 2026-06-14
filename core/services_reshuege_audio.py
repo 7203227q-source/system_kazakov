@@ -34,6 +34,28 @@ def build_group_key(*, audio_url: str) -> str:
     return f"audio:{normalize_audio_url(audio_url)}"
 
 
+def rewrite_audio_sources(html: str, *, audio_url: str) -> str:
+    if not html or not audio_url:
+        return html
+
+    soup = BeautifulSoup(html, "html.parser")
+    audio_nodes = soup.select("audio")
+    source_nodes = soup.select("audio source[src], source[src]")
+
+    if audio_nodes or source_nodes:
+        for audio in audio_nodes:
+            audio["src"] = audio_url
+        for source in source_nodes:
+            source["src"] = audio_url
+        return str(soup)
+
+    injected = BeautifulSoup("", "html.parser")
+    audio_tag = injected.new_tag("audio", controls=True)
+    audio_tag["src"] = audio_url
+    soup.insert(0, audio_tag)
+    return str(soup)
+
+
 def get_or_create_context_group(
     *,
     source: str,
