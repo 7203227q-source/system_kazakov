@@ -7168,6 +7168,32 @@ def api_verify_with_ai(request, submission_id):
         except Exception:
             pass
 
+        srs_due_remaining = None
+        srs_eta_minutes = None
+        try:
+            if SpacedRepetition.objects.filter(student=request.user, task=task).exists():
+                srs_due_remaining = get_due_tasks_for_student(
+                    request.user,
+                    subject_id=getattr(getattr(task, "topic", None), "subject_id", None),
+                ).count()
+                avg = (
+                    TaskLog.objects.filter(student=request.user, is_anomaly=False, time_spent__gt=0)
+                    .aggregate(a=models.Avg("time_spent"))
+                    .get("a")
+                )
+                if not avg:
+                    avg = (
+                        TaskLog.objects.filter(is_anomaly=False, time_spent__gt=0)
+                        .aggregate(a=models.Avg("time_spent"))
+                        .get("a")
+                    )
+                avg_seconds = float(avg) if avg else 60.0
+                import math
+                srs_eta_minutes = int(math.ceil((float(srs_due_remaining) * avg_seconds) / 60.0))
+        except Exception:
+            srs_due_remaining = None
+            srs_eta_minutes = None
+
         return JsonResponse({
             'status': 'ok',
             'primary_score': primary_score,
@@ -7185,6 +7211,8 @@ def api_verify_with_ai(request, submission_id):
             'solution_html': solution_html,
             'model': model_used,
             'cooldown_seconds': cooldown_seconds,
+            'srs_due_remaining': srs_due_remaining,
+            'srs_eta_minutes': srs_eta_minutes,
         })
     except Exception as e:
         return JsonResponse({'error': 'ai_failed', 'upstream_message': str(e)}, status=400)

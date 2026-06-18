@@ -99,12 +99,12 @@
 
             {% if mode == 'srs' %}
             <div class="mb-4 text-sm text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
-                <div><span class="font-bold">Сегодня повторить:</span> {{ srs_due_total|default:0 }}</div>
+                <div><span class="font-bold">Сегодня повторить:</span> <span id="srs_due_total_value">{{ srs_due_total|default:0 }}</span></div>
                 {% if task %}
-                <div><span class="font-bold">После этой останется:</span> {{ srs_due_left_after_current|default:0 }}</div>
+                <div><span class="font-bold">После этой останется:</span> <span id="srs_due_left_value">{{ srs_due_left_after_current|default:0 }}</span></div>
                 {% endif %}
                 {% if srs_eta_minutes is not None %}
-                <div><span class="font-bold">≈</span> {{ srs_eta_minutes }} мин</div>
+                <div><span class="font-bold">≈</span> <span id="srs_eta_value">{{ srs_eta_minutes }}</span> мин</div>
                 {% endif %}
             </div>
             {% endif %}
@@ -423,6 +423,16 @@
                                     }
                                     if (solBlock) solBlock.classList.remove('hidden');
                                     if (verdict) verdict.classList.remove('hidden');
+                                    if (typeof data.srs_due_remaining === 'number') {
+                                        const totalEl = document.getElementById('srs_due_total_value');
+                                        const leftEl = document.getElementById('srs_due_left_value');
+                                        if (totalEl) totalEl.textContent = String(data.srs_due_remaining);
+                                        if (leftEl) leftEl.textContent = String(data.srs_due_remaining);
+                                    }
+                                    if (typeof data.srs_eta_minutes === 'number') {
+                                        const etaEl = document.getElementById('srs_eta_value');
+                                        if (etaEl) etaEl.textContent = String(data.srs_eta_minutes);
+                                    }
                                     // Скроем блок загрузки, чтобы не было двойного UI
                                     const up = document.getElementById('srs_upload_block');
                                     if (up) up.classList.add('hidden');
