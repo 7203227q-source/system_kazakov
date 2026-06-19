@@ -3,10 +3,11 @@ from datetime import timedelta
 
 from django.db import models
 from django.db.models import Q
-from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
 from core.models import Submission, TaskType
+
+TASK_TYPE_RATE_RETROSPECTIVE_DAYS = (50, 32, 16, 8, 4)
 
 
 def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=None) -> str | None:
@@ -109,6 +110,60 @@ def build_submission_summary(student, *, subject_id: int | None) -> dict:
     return {"total": total, "correct": earned_total, "incorrect": incorrect_total, "correct_rate": correct_rate}
 
 
+def _task_type_rate_effective_dt(row) -> object:
+    return row["tutor_scored_at"] or row["ai_last_verify_at"] or row["created_at"]
+
+
+def _task_type_rate_points(row) -> tuple[int, float]:
+    mp = int(row["task__exam_points"] or 0)
+    if mp <= 0:
+        mp = int(row["task__task_type__max_points"] or 1)
+    mp = max(1, int(mp))
+
+    if bool(row["is_correct"]):
+        earned = float(mp)
+    else:
+        v = row["tutor_primary_score"]
+        if v is None:
+            v = row["primary_score"]
+        if v is None:
+            v = row["score"]
+        earned = float(v or 0)
+
+    return mp, earned
+
+
+def _build_task_type_rate_snapshot(rows: list[dict], *, anchor_day, half_life_days: float) -> dict[int, dict]:
+    latest_by_task: dict[int, dict] = {}
+    for row in rows:
+        effective_dt = _task_type_rate_effective_dt(row)
+        if not effective_dt or effective_dt.date() > anchor_day:
+            continue
+
+        task_id = int(row["task_id"])
+        current = latest_by_task.get(task_id)
+        if current is None or _task_type_rate_effective_dt(current) <= effective_dt:
+            latest_by_task[task_id] = row
+
+    agg: dict[int, dict] = {}
+    for row in latest_by_task.values():
+        number = int(row["task__task_type__number"])
+        effective_dt = _task_type_rate_effective_dt(row)
+        age_days = max(0, (anchor_day - effective_dt.date()).days)
+        weight = 0.5 ** (float(age_days) / float(half_life_days))
+        mp, earned = _task_type_rate_points(row)
+        frac = earned / float(mp) if mp > 0 else 0.0
+        frac = max(0.0, min(1.0, float(frac)))
+
+        bucket = agg.setdefault(number, {"wt": 0.0, "ws": 0.0, "total": 0.0, "correct": 0.0})
+        bucket["wt"] += float(weight)
+        bucket["ws"] += float(weight) * float(frac)
+        bucket["total"] += float(mp)
+        bucket["correct"] += float(earned)
+
+    return agg
+
+
 def build_task_type_rates(student, *, subject_id: int | None, exam_format, today=None) -> tuple[list[dict], str | None]:
     if not subject_id or not exam_format:
         return ([], None)
@@ -132,18 +187,13 @@ def build_task_type_rates(student, *, subject_id: int | None, exam_format, today
     )
     submissions_scored = submissions_base.filter(scored_filter)
 
-    latest_id_subq = (
-        submissions_scored.filter(task_id=OuterRef("task_id"))
-        .order_by("-created_at", "-id")
-        .values("id")[:1]
-    )
-    latest_rows = (
-        submissions_scored.annotate(latest_id=Subquery(latest_id_subq))
-        .filter(id=models.F("latest_id"))
-        .select_related("task", "task__task_type")
-        .values(
+    rows = list(
+        submissions_scored.values(
+            "task_id",
             "task__task_type__number",
             "created_at",
+            "tutor_scored_at",
+            "ai_last_verify_at",
             "is_correct",
             "tutor_primary_score",
             "primary_score",
@@ -153,37 +203,16 @@ def build_task_type_rates(student, *, subject_id: int | None, exam_format, today
         )
     )
 
-    half_life_days = 14.0
-    agg: dict[int, dict] = {}
-    for r in latest_rows:
-        n = int(r["task__task_type__number"])
-        created_at = r["created_at"]
-        age_days = max(0, (today - created_at.date()).days)
-        weight = 0.5 ** (float(age_days) / float(half_life_days))
-
-        mp = int(r["task__exam_points"] or 0)
-        if mp <= 0:
-            mp = int(r["task__task_type__max_points"] or 1)
-        mp = max(1, int(mp))
-
-        if bool(r["is_correct"]):
-            earned = float(mp)
-        else:
-            v = r["tutor_primary_score"]
-            if v is None:
-                v = r["primary_score"]
-            if v is None:
-                v = r["score"]
-            earned = float(v or 0)
-
-        frac = earned / float(mp) if mp > 0 else 0.0
-        frac = max(0.0, min(1.0, float(frac)))
-
-        a = agg.setdefault(n, {"wt": 0.0, "ws": 0.0, "total": 0.0, "correct": 0.0})
-        a["wt"] += float(weight)
-        a["ws"] += float(weight) * float(frac)
-        a["total"] += float(mp)
-        a["correct"] += float(earned)
+    half_life_days = 21.0
+    agg = _build_task_type_rate_snapshot(rows, anchor_day=today, half_life_days=half_life_days)
+    retrospective_agg = {
+        days: _build_task_type_rate_snapshot(
+            rows,
+            anchor_day=today - timedelta(days=days),
+            half_life_days=half_life_days,
+        )
+        for days in TASK_TYPE_RATE_RETROSPECTIVE_DAYS
+    }
 
     numbers = list(
         TaskType.objects.filter(exam_format=exam_format).values_list("number", flat=True).order_by("number")
@@ -197,9 +226,27 @@ def build_task_type_rates(student, *, subject_id: int | None, exam_format, today
     task_type_rates: list[dict] = []
     for n in numbers:
         a = agg.get(int(n))
+        retrospective = []
+        for days in TASK_TYPE_RATE_RETROSPECTIVE_DAYS:
+            snapshot = retrospective_agg[days].get(int(n))
+            retrospective.append(
+                {
+                    "days_ago": days,
+                    "rate": (float(snapshot["ws"]) / float(snapshot["wt"]) * 100.0)
+                    if snapshot and float(snapshot.get("wt") or 0.0) > 0
+                    else None,
+                }
+            )
         if not a or float(a.get("wt") or 0.0) <= 0:
             task_type_rates.append(
-                {"number": n, "name": task_type_name_map.get(n, ""), "rate": None, "total": 0, "correct": 0}
+                {
+                    "number": n,
+                    "name": task_type_name_map.get(n, ""),
+                    "rate": None,
+                    "total": 0,
+                    "correct": 0,
+                    "retrospective": retrospective,
+                }
             )
             continue
         rate = (float(a["ws"]) / float(a["wt"]) * 100.0) if float(a["wt"]) > 0 else None
@@ -210,6 +257,7 @@ def build_task_type_rates(student, *, subject_id: int | None, exam_format, today
                 "rate": rate,
                 "total": int(round(float(a["total"]))),
                 "correct": int(round(float(a["correct"]))),
+                "retrospective": retrospective,
             }
         )
 

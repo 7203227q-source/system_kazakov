@@ -1,5 +1,6 @@
 from datetime import datetime, time
 
+from bs4 import BeautifulSoup
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -57,11 +58,24 @@ class StudentDashboardTaskTypeRatesTests(TestCase):
         self.assertEqual(int(r1["total"]), 1)
         self.assertEqual(int(r1["correct"]), 1)
         self.assertEqual(int(round(float(r1["rate"]))), 100)
+        self.assertEqual([int(point["days_ago"]) for point in r1["retrospective"]], [50, 32, 16, 8, 4])
+        self.assertEqual(len(r1["retrospective"]), 5)
 
         r2 = next(r for r in rates if r["number"] == 2)
         self.assertEqual(int(r2["total"]), 2)
         self.assertEqual(int(r2["correct"]), 1)
         self.assertEqual(int(round(float(r2["rate"]))), 50)
+        self.assertEqual([int(point["days_ago"]) for point in r2["retrospective"]], [50, 32, 16, 8, 4])
+        self.assertEqual(len(r2["retrospective"]), 5)
+
+        for label in ["50д", "32д", "16д", "8д", "4д"]:
+            self.assertContains(res, label)
+
+        soup = BeautifulSoup(res.content, "html.parser")
+        tiles = soup.select(".task-type-tile")
+        self.assertEqual(len(tiles), 2)
+        retrospective_days = [el.get_text(" ", strip=True) for el in tiles[0].select("[data-retrospective-day]")]
+        self.assertEqual(retrospective_days, ["50д", "32д", "16д", "8д", "4д"])
 
     def test_dashboard_shows_no_tiles_when_exam_format_not_selected(self):
         StudentSubjectProfile.objects.filter(student=self.student, subject=self.subject).update(exam_format=None)
@@ -69,4 +83,3 @@ class StudentDashboardTaskTypeRatesTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.context.get("task_type_rates"), [])
         self.assertIsNone(res.context.get("active_exam_format_label"))
-

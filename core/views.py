@@ -3152,7 +3152,6 @@ def tutor_dashboard(request):
             )
 
         active_exam_format = None
-        task_type_name_map = {}
         if profiles:
             profile = (
                 StudentSubjectProfile.objects.filter(student=selected_student, subject_id=chart_subject_id)
@@ -3167,8 +3166,14 @@ def tutor_dashboard(request):
                     or ExamFormat.objects.filter(subject_id=chart_subject_id).order_by("-year", "name").first()
                 )
         if active_exam_format:
-            task_types_for_exam = list(TaskType.objects.filter(exam_format=active_exam_format).only("number", "name").order_by("number"))
-            task_type_name_map = {int(tt.number): tt.name for tt in task_types_for_exam}
+            from core.dashboard_analytics import build_task_type_rates
+
+            task_type_rates, active_exam_format_label = build_task_type_rates(
+                selected_student,
+                subject_id=chart_subject_id,
+                exam_format=active_exam_format,
+                today=today,
+            )
 
         # --- Exam display (баллы + оценка) for profile cards ---
         try:
@@ -3230,53 +3235,6 @@ def tutor_dashboard(request):
             Q(is_correct__isnull=False) | Q(tutor_primary_score__isnull=False) | Q(primary_score__isnull=False) | Q(score__isnull=False)
         )
 
-        last_sub = submissions_base.filter(task_id=OuterRef("task_id")).order_by("-created_at")
-        latest_rows = (
-            submissions_base.values(
-                "task_id",
-                "task__task_type__number",
-                "task__exam_points",
-                "task__task_type__max_points",
-            )
-            .distinct()
-            .annotate(
-                last_created_at=Subquery(last_sub.values("created_at")[:1]),
-                last_tutor_scored_at=Subquery(last_sub.values("tutor_scored_at")[:1]),
-                last_ai_last_verify_at=Subquery(last_sub.values("ai_last_verify_at")[:1]),
-                last_is_correct=Subquery(last_sub.values("is_correct")[:1]),
-                last_tutor_primary_score=Subquery(last_sub.values("tutor_primary_score")[:1]),
-                last_primary_score=Subquery(last_sub.values("primary_score")[:1]),
-                last_score=Subquery(last_sub.values("score")[:1]),
-            )
-        )
-
-        half_life_days = 14.0
-        agg = {}
-        for r in latest_rows:
-            n_raw = r.get("task__task_type__number")
-            if n_raw is None:
-                continue
-            dt = r.get("last_tutor_scored_at") or r.get("last_ai_last_verify_at") or r.get("last_created_at")
-            if not dt:
-                continue
-            age_days = (today - dt.date()).days
-            if age_days < 0:
-                age_days = 0
-            weight = 0.5 ** (age_days / half_life_days)
-            n = int(n_raw)
-            earned, mp, frac = _earned_max_fraction(
-                is_correct=r.get("last_is_correct"),
-                tutor_primary_score=r.get("last_tutor_primary_score"),
-                primary_score=r.get("last_primary_score"),
-                score=r.get("last_score"),
-                task_exam_points=r.get("task__exam_points"),
-                task_type_max_points=r.get("task__task_type__max_points"),
-            )
-            a = agg.setdefault(n, {"wt": 0.0, "ws": 0.0, "total": 0.0, "correct": 0.0})
-            a["wt"] = float(a["wt"]) + float(weight)
-            a["ws"] = float(a["ws"]) + (float(weight) * float(frac))
-            a["total"] = float(a["total"]) + float(mp)
-            a["correct"] = float(a["correct"]) + float(earned)
         attempts_total = submissions_subject.aggregate(total=models.Count("id"))
         student_total_submissions = int(attempts_total.get("total") or 0)
 
@@ -3306,23 +3264,6 @@ def tutor_dashboard(request):
         max_total = float(pts.get("max_total") or 0.0)
         earned_total = float(pts.get("earned_total") or 0.0)
         student_correct_rate = (earned_total / max_total * 100.0) if max_total > 0 else None
-        numbers = []
-        if active_exam_format:
-            active_exam_format_label = f"{active_exam_format.name} {active_exam_format.year}"
-            numbers = list(
-                TaskType.objects.filter(exam_format=active_exam_format)
-                .values_list("number", flat=True)
-                .order_by("number")
-            )
-            numbers = [int(n) for n in numbers if n is not None]
-        for n in numbers:
-            a = agg.get(int(n))
-            if not a or float(a.get("wt") or 0.0) <= 0:
-                task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': None, 'total': 0, 'correct': 0})
-                continue
-            rate = (float(a["ws"]) / float(a["wt"]) * 100.0) if float(a["wt"]) > 0 else None
-            task_type_rates.append({'number': n, 'name': task_type_name_map.get(n, ''), 'rate': rate, 'total': int(round(float(a["total"]))), 'correct': int(round(float(a["correct"])))})
-
         from core.models import TutorReward
 
         recent_rewards = (

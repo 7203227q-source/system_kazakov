@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from core.dashboard_analytics import build_task_type_rates
 from core.models import ExamFormat, Subject, StudentSubjectProfile, Submission, Task, TaskType, TaskVariant, Topic, User
 
 
@@ -75,4 +76,35 @@ class TutorSolveRateDecayTests(TestCase):
         )
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, ">2<")
-        self.assertContains(res, 'data-rate="33"')
+        self.assertContains(res, 'data-rate="39"')
+
+    def test_tutor_dashboard_uses_shared_task_type_rate_builder(self):
+        task = Task.objects.filter(task_type=self.tt2).first()
+        now = timezone.now()
+        old = now - timezone.timedelta(days=14)
+
+        s_old = Submission.objects.create(student=self.student, task=task, user_answer=task.correct_answer, is_correct=True, score=1)
+        Submission.objects.filter(id=s_old.id).update(created_at=old)
+        s_new = Submission.objects.create(student=self.student, task=task, user_answer="0", is_correct=False, score=0)
+        Submission.objects.filter(id=s_new.id).update(created_at=now)
+
+        expected_rates, expected_label = build_task_type_rates(
+            self.student,
+            subject_id=self.subject.id,
+            exam_format=self.ef_b,
+        )
+
+        self.client.login(username="t", password="pass")
+        res = self.client.get(
+            reverse("tutor_dashboard"),
+            {"student_id": self.student.id, "subject_id": self.subject.id},
+        )
+        self.assertEqual(res.status_code, 200)
+
+        actual = next(item for item in res.context["task_type_rates"] if item["number"] == 2)
+        expected = next(item for item in expected_rates if item["number"] == 2)
+        self.assertEqual(res.context["active_exam_format_label"], expected_label)
+        self.assertEqual(actual["retrospective"], expected["retrospective"])
+        self.assertContains(res, 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3')
+        for days in (50, 32, 16, 8, 4):
+            self.assertContains(res, f">{days}д<")

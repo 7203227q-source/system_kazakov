@@ -440,18 +440,32 @@
                                 <div class="text-xs text-gray-400">0% → 100%</div>
                             </div>
                         </div>
-                        <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                             {% for item in task_type_rates %}
-                            <div class="rounded-lg border border-gray-200 p-2 text-center bg-white task-type-tile" data-rate="{% if item.rate is None %}{% else %}{{ item.rate|floatformat:0 }}{% endif %}" title="{{ item.name|default:'' }}">
+                            <div class="rounded-lg border border-gray-200 p-3 text-center bg-white task-type-tile" data-rate="{% if item.rate is None %}{% else %}{{ item.rate|floatformat:0 }}{% endif %}" title="{{ item.name|default:'' }}">
                                 <div class="text-xs font-black text-gray-800">{{ item.number }}</div>
-                                <div class="text-[10px] text-gray-500 mt-1">
+                                <div class="text-sm font-black text-gray-800 mt-1">
                                     {% if item.rate is None %}
                                         —
                                     {% else %}
                                         {{ item.rate|floatformat:0 }}%
                                     {% endif %}
                                 </div>
-                                <div class="text-[10px] text-gray-400 mt-0.5">{{ item.correct }}/{{ item.total }}</div>
+                                <div class="mt-2 grid grid-cols-5 gap-1">
+                                    {% for point in item.retrospective %}
+                                    <div class="rounded border border-gray-100 bg-gray-50 px-0.5 py-1">
+                                        <div class="text-[8px] font-bold uppercase text-gray-400">{{ point.days_ago }}д</div>
+                                        <div class="text-[9px] font-bold text-gray-600">
+                                            {% if point.rate is None %}
+                                                —
+                                            {% else %}
+                                                {{ point.rate|floatformat:0 }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="text-[10px] text-gray-400 mt-2">{{ item.correct }}/{{ item.total }}</div>
                             </div>
                             {% endfor %}
                         </div>
