@@ -41,13 +41,17 @@
                 {% endif %}
             </div>
             <div class="flex items-center space-x-3 md:space-x-4">
-                <div class="relative hidden sm:block">
+                <form method="GET" class="relative hidden sm:block">
+                    {% if selected_student %}
+                    <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+                    {% endif %}
+                    {% if request.GET.subject_id or chart_subject_id %}
+                    <input type="hidden" name="subject_id" value="{{ request.GET.subject_id|default:chart_subject_id }}">
+                    {% endif %}
+                    <input type="hidden" name="range" value="{{ chart_range|default:30 }}">
                     <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    <input type="text" placeholder="Поиск ученика..." class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent w-48">
-                </div>
-                <button class="bg-primary text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center">
-                    <i class="fas fa-plus md:mr-2"></i> <span class="hidden md:inline">Добавить ученика</span>
-                </button>
+                    <input type="text" name="q" value="{{ search_query }}" placeholder="Поиск ученика..." class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent w-48">
+                </form>
                 <a href="{% url 'logout' %}" class="hidden md:flex text-red-500 hover:text-red-700 ml-2 md:ml-6 items-center font-medium transition" title="Выйти">
                     <i class="fas fa-sign-out-alt text-xl md:mr-2"></i> <span class="hidden md:inline">Выйти</span>
                 </a>
@@ -70,7 +74,7 @@
                 <!-- Student List -->
                 <div class="p-2 space-y-2">
                     {% for student in students %}
-                     <a href="?student_id={{ student.id }}" class="relative block bg-white rounded-xl shadow-sm border {% if selected_student.id == student.id %}border-primary ring-1 ring-primary/20{% else %}border-gray-100{% endif %} hover:shadow-md transition px-3 py-2.5">
+                     <a href="?student_id={{ student.id }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if request.GET.subject_id or chart_subject_id %}&subject_id={{ request.GET.subject_id|default:chart_subject_id }}{% endif %}&range={{ chart_range|default:30 }}" class="relative block bg-white rounded-xl shadow-sm border {% if selected_student.id == student.id %}border-primary ring-1 ring-primary/20{% else %}border-gray-100{% endif %} hover:shadow-md transition px-3 py-2.5">
                          {% if selected_student.id == student.id %}
                          <span class="absolute left-0 top-2.5 bottom-2.5 w-1 bg-primary rounded-r"></span>
                          {% endif %}
@@ -86,7 +90,7 @@
                                      {% if student.subject_profiles.exists %}
                                          {% with total=student.subject_profiles.count %}
                                              {% for profile in student.subject_profiles.all|slice:":2" %}
-                                                <a href="?student_id={{ student.id }}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition {% if selected_student.id == student.id and chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200{% endif %}">
+                                               <a href="?student_id={{ student.id }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition {% if selected_student.id == student.id and chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200{% endif %}">
                                                     {{ profile.subject.name }} · {{ profile.xp|default:0 }} XP
                                                 </a>
                                              {% endfor %}
@@ -113,14 +117,14 @@
                                 {% endif %}
                                 {% if student.pending_extension_requests %}
                                 <div class="mt-1">
-                                    <a href="?student_id={{ student.id }}" class="inline-flex items-center bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">
+                                    <a href="?student_id={{ student.id }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if request.GET.subject_id or chart_subject_id %}&subject_id={{ request.GET.subject_id|default:chart_subject_id }}{% endif %}&range={{ chart_range|default:30 }}" class="inline-flex items-center bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-yellow-200 hover:bg-yellow-200 transition">
                                         Продление: {{ student.pending_extension_requests }}
                                     </a>
                                 </div>
                                 {% endif %}
                                 {% if student.pending_srs_removal_requests %}
                                 <div class="mt-1">
-                                    <a href="?student_id={{ student.id }}" class="inline-flex items-center bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 hover:bg-red-200 transition">
+                                    <a href="?student_id={{ student.id }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if request.GET.subject_id or chart_subject_id %}&subject_id={{ request.GET.subject_id|default:chart_subject_id }}{% endif %}&range={{ chart_range|default:30 }}" class="inline-flex items-center bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 hover:bg-red-200 transition">
                                         Повтор: {{ student.pending_srs_removal_requests }}
                                     </a>
                                 </div>
@@ -133,7 +137,9 @@
                          </div>
                      </a>
                      {% empty %}
-                    <div class="p-4 text-center text-gray-500 text-sm">У вас пока нет учеников.</div>
+                    <div class="p-4 text-center text-gray-500 text-sm">
+                        {% if search_query %}Ученики не найдены{% else %}У вас пока нет учеников.{% endif %}
+                    </div>
                     {% endfor %}
                 </div>
             </div>
@@ -213,7 +219,7 @@
                     <div class="flex flex-wrap items-center justify-end gap-2">
                         <span class="text-xs font-bold text-gray-500 mr-1">Предмет:</span>
                         {% for profile in selected_student.subject_profiles.all %}
-                            <a href="?student_id={{ selected_student.id }}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-3 py-1 rounded-full text-xs font-bold border transition {% if chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200{% endif %}">
+                            <a href="?student_id={{ selected_student.id }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}&subject_id={{ profile.subject.id }}&range={{ chart_range|default:30 }}" class="px-3 py-1 rounded-full text-xs font-bold border transition {% if chart_subject_id == profile.subject.id %}bg-primary text-white border-indigo-600{% else %}bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200{% endif %}">
                                 {{ profile.subject.name }} · {{ profile.xp|default:0 }} XP
                             </a>
                         {% endfor %}
@@ -364,6 +370,9 @@
                             </span>
                             <form method="GET" class="flex flex-wrap items-center gap-2">
                                 <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+                                {% if search_query %}
+                                <input type="hidden" name="q" value="{{ search_query }}">
+                                {% endif %}
                                 {% if chart_subject_id %}
                                 <input type="hidden" name="subject_id" value="{{ chart_subject_id }}">
                                 {% endif %}

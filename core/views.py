@@ -2743,8 +2743,18 @@ def tutor_dashboard(request):
         .annotate(c=Count("id"))
         .values("c")[:1]
     )
+    search_query = (request.GET.get("q") or "").strip()
     students = (
         request.user.students.all()
+        .filter(
+            Q(first_name__icontains=search_query)
+            | Q(last_name__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(username__icontains=search_query)
+        ) if search_query else request.user.students.all()
+    )
+    students = (
+        students
         .prefetch_related('subject_profiles', 'subject_profiles__subject')
         .annotate(
             unread_student_questions=Coalesce(Subquery(unresolved_qs, output_field=IntegerField()), 0),
@@ -3296,6 +3306,7 @@ def tutor_dashboard(request):
         'student_total_submissions': student_total_submissions,
         'student_correct_rate': student_correct_rate,
         'recent_rewards': recent_rewards,
+        'search_query': search_query,
         'profiles': profiles if selected_student else [],
         'available_subjects': available_subjects if selected_student else [],
         'pending_extension_requests': pending_extension_requests if selected_student else [],
