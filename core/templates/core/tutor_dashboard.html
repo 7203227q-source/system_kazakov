@@ -936,7 +936,6 @@
                 const weekly = JSON.parse(weeklyRaw);
                 const wctx = document.getElementById('studentWeeklySolvedChart');
                 if (wctx && weekly && Array.isArray(weekly.labels)) {
-<<<<<<< HEAD
                     const minutes = Array.isArray(weekly.minutes) ? weekly.minutes : [];
                     const minutesPlugin = {
                         id: 'minutesLabels',
@@ -977,10 +976,6 @@
                     new Chart(wctx, {
                         type: 'bar',
                         plugins: [minutesPlugin],
-=======
-                    new Chart(wctx, {
-                        type: 'bar',
->>>>>>> trae/solo-agent-a9Fte2
                         data: {
                             labels: weekly.labels,
                             datasets: [

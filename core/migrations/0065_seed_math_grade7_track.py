@@ -33,15 +33,6 @@ def forwards(apps, schema_editor):
 
 def backwards(apps, schema_editor):
     LearningTrack = apps.get_model("core", "LearningTrack")
-<<<<<<< HEAD
-
-    LearningTrack.objects.filter(
-        mode="school",
-        grade=7,
-        title="Математика, 7 класс",
-        subject__name="Математика",
-    ).delete()
-=======
     CurriculumUnit = apps.get_model("core", "CurriculumUnit")
 
     track_ids = list(
@@ -61,7 +52,6 @@ def backwards(apps, schema_editor):
     with schema_editor.connection.cursor() as cursor:
         cursor.execute(f'DELETE FROM "{cu_table}" WHERE learning_track_id IN ({placeholders})', track_ids)
         cursor.execute(f'DELETE FROM "{lt_table}" WHERE id IN ({placeholders})', track_ids)
->>>>>>> trae/solo-agent-a9Fte2
 
 
 class Migration(migrations.Migration):

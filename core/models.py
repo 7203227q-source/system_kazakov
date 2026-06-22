@@ -123,11 +123,8 @@ class TaskType(models.Model):
     max_points = models.IntegerField(default=1, verbose_name="Максимальный балл")
     is_geometry = models.BooleanField(default=False, verbose_name="Геометрия (для ОГЭ)")
     is_extended_answer = models.BooleanField(default=False, verbose_name="Развёрнутый ответ (часть 2)")
-<<<<<<< HEAD
-=======
     explanation = models.TextField(blank=True, default="", verbose_name="Пояснение (RU)")
     explanation_en = models.TextField(blank=True, default="", verbose_name="Пояснение (EN)")
->>>>>>> trae/solo-agent-a9Fte2
     
     class Meta:
         ordering = ['number']
@@ -161,8 +158,6 @@ class TaskType(models.Model):
             return f"№{n} — {t}"
         return f"№{n}"
 
-<<<<<<< HEAD
-=======
     @property
     def explanation_effective(self):
         subj_name = (getattr(getattr(self.exam_format, "subject", None), "name", "") or "").strip().lower()
@@ -171,8 +166,6 @@ class TaskType(models.Model):
             if v:
                 return v
         return (self.explanation or "").strip()
-
->>>>>>> trae/solo-agent-a9Fte2
 
 class ExamScoreScale(models.Model):
     """
