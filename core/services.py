@@ -119,12 +119,16 @@ def _process_fsrs_review(srs_record, *, grade, active_time_seconds=None, attempt
 
     next_state = review_card(srs_record.fsrs_state, signal)
     due_dt = datetime.fromisoformat(next_state["due"])
+    today = timezone.localdate()
+    due_date = due_dt.date()
+    if due_date <= today:
+        due_date = today + timedelta(days=1)
 
     srs_record.srs_algorithm = "fsrs"
     srs_record.fsrs_state = next_state
     srs_record.last_grade = int(grade)
     srs_record.last_reviewed_at = timezone.now()
-    srs_record.next_review_date = due_dt.date()
+    srs_record.next_review_date = due_date
     srs_record.save(
         update_fields=[
             "srs_algorithm",

@@ -123,6 +123,8 @@ class TaskType(models.Model):
     max_points = models.IntegerField(default=1, verbose_name="Максимальный балл")
     is_geometry = models.BooleanField(default=False, verbose_name="Геометрия (для ОГЭ)")
     is_extended_answer = models.BooleanField(default=False, verbose_name="Развёрнутый ответ (часть 2)")
+    explanation = models.TextField(blank=True, default="", verbose_name="Пояснение (RU)")
+    explanation_en = models.TextField(blank=True, default="", verbose_name="Пояснение (EN)")
     
     class Meta:
         ordering = ['number']
@@ -155,6 +157,15 @@ class TaskType(models.Model):
         if t:
             return f"№{n} — {t}"
         return f"№{n}"
+
+    @property
+    def explanation_effective(self):
+        subj_name = (getattr(getattr(self.exam_format, "subject", None), "name", "") or "").strip().lower()
+        if "англ" in subj_name:
+            v = (self.explanation_en or "").strip()
+            if v:
+                return v
+        return (self.explanation or "").strip()
 
 
 class ExamScoreScale(models.Model):

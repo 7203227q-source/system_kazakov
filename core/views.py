@@ -1597,7 +1597,11 @@ def student_assignment_summary(request, assignment_id):
     if not assignment.is_completed:
         return redirect('student_solve_assignment', assignment_id=assignment.id)
         
-    tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+    tasks = assignment.tasks.select_related(
+        "task_type",
+        "task_type__exam_format",
+        "task_type__exam_format__subject",
+    ).order_by("task_type__number", "id")
     submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
     
     tasks_list = []
@@ -2311,9 +2315,17 @@ def student_history(request):
 
     submissions_qs = (
         Submission.objects.filter(student=request.user)
-        .select_related('task', 'task__topic', 'task__topic__subject', 'assignment')
-        .prefetch_related('comments', 'comments__author')
-        .order_by('-created_at', '-id')
+        .select_related(
+            "task",
+            "task__topic",
+            "task__topic__subject",
+            "task__task_type",
+            "task__task_type__exam_format",
+            "task__task_type__exam_format__subject",
+            "assignment",
+        )
+        .prefetch_related("comments", "comments__author")
+        .order_by("-created_at", "-id")
     )
     if active_subject_id:
         submissions_qs = submissions_qs.filter(task__topic__subject_id=active_subject_id)
@@ -3520,7 +3532,11 @@ def tutor_assignment_view(request, assignment_id):
         assignment.due_is_overdue = False
 
     theme = getattr(request.user, 'preferred_theme', None) or 'classic'
-    tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+    tasks = assignment.tasks.select_related(
+        "task_type",
+        "task_type__exam_format",
+        "task_type__exam_format__subject",
+    ).order_by("task_type__number", "id")
     subs = (
         Submission.objects.filter(assignment=assignment, student=assignment.student, task__in=tasks)
         .select_related('task')
@@ -4029,7 +4045,7 @@ def tutor_create_assignment(request):
                 if t_type_id:
                     allowed_subtypes_by_type.setdefault(int(t_type_id), []).append(subtype_tag)
 
-        task_types = list(TaskType.objects.filter(exam_format=exam_format))
+        task_types = list(TaskType.objects.filter(exam_format=exam_format).select_related("exam_format", "exam_format__subject"))
 
         bundle_task_types = [
             t
@@ -4514,7 +4530,12 @@ def tutor_preview_assignment(request, assignment_id):
     from django.db.models import OuterRef, Subquery
     link_sq = through.objects.filter(assignment_id=assignment.id, task_id=OuterRef('pk')).values('id')[:1]
     tasks_qs = (
-        assignment.tasks.select_related('task_type', 'school_meta__learning_task_type')
+        assignment.tasks.select_related(
+            "task_type",
+            "task_type__exam_format",
+            "task_type__exam_format__subject",
+            "school_meta__learning_task_type",
+        )
         .annotate(_link_id=Subquery(link_sq))
         .order_by('task_type__number', '_link_id')
     )
@@ -4859,7 +4880,7 @@ def tutor_task_bank(request):
         request.user.save(update_fields=['invite_code'])
 
     tasks = (
-        Task.objects.select_related('topic', 'task_type', 'task_type__exam_format')
+        Task.objects.select_related('topic', 'task_type', 'task_type__exam_format', 'task_type__exam_format__subject')
         .prefetch_related('ai_tags')
         .all()
         .order_by('id')
@@ -5866,15 +5887,31 @@ def admin_exam_structure(request):
         task_types = list(TaskType.objects.filter(exam_format=selected_exam_format).order_by("number"))
         changed = 0
         for tt in task_types:
-            raw = request.POST.get(f"name_{tt.id}")
-            if raw is None:
-                continue
-            name = raw.strip()
-            if not name:
-                continue
-            if name != tt.name:
-                tt.name = name
-                tt.save(update_fields=["name"])
+            name_raw = request.POST.get(f"name_{tt.id}")
+            exp_raw = request.POST.get(f"explanation_{tt.id}")
+            exp_en_raw = request.POST.get(f"explanation_en_{tt.id}")
+
+            changed_fields = []
+            if name_raw is not None:
+                name = name_raw.strip()
+                if name and name != tt.name:
+                    tt.name = name
+                    changed_fields.append("name")
+
+            if exp_raw is not None:
+                exp = exp_raw.strip()
+                if exp != (tt.explanation or ""):
+                    tt.explanation = exp
+                    changed_fields.append("explanation")
+
+            if exp_en_raw is not None:
+                exp_en = exp_en_raw.strip()
+                if exp_en != (tt.explanation_en or ""):
+                    tt.explanation_en = exp_en
+                    changed_fields.append("explanation_en")
+
+            if changed_fields:
+                tt.save(update_fields=changed_fields)
                 changed += 1
         messages.success(request, f"Сохранено изменений: {changed}")
         return redirect(f"{reverse('admin_exam_structure')}?exam_format={selected_exam_format.id}")

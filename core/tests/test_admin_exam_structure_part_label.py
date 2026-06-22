@@ -6,7 +6,7 @@ from core.models import Subject, ExamFormat, TaskType, User
 
 class AdminExamStructurePartLabelTests(TestCase):
     def test_part_label_uses_is_extended_answer(self):
-        admin = User.objects.create_user(username="admin1", password="pw", role="admin")
+        admin = User.objects.create_user(username="admin_part_label", password="pw", role="admin")
         subject = Subject.objects.create(name="Физика")
         ef = ExamFormat.objects.create(subject=subject, name="ОГЭ физика (тест)", year=2026, is_active=True)
 
@@ -18,4 +18,3 @@ class AdminExamStructurePartLabelTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Тестовая часть")
         self.assertContains(res, "Развёрнутая часть")
-

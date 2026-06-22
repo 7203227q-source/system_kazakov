@@ -87,6 +87,9 @@
                                         Задание {{ sub.task.fipi_id|default:sub.task.id }}
                                     </h4>
                                     <p class="text-xs text-gray-500">{{ sub.task.topic.name }}</p>
+                                    {% if sub.task.task_type and sub.task.task_type.explanation_effective %}
+                                        <p class="text-xs text-gray-500 mt-1 whitespace-pre-line">{{ sub.task.task_type.explanation_effective }}</p>
+                                    {% endif %}
                                 </div>
                             </div>
                             <span class="text-xs text-gray-400">{{ sub.created_at|date:"d M H:i" }}</span>

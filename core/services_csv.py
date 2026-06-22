@@ -10,7 +10,16 @@ def import_tasks_from_csv(file_obj, exam_format_id):
     Expected CSV columns:
     fipi_id, type_number, subtype_tag, difficulty, correct_answer, theme, content, solution
     """
-    decoded_file = file_obj.read().decode('utf-8')
+    raw = file_obj.read() or b""
+    decoded_file = None
+    for enc in ("utf-8-sig", "utf-8", "cp1251"):
+        try:
+            decoded_file = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if decoded_file is None:
+        decoded_file = raw.decode("utf-8", errors="replace")
     io_string = io.StringIO(decoded_file)
     reader = csv.DictReader(io_string)
 
