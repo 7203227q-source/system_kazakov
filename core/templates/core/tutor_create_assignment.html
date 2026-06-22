@@ -235,7 +235,16 @@
                                 <div class="flex items-center space-x-3 mb-2 sm:mb-0">
                                     <i class="fas fa-chevron-down text-gray-400 transition-transform duration-200 transform -rotate-90 group-chevron w-4 text-center"></i>
                                     <input type="checkbox" class="master-checkbox w-4 h-4 text-primary bg-white border-gray-300 rounded focus:ring-primary" checked onclick="event.stopPropagation(); toggleMasterCheckbox(this)">
+<<<<<<< HEAD
                                     <h4 class="font-bold text-gray-800 text-sm">{{ group.type.label }}</h4>
+=======
+                                    <div class="min-w-0">
+                                        <h4 class="font-bold text-gray-800 text-sm">{{ group.type.label }}</h4>
+                                        {% if group.type and group.type.explanation_effective %}
+                                            <div class="text-xs text-gray-500 mt-1 whitespace-pre-line">{{ group.type.explanation_effective }}</div>
+                                        {% endif %}
+                                    </div>
+>>>>>>> trae/solo-agent-a9Fte2
                                 </div>
                                 <div class="flex items-center space-x-3 header-controls" onclick="event.stopPropagation();">
                                     <span class="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm pointer-events-none hidden sm:inline-block">В базе: {{ group.total_count }}</span>

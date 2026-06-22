@@ -5,7 +5,11 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+<<<<<<< HEAD
 from core.models import Submission, TaskLog, TaskType
+=======
+from core.models import Submission, TaskType
+>>>>>>> trae/solo-agent-a9Fte2
 
 TASK_TYPE_RATE_RETROSPECTIVE_DAYS = (50, 32, 16, 8, 4)
 
@@ -18,6 +22,7 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
         today = timezone.localdate()
 
     start = today - timedelta(days=6)
+<<<<<<< HEAD
     log_qs = (
         TaskLog.objects.filter(
             student=student,
@@ -33,6 +38,8 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
         d = created_at.date()
         seconds_by_day[d] = int(seconds_by_day.get(d, 0)) + int(time_spent or 0)
 
+=======
+>>>>>>> trae/solo-agent-a9Fte2
     qs = (
         Submission.objects.filter(
             student=student,
@@ -72,7 +79,10 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
     labels: list[str] = []
     correct: list[int] = []
     incorrect: list[int] = []
+<<<<<<< HEAD
     minutes: list[int] = []
+=======
+>>>>>>> trae/solo-agent-a9Fte2
 
     for i in range(7):
         day = start + timedelta(days=i)
@@ -87,9 +97,14 @@ def build_weekly_solved_chart_data(student, *, subject_id: int | None, today=Non
             w += float(mp - earned)
         correct.append(int(round(c)))
         incorrect.append(int(round(w)))
+<<<<<<< HEAD
         minutes.append(int(round(float(seconds_by_day.get(day, 0)) / 60.0)))
 
     return json.dumps({"labels": labels, "correct": correct, "incorrect": incorrect, "minutes": minutes})
+=======
+
+    return json.dumps({"labels": labels, "correct": correct, "incorrect": incorrect})
+>>>>>>> trae/solo-agent-a9Fte2
 
 
 def build_submission_summary(student, *, subject_id: int | None) -> dict:

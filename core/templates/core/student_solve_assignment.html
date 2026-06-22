@@ -122,9 +122,18 @@
                 {% for task in tasks %}
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden task-card" data-task-id="{{ task.id }}" id="task_{{ task.id }}">
                     <div class="bg-gray-50 px-6 py-3 border-b border-gray-100 flex justify-between items-center gap-3">
+<<<<<<< HEAD
                         <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">
                             {% if task.task_type %}{{ task.task_type.label }}{% else %}Задача №{{ forloop.counter }}{% endif %}
                         </span>
+=======
+                        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            <div>{% if task.task_type %}{{ task.task_type.label }}{% else %}Задача №{{ forloop.counter }}{% endif %}</div>
+                            {% if task.task_type and task.task_type.explanation_effective %}
+                                <div class="mt-1 text-xs text-gray-500 whitespace-pre-line normal-case font-normal">{{ task.task_type.explanation_effective }}</div>
+                            {% endif %}
+                        </div>
+>>>>>>> trae/solo-agent-a9Fte2
                         <div class="flex items-center gap-2">
                             <button
                                 type="button"

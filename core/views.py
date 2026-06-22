@@ -1597,7 +1597,15 @@ def student_assignment_summary(request, assignment_id):
     if not assignment.is_completed:
         return redirect('student_solve_assignment', assignment_id=assignment.id)
         
+<<<<<<< HEAD
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+=======
+    tasks = assignment.tasks.select_related(
+        "task_type",
+        "task_type__exam_format",
+        "task_type__exam_format__subject",
+    ).order_by("task_type__number", "id")
+>>>>>>> trae/solo-agent-a9Fte2
     submissions = {sub.task_id: sub for sub in Submission.objects.filter(assignment=assignment, student=request.user)}
     
     tasks_list = []
@@ -2311,9 +2319,23 @@ def student_history(request):
 
     submissions_qs = (
         Submission.objects.filter(student=request.user)
+<<<<<<< HEAD
         .select_related('task', 'task__topic', 'task__topic__subject', 'assignment')
         .prefetch_related('comments', 'comments__author')
         .order_by('-created_at', '-id')
+=======
+        .select_related(
+            "task",
+            "task__topic",
+            "task__topic__subject",
+            "task__task_type",
+            "task__task_type__exam_format",
+            "task__task_type__exam_format__subject",
+            "assignment",
+        )
+        .prefetch_related("comments", "comments__author")
+        .order_by("-created_at", "-id")
+>>>>>>> trae/solo-agent-a9Fte2
     )
     if active_subject_id:
         submissions_qs = submissions_qs.filter(task__topic__subject_id=active_subject_id)
@@ -3110,6 +3132,7 @@ def tutor_dashboard(request):
             wd = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
             weekly_labels = [f"{wd[d.weekday()]} {d.strftime('%d.%m')}" for d in day_list]
 
+<<<<<<< HEAD
             from core.models import TaskLog
 
             log_qs = (
@@ -3127,6 +3150,8 @@ def tutor_dashboard(request):
                 d = created_at.date()
                 seconds_by_day[d] = int(seconds_by_day.get(d, 0)) + int(time_spent or 0)
 
+=======
+>>>>>>> trae/solo-agent-a9Fte2
             qs = (
                 Submission.objects.filter(
                     student=selected_student,
@@ -3173,9 +3198,14 @@ def tutor_dashboard(request):
 
             weekly_correct = [int(round(float(by_day.get(d, {}).get("correct", 0.0)))) for d in day_list]
             weekly_incorrect = [int(round(float(by_day.get(d, {}).get("incorrect", 0.0)))) for d in day_list]
+<<<<<<< HEAD
             weekly_minutes = [int(round(float(seconds_by_day.get(d, 0)) / 60.0)) for d in day_list]
             weekly_solved_chart_data = json.dumps(
                 {"labels": weekly_labels, "correct": weekly_correct, "incorrect": weekly_incorrect, "minutes": weekly_minutes},
+=======
+            weekly_solved_chart_data = json.dumps(
+                {"labels": weekly_labels, "correct": weekly_correct, "incorrect": weekly_incorrect},
+>>>>>>> trae/solo-agent-a9Fte2
                 ensure_ascii=False,
             )
 
@@ -3538,7 +3568,15 @@ def tutor_assignment_view(request, assignment_id):
         assignment.due_is_overdue = False
 
     theme = getattr(request.user, 'preferred_theme', None) or 'classic'
+<<<<<<< HEAD
     tasks = assignment.tasks.select_related('task_type').order_by('task_type__number', 'id')
+=======
+    tasks = assignment.tasks.select_related(
+        "task_type",
+        "task_type__exam_format",
+        "task_type__exam_format__subject",
+    ).order_by("task_type__number", "id")
+>>>>>>> trae/solo-agent-a9Fte2
     subs = (
         Submission.objects.filter(assignment=assignment, student=assignment.student, task__in=tasks)
         .select_related('task')
@@ -4047,7 +4085,11 @@ def tutor_create_assignment(request):
                 if t_type_id:
                     allowed_subtypes_by_type.setdefault(int(t_type_id), []).append(subtype_tag)
 
+<<<<<<< HEAD
         task_types = list(TaskType.objects.filter(exam_format=exam_format))
+=======
+        task_types = list(TaskType.objects.filter(exam_format=exam_format).select_related("exam_format", "exam_format__subject"))
+>>>>>>> trae/solo-agent-a9Fte2
 
         bundle_task_types = [
             t
@@ -4532,7 +4574,16 @@ def tutor_preview_assignment(request, assignment_id):
     from django.db.models import OuterRef, Subquery
     link_sq = through.objects.filter(assignment_id=assignment.id, task_id=OuterRef('pk')).values('id')[:1]
     tasks_qs = (
+<<<<<<< HEAD
         assignment.tasks.select_related('task_type', 'school_meta__learning_task_type')
+=======
+        assignment.tasks.select_related(
+            "task_type",
+            "task_type__exam_format",
+            "task_type__exam_format__subject",
+            "school_meta__learning_task_type",
+        )
+>>>>>>> trae/solo-agent-a9Fte2
         .annotate(_link_id=Subquery(link_sq))
         .order_by('task_type__number', '_link_id')
     )
@@ -4877,7 +4928,11 @@ def tutor_task_bank(request):
         request.user.save(update_fields=['invite_code'])
 
     tasks = (
+<<<<<<< HEAD
         Task.objects.select_related('topic', 'task_type', 'task_type__exam_format')
+=======
+        Task.objects.select_related('topic', 'task_type', 'task_type__exam_format', 'task_type__exam_format__subject')
+>>>>>>> trae/solo-agent-a9Fte2
         .prefetch_related('ai_tags')
         .all()
         .order_by('id')
@@ -5884,6 +5939,7 @@ def admin_exam_structure(request):
         task_types = list(TaskType.objects.filter(exam_format=selected_exam_format).order_by("number"))
         changed = 0
         for tt in task_types:
+<<<<<<< HEAD
             raw = request.POST.get(f"name_{tt.id}")
             if raw is None:
                 continue
@@ -5893,6 +5949,33 @@ def admin_exam_structure(request):
             if name != tt.name:
                 tt.name = name
                 tt.save(update_fields=["name"])
+=======
+            name_raw = request.POST.get(f"name_{tt.id}")
+            exp_raw = request.POST.get(f"explanation_{tt.id}")
+            exp_en_raw = request.POST.get(f"explanation_en_{tt.id}")
+
+            changed_fields = []
+            if name_raw is not None:
+                name = name_raw.strip()
+                if name and name != tt.name:
+                    tt.name = name
+                    changed_fields.append("name")
+
+            if exp_raw is not None:
+                exp = exp_raw.strip()
+                if exp != (tt.explanation or ""):
+                    tt.explanation = exp
+                    changed_fields.append("explanation")
+
+            if exp_en_raw is not None:
+                exp_en = exp_en_raw.strip()
+                if exp_en != (tt.explanation_en or ""):
+                    tt.explanation_en = exp_en
+                    changed_fields.append("explanation_en")
+
+            if changed_fields:
+                tt.save(update_fields=changed_fields)
+>>>>>>> trae/solo-agent-a9Fte2
                 changed += 1
         messages.success(request, f"Сохранено изменений: {changed}")
         return redirect(f"{reverse('admin_exam_structure')}?exam_format={selected_exam_format.id}")

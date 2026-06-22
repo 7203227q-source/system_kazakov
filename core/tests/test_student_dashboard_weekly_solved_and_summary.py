@@ -5,7 +5,11 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+<<<<<<< HEAD
 from core.models import ExamFormat, StudentSubjectProfile, Subject, Submission, Task, TaskLog, TaskType, Topic, User
+=======
+from core.models import ExamFormat, StudentSubjectProfile, Subject, Submission, Task, TaskType, Topic, User
+>>>>>>> trae/solo-agent-a9Fte2
 
 
 class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
@@ -42,29 +46,42 @@ class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
         yesterday = today - timedelta(days=1)
         tz = timezone.get_current_timezone()
 
+<<<<<<< HEAD
         d1 = timezone.make_aware(datetime.combine(yesterday, time(10, 0)), tz)
         d2 = timezone.make_aware(datetime.combine(yesterday, time(20, 0)), tz)
 
+=======
+>>>>>>> trae/solo-agent-a9Fte2
         s1 = Submission.objects.create(
             student=self.student,
             task=self.task,
             is_correct=False,
         )
         Submission.objects.filter(id=s1.id).update(
+<<<<<<< HEAD
             created_at=d1,
         )
         l1 = TaskLog.objects.create(student=self.student, task=self.task, submission=s1, time_spent=120)
         TaskLog.objects.filter(id=l1.id).update(created_at=d1)
+=======
+            created_at=timezone.make_aware(datetime.combine(yesterday, time(10, 0)), tz),
+        )
+>>>>>>> trae/solo-agent-a9Fte2
         s2 = Submission.objects.create(
             student=self.student,
             task=self.task,
             is_correct=True,
         )
         Submission.objects.filter(id=s2.id).update(
+<<<<<<< HEAD
             created_at=d2,
         )
         l2 = TaskLog.objects.create(student=self.student, task=self.task, submission=s2, time_spent=300)
         TaskLog.objects.filter(id=l2.id).update(created_at=d2)
+=======
+            created_at=timezone.make_aware(datetime.combine(yesterday, time(20, 0)), tz),
+        )
+>>>>>>> trae/solo-agent-a9Fte2
 
         res = self.client.get(reverse("student_dashboard"), {"subject_id": self.subject.id})
         self.assertEqual(res.status_code, 200)
@@ -76,12 +93,18 @@ class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
         self.assertEqual(len(data["labels"]), 7)
         self.assertEqual(len(data["correct"]), 7)
         self.assertEqual(len(data["incorrect"]), 7)
+<<<<<<< HEAD
         self.assertEqual(len(data["minutes"]), 7)
+=======
+>>>>>>> trae/solo-agent-a9Fte2
 
         idx = data["labels"].index(yesterday.strftime("%d %b"))
         self.assertEqual(int(data["correct"][idx]), 1)
         self.assertEqual(int(data["incorrect"][idx]), 0)
+<<<<<<< HEAD
         self.assertEqual(int(data["minutes"][idx]), 7)
+=======
+>>>>>>> trae/solo-agent-a9Fte2
 
     def test_weekly_chart_uses_scoring_timestamp_for_extended_submissions(self):
         today = timezone.localdate()
@@ -89,7 +112,10 @@ class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
         old_day = today - timedelta(days=10)
         tz = timezone.get_current_timezone()
 
+<<<<<<< HEAD
         scored_at = timezone.make_aware(datetime.combine(yesterday, time(20, 0)), tz)
+=======
+>>>>>>> trae/solo-agent-a9Fte2
         sub = Submission.objects.create(
             student=self.student,
             task=self.task,
@@ -97,10 +123,15 @@ class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
         )
         Submission.objects.filter(id=sub.id).update(
             created_at=timezone.make_aware(datetime.combine(old_day, time(10, 0)), tz),
+<<<<<<< HEAD
             ai_last_verify_at=scored_at,
         )
         log = TaskLog.objects.create(student=self.student, task=self.task, submission=sub, time_spent=180)
         TaskLog.objects.filter(id=log.id).update(created_at=scored_at)
+=======
+            ai_last_verify_at=timezone.make_aware(datetime.combine(yesterday, time(20, 0)), tz),
+        )
+>>>>>>> trae/solo-agent-a9Fte2
 
         res = self.client.get(reverse("student_dashboard"), {"subject_id": self.subject.id})
         self.assertEqual(res.status_code, 200)
@@ -109,7 +140,10 @@ class StudentDashboardWeeklySolvedAndSummaryTests(TestCase):
         idx = data["labels"].index(yesterday.strftime("%d %b"))
         self.assertEqual(int(data["correct"][idx]), 1)
         self.assertEqual(int(data["incorrect"][idx]), 0)
+<<<<<<< HEAD
         self.assertEqual(int(data["minutes"][idx]), 3)
+=======
+>>>>>>> trae/solo-agent-a9Fte2
 
     def test_dashboard_provides_submission_summary_for_active_subject(self):
         Submission.objects.create(student=self.student, task=self.task, is_correct=False)

@@ -288,7 +288,16 @@
                             <div class="flex items-center space-x-3">
                                 <input type="checkbox" name="task_ids" value="{{ task.id }}" class="task-checkbox w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2 mr-2">
                                 <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded">ID: {{ task.fipi_id|default:task.id }}</span>
+<<<<<<< HEAD
                             <h3 class="font-bold text-indigo-900">{{ task.task_type.name|default:"Без типа" }}</h3>
+=======
+                            <div class="min-w-0">
+                                <h3 class="font-bold text-indigo-900">{{ task.task_type.name|default:"Без типа" }}</h3>
+                                {% if task.task_type and task.task_type.explanation_effective %}
+                                    <div class="text-xs text-gray-500 mt-1 whitespace-pre-line">{{ task.task_type.explanation_effective }}</div>
+                                {% endif %}
+                            </div>
+>>>>>>> trae/solo-agent-a9Fte2
                             <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">{{ task.task_type.exam_format.name }}</span>
                             {% if task.subtype_tag %}
                                 <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full"><i class="fas fa-tag mr-1"></i>{{ task.subtype_tag }}</span>

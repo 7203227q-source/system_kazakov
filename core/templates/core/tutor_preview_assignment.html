@@ -77,6 +77,12 @@
                         <span class="text-sm font-bold text-gray-800 mr-2">
                             {% if task.task_type %}№{{ task.task_type.number }}. {{ task.task_type.name }}{% elif task.school_meta_id %}{{ task.school_meta.learning_task_type.name }}{% else %}Задача №{{ forloop.counter }}{% endif %}
                         </span>
+<<<<<<< HEAD
+=======
+                        {% if task.task_type and task.task_type.explanation_effective %}
+                            <div class="text-xs text-gray-500 mt-1 w-full whitespace-pre-line">{{ task.task_type.explanation_effective }}</div>
+                        {% endif %}
+>>>>>>> trae/solo-agent-a9Fte2
                         {% if task.subtype_tag %}
                         <span class="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full">
                             <i class="fas fa-tag mr-1"></i> {{ task.subtype_tag }} (В базе: {{ task.subtype_count }})

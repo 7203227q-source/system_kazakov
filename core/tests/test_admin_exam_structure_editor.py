@@ -21,7 +21,11 @@ class AdminExamStructureEditorTests(TestCase):
 
     def test_admin_can_open_page(self):
         self.client.login(username="a", password="pass")
+<<<<<<< HEAD
         res = self.client.get(reverse("admin_exam_structure"))
+=======
+        res = self.client.get(reverse("admin_exam_structure"), {"exam_format": str(self.ef.id)})
+>>>>>>> trae/solo-agent-a9Fte2
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, self.ef.name)
         self.assertContains(res, "Тестовая часть")
@@ -48,6 +52,11 @@ class AdminExamStructureEditorTests(TestCase):
                 "exam_format_id": str(self.ef.id),
                 f"name_{self.tt1.id}": "Планиметрия",
                 f"name_{self.tt2.id}": "Алгебра",
+<<<<<<< HEAD
+=======
+                f"explanation_{self.tt1.id}": "Пояснение RU",
+                f"explanation_en_{self.tt1.id}": "Explanation EN",
+>>>>>>> trae/solo-agent-a9Fte2
             },
         )
         self.assertEqual(res.status_code, 302)
@@ -55,3 +64,8 @@ class AdminExamStructureEditorTests(TestCase):
         self.tt2.refresh_from_db()
         self.assertEqual(self.tt1.name, "Планиметрия")
         self.assertEqual(self.tt2.name, "Алгебра")
+<<<<<<< HEAD
+=======
+        self.assertEqual(self.tt1.explanation, "Пояснение RU")
+        self.assertEqual(self.tt1.explanation_en, "Explanation EN")
+>>>>>>> trae/solo-agent-a9Fte2

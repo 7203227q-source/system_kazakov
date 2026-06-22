@@ -119,12 +119,23 @@ def _process_fsrs_review(srs_record, *, grade, active_time_seconds=None, attempt
 
     next_state = review_card(srs_record.fsrs_state, signal)
     due_dt = datetime.fromisoformat(next_state["due"])
+<<<<<<< HEAD
+=======
+    today = timezone.localdate()
+    due_date = due_dt.date()
+    if due_date <= today:
+        due_date = today + timedelta(days=1)
+>>>>>>> trae/solo-agent-a9Fte2
 
     srs_record.srs_algorithm = "fsrs"
     srs_record.fsrs_state = next_state
     srs_record.last_grade = int(grade)
     srs_record.last_reviewed_at = timezone.now()
+<<<<<<< HEAD
     srs_record.next_review_date = due_dt.date()
+=======
+    srs_record.next_review_date = due_date
+>>>>>>> trae/solo-agent-a9Fte2
     srs_record.save(
         update_fields=[
             "srs_algorithm",

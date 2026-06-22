@@ -757,6 +757,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const wEl = document.getElementById('weeklySolvedChart');
     if (!wEl) return;
 
+<<<<<<< HEAD
     const minutes = Array.isArray(weekly.minutes) ? weekly.minutes : [];
     const minutesLabelsPlugin = {
         id: 'minutesLabels',
@@ -793,6 +794,10 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(wEl.getContext('2d'), {
         type: 'bar',
         plugins: [minutesLabelsPlugin],
+=======
+    new Chart(wEl.getContext('2d'), {
+        type: 'bar',
+>>>>>>> trae/solo-agent-a9Fte2
         data: {
             labels: weekly.labels,
             datasets: [
