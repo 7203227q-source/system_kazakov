@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import ExamFormat, StudentSubjectProfile, Subject, Submission, Task, TaskType, Topic, User
+from core.models import ExamFormat, StudentSubjectProfile, Subject, Submission, Task, TaskLog, TaskType, Topic, User
 
 
 class TutorDashboardWeeklySolvedChartTests(TestCase):
@@ -28,12 +28,21 @@ class TutorDashboardWeeklySolvedChartTests(TestCase):
         d2 = today - timezone.timedelta(days=2)
 
         s1 = Submission.objects.create(student=student, task=task_a, user_answer="0", is_correct=False, score=0)
-        Submission.objects.filter(id=s1.id).update(created_at=timezone.make_aware(datetime.combine(d2, time(9, 0))))
+        dt1 = timezone.make_aware(datetime.combine(d2, time(9, 0)))
+        Submission.objects.filter(id=s1.id).update(created_at=dt1)
+        l1 = TaskLog.objects.create(student=student, task=task_a, submission=s1, time_spent=120)
+        TaskLog.objects.filter(id=l1.id).update(created_at=dt1)
         s2 = Submission.objects.create(student=student, task=task_a, user_answer="1", is_correct=True, score=1)
-        Submission.objects.filter(id=s2.id).update(created_at=timezone.make_aware(datetime.combine(d2, time(21, 0))))
+        dt2 = timezone.make_aware(datetime.combine(d2, time(21, 0)))
+        Submission.objects.filter(id=s2.id).update(created_at=dt2)
+        l2 = TaskLog.objects.create(student=student, task=task_a, submission=s2, time_spent=300)
+        TaskLog.objects.filter(id=l2.id).update(created_at=dt2)
 
         s3 = Submission.objects.create(student=student, task=task_b, user_answer="0", is_correct=False, score=0)
-        Submission.objects.filter(id=s3.id).update(created_at=timezone.make_aware(datetime.combine(d1, time(22, 0))))
+        dt3 = timezone.make_aware(datetime.combine(d1, time(22, 0)))
+        Submission.objects.filter(id=s3.id).update(created_at=dt3)
+        l3 = TaskLog.objects.create(student=student, task=task_b, submission=s3, time_spent=240)
+        TaskLog.objects.filter(id=l3.id).update(created_at=dt3)
 
         self.client.login(username="t", password="pass")
         res = self.client.get(reverse("tutor_dashboard"), {"student_id": student.id, "subject_id": subj.id})
@@ -52,6 +61,9 @@ class TutorDashboardWeeklySolvedChartTests(TestCase):
         self.assertEqual(data["incorrect"][idx_d2], 0)
         self.assertEqual(data["correct"][idx_d1], 0)
         self.assertEqual(data["incorrect"][idx_d1], 1)
+        self.assertEqual(len(data["minutes"]), 7)
+        self.assertEqual(int(data["minutes"][idx_d2]), 7)
+        self.assertEqual(int(data["minutes"][idx_d1]), 4)
 
     def test_weekly_chart_counts_extended_score_on_scored_at_day(self):
         tutor = User.objects.create_user(username="t", password="pass", role="tutor")
@@ -72,10 +84,13 @@ class TutorDashboardWeeklySolvedChartTests(TestCase):
         tz = timezone.get_current_timezone()
 
         sub = Submission.objects.create(student=student, task=task, is_correct=None, score=2)
+        scored_at = timezone.make_aware(datetime.combine(yesterday, time(18, 0)), tz)
         Submission.objects.filter(id=sub.id).update(
             created_at=timezone.make_aware(datetime.combine(old_day, time(10, 0)), tz),
-            tutor_scored_at=timezone.make_aware(datetime.combine(yesterday, time(18, 0)), tz),
+            tutor_scored_at=scored_at,
         )
+        log = TaskLog.objects.create(student=student, task=task, submission=sub, time_spent=420)
+        TaskLog.objects.filter(id=log.id).update(created_at=scored_at)
 
         self.client.login(username="t", password="pass")
         res = self.client.get(reverse("tutor_dashboard"), {"student_id": student.id, "subject_id": subj.id})
@@ -86,3 +101,5 @@ class TutorDashboardWeeklySolvedChartTests(TestCase):
         idx = next(i for i, x in enumerate(labels) if x.endswith(yesterday.strftime("%d.%m")))
         self.assertEqual(int(data["correct"][idx]), 2)
         self.assertEqual(int(data["incorrect"][idx]), 1)
+        self.assertEqual(len(data["minutes"]), 7)
+        self.assertEqual(int(data["minutes"][idx]), 7)

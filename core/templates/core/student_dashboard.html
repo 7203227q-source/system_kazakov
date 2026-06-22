@@ -757,8 +757,42 @@ document.addEventListener('DOMContentLoaded', function() {
     const wEl = document.getElementById('weeklySolvedChart');
     if (!wEl) return;
 
+    const minutes = Array.isArray(weekly.minutes) ? weekly.minutes : [];
+    const minutesLabelsPlugin = {
+        id: 'minutesLabels',
+        afterDatasetsDraw(chart) {
+            const x = chart.scales && chart.scales.x;
+            const y = chart.scales && chart.scales.y;
+            if (!x || !y) return;
+            if (!chart.data || !Array.isArray(chart.data.labels)) return;
+            if (!chart.chartArea) return;
+
+            const maxI = Math.min(chart.data.labels.length, minutes.length);
+            chart.ctx.save();
+            chart.ctx.textAlign = 'center';
+            chart.ctx.textBaseline = 'bottom';
+            chart.ctx.fillStyle = '#6b7280';
+            chart.ctx.font = '600 10px system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif';
+
+            for (let i = 0; i < maxI; i += 1) {
+                const m = Number(minutes[i] || 0);
+                if (!(m >= 1)) continue;
+                const correct = Number((weekly.correct && weekly.correct[i]) || 0);
+                const incorrect = Number((weekly.incorrect && weekly.incorrect[i]) || 0);
+                const total = (Number.isFinite(correct) ? correct : 0) + (Number.isFinite(incorrect) ? incorrect : 0);
+                const xPos = x.getPixelForTick(i);
+                let yPos = y.getPixelForValue(total) - 6;
+                yPos = Math.max(yPos, chart.chartArea.top + 10);
+                chart.ctx.fillText(`${m} мин`, xPos, yPos);
+            }
+
+            chart.ctx.restore();
+        },
+    };
+
     new Chart(wEl.getContext('2d'), {
         type: 'bar',
+        plugins: [minutesLabelsPlugin],
         data: {
             labels: weekly.labels,
             datasets: [

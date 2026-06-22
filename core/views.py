@@ -3110,6 +3110,23 @@ def tutor_dashboard(request):
             wd = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
             weekly_labels = [f"{wd[d.weekday()]} {d.strftime('%d.%m')}" for d in day_list]
 
+            from core.models import TaskLog
+
+            log_qs = (
+                TaskLog.objects.filter(
+                    student=selected_student,
+                    task__topic__subject_id=chart_subject_id,
+                    created_at__date__gte=start_week,
+                    created_at__date__lte=today,
+                    is_anomaly=False,
+                    time_spent__gt=0,
+                ).values_list("created_at", "time_spent")
+            )
+            seconds_by_day: dict[object, int] = {}
+            for created_at, time_spent in log_qs:
+                d = created_at.date()
+                seconds_by_day[d] = int(seconds_by_day.get(d, 0)) + int(time_spent or 0)
+
             qs = (
                 Submission.objects.filter(
                     student=selected_student,
@@ -3156,8 +3173,9 @@ def tutor_dashboard(request):
 
             weekly_correct = [int(round(float(by_day.get(d, {}).get("correct", 0.0)))) for d in day_list]
             weekly_incorrect = [int(round(float(by_day.get(d, {}).get("incorrect", 0.0)))) for d in day_list]
+            weekly_minutes = [int(round(float(seconds_by_day.get(d, 0)) / 60.0)) for d in day_list]
             weekly_solved_chart_data = json.dumps(
-                {"labels": weekly_labels, "correct": weekly_correct, "incorrect": weekly_incorrect},
+                {"labels": weekly_labels, "correct": weekly_correct, "incorrect": weekly_incorrect, "minutes": weekly_minutes},
                 ensure_ascii=False,
             )
 

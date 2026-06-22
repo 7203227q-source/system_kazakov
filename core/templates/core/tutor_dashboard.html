@@ -936,8 +936,46 @@
                 const weekly = JSON.parse(weeklyRaw);
                 const wctx = document.getElementById('studentWeeklySolvedChart');
                 if (wctx && weekly && Array.isArray(weekly.labels)) {
+                    const minutes = Array.isArray(weekly.minutes) ? weekly.minutes : [];
+                    const minutesPlugin = {
+                        id: 'minutesLabels',
+                        afterDatasetsDraw(chart) {
+                            const x = chart.scales?.x;
+                            const y = chart.scales?.y;
+                            if (!x || !y) return;
+
+                            const labels = chart.data?.labels || [];
+                            const maxI = Math.min(labels.length, minutes.length);
+
+                            chart.ctx.save();
+                            chart.ctx.textAlign = 'center';
+                            chart.ctx.textBaseline = 'bottom';
+                            chart.ctx.fillStyle = '#6B7280';
+                            chart.ctx.font = '600 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"';
+
+                            for (let i = 0; i < maxI; i++) {
+                                const m = Number(minutes[i] || 0);
+                                if (!(m >= 1)) continue;
+
+                                let total = 0;
+                                for (const ds of chart.data.datasets || []) {
+                                    const v = Number(ds?.data?.[i] || 0);
+                                    if (Number.isFinite(v)) total += v;
+                                }
+
+                                const xPos = x.getPixelForTick(i);
+                                let yPos = y.getPixelForValue(total) - 6;
+                                yPos = Math.max(yPos, chart.chartArea.top + 10);
+
+                                chart.ctx.fillText(`${m} мин`, xPos, yPos);
+                            }
+
+                            chart.ctx.restore();
+                        },
+                    };
                     new Chart(wctx, {
                         type: 'bar',
+                        plugins: [minutesPlugin],
                         data: {
                             labels: weekly.labels,
                             datasets: [
